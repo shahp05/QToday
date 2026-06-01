@@ -125,11 +125,13 @@ export default function DemoPage() {
         {/* ── Right: query + results ───────────────────────────────────────── */}
         <section className="demo-right">
 
+          <p className="demo-section-label">Enter a topic name and grade</p>
+
           {/* Query card */}
           <div className="demo-query-card">
             <div className="demo-query-row">
               <div className="demo-field demo-field--grow">
-                <label className="demo-label">Topic or question</label>
+                <label className="demo-label">Topic name</label>
                 <input
                   className="demo-input"
                   type="text"
@@ -144,19 +146,19 @@ export default function DemoPage() {
                 <select className="demo-select" value={grade} onChange={e => setGrade(e.target.value)}>
                   <option value="">—</option>
                   {GRADES.map(g => (
-                    <option key={g} value={g}>Grade {g}</option>
+                    <option key={g} value={g}>{g}</option>
                   ))}
                 </select>
               </div>
+              <button
+                className="demo-fetch-btn"
+                onClick={handleFetch}
+                disabled={!selectedSubject || !grade || loading}
+              >
+                <IconFetch />
+                {loading ? 'Fetching…' : 'Fetch Questions'}
+              </button>
             </div>
-            <button
-              className="demo-fetch-btn"
-              onClick={handleFetch}
-              disabled={!selectedSubject || !grade || loading}
-            >
-              <IconFetch />
-              {loading ? 'Fetching…' : 'Fetch Questions'}
-            </button>
           </div>
 
           {/* Results */}
