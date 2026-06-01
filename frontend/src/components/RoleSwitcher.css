@@ -1,9 +1,6 @@
-/* DEV-only role switcher – floating bottom-right */
+/* DEV-only role switcher – positioned by parent dev-bar */
 .roleswitcher {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  z-index: 9999;
+  position: relative;
   font-family: var(--font-family);
 }
 

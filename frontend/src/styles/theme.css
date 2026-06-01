@@ -18,6 +18,7 @@
   --color-text:         #343434;
   --color-text-light:   #666666;
   --color-text-muted:   #999999;
+  --color-placeholder:  #999999;
   --color-text-on-green:#ffffff;   /* text / icons placed on green background     */
 
   /* Typography – Desktop (default, smaller for precision) */
@@ -46,9 +47,10 @@
   --nav-gap:          28px;
 
   /* Left nav */
-  --leftnav-width:    110px;
+  --leftnav-width:    72px;
   --leftnav-icon-size:22px;
   --leftnav-font-size:var(--font-size-sm);
+  --panel2-width:     300px;
 
   /* Dividers */
   --divider-color:    rgba(255, 255, 255, 0.25);
@@ -94,7 +96,7 @@
     --nav-icon-size:     44px;
     --nav-icon-label:    12px;
     --nav-gap:           20px;
-    --leftnav-width:     72px;   /* icons only on tablet */
+    --leftnav-width:     72px;
     --content-padding-h: 20px;
     --btn-height-sm:     38px;
     --btn-height-md:     46px;

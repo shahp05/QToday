@@ -1,90 +1,96 @@
 import { useState } from 'react'
+import { useUI } from '../../context/UIContext'
+import { SUBJECTS } from './subjectsData'
 import './SubjectsPage.css'
 
-// Subject image imports
-import imgEnglish          from '../../assets/english.webp'
-import imgMaths5           from '../../assets/maths-5.webp'
-import imgMaths12          from '../../assets/maths-12.webp'
-import imgBiology          from '../../assets/biology.webp'
-import imgChemistry        from '../../assets/chemistry.webp'
-import imgPhysics          from '../../assets/physics.webp'
-import imgHistory          from '../../assets/history.webp'
-import imgGeography        from '../../assets/geography.webp'
-import imgCivics           from '../../assets/civics.webp'
-import imgSocialStudies    from '../../assets/social-studies.webp'
-import imgEVS              from '../../assets/EVS.webp'
-import imgEconomics        from '../../assets/economics.webp'
-import imgCommerce         from '../../assets/commerce.webp'
-import imgPoliticalScience from '../../assets/political-science.webp'
-import imgPsychology       from '../../assets/psychology.webp'
-import imgSociology        from '../../assets/sociology.webp'
+const GRADES   = Array.from({ length: 12 }, (_, i) => i + 1)
+const SECTIONS = ['A', 'B', 'C', 'D', 'E']
 
-const SUBJECTS = [
-  { id: 'english',           label: 'English',            img: imgEnglish          },
-  { id: 'maths-5',           label: 'Mathematics (I–V)',  img: imgMaths5           },
-  { id: 'maths-12',          label: 'Mathematics (VI+)',  img: imgMaths12          },
-  { id: 'evs',               label: 'EVS',                img: imgEVS              },
-  { id: 'biology',           label: 'Biology',            img: imgBiology          },
-  { id: 'chemistry',         label: 'Chemistry',          img: imgChemistry        },
-  { id: 'physics',           label: 'Physics',            img: imgPhysics          },
-  { id: 'history',           label: 'History',            img: imgHistory          },
-  { id: 'geography',         label: 'Geography',          img: imgGeography        },
-  { id: 'civics',            label: 'Civics',             img: imgCivics           },
-  { id: 'social-studies',    label: 'Social Studies',     img: imgSocialStudies    },
-  { id: 'economics',         label: 'Economics',          img: imgEconomics        },
-  { id: 'commerce',          label: 'Commerce',           img: imgCommerce         },
-  { id: 'political-science', label: 'Political Science',  img: imgPoliticalScience },
-  { id: 'psychology',        label: 'Psychology',         img: imgPsychology       },
-  { id: 'sociology',         label: 'Sociology',          img: imgSociology        },
-]
-
-function IconArrow() {
+function IconTeacher() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/>
+    <svg width="56" height="56" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 11.55C9.64 9.35 6.48 8 3 8v11c3.48 0 6.64 1.35 9 3.55 2.36-2.19 5.52-3.55 9-3.55V8c-3.48 0-6.64 1.35-9 3.55z"/>
+      <path d="M12 8c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3z"/>
     </svg>
   )
 }
 
-export default function SubjectsPage() {
-  const [selected, setSelected] = useState(null)
+function IconFetch() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12l-5.5-2.5z"/>
+    </svg>
+  )
+}
 
-  const selectedSubject = SUBJECTS.find(s => s.id === selected)
+function SubjectQuery({ subject }) {
+  const [topic,   setTopic]   = useState('')
+  const [grade,   setGrade]   = useState('')
+  const [section, setSection] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  function handleFetch() {
+    if (!topic || !grade) return
+    setLoading(true)
+    setTimeout(() => setLoading(false), 800)
+  }
 
   return (
-    <div className="subjects-page">
-
-      {/* ── Grid ──────────────────────────────────────────────────────────── */}
-      <div className="subjects-grid">
-        {SUBJECTS.map(({ id, label, img }) => (
-          <button
-            key={id}
-            className={`subject-card ${selected === id ? 'subject-card--selected' : ''}`}
-            onClick={() => setSelected(prev => prev === id ? null : id)}
-            aria-pressed={selected === id}
-            aria-label={label}
-          >
-            <div className="subject-card-img">
-              <img src={img} alt={label} draggable={false} />
-            </div>
-            <span className="subject-card-label">{label}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* ── Action bar — appears when a subject is selected ───────────────── */}
-      {selected && (
-        <div className="subjects-action-bar">
-          <span className="subjects-action-name">{selectedSubject?.label}</span>
-          <button
-            className="subjects-action-btn"
-            onClick={() => alert(`Continue with ${selectedSubject?.label} — wired shortly`)}
-          >
-            Continue <IconArrow />
-          </button>
+    <div className="subj-query">
+      <p className="subj-query-prompt">Which topic did you teach today?</p>
+      <div className="subj-query-row">
+        <div className="subj-field subj-field--grow">
+          <input
+            className="subj-input"
+            type="text"
+            placeholder="Topic name?"
+            value={topic}
+            onChange={e => setTopic(e.target.value)}
+          />
         </div>
-      )}
+        <div className="subj-field">
+          <select className={`subj-select ${!grade ? 'subj-select--placeholder' : ''}`} value={grade} onChange={e => setGrade(e.target.value)}>
+            <option value="">Grade?</option>
+            {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
+          </select>
+        </div>
+        <button
+          className="subj-fetch-btn"
+          onClick={handleFetch}
+          disabled={!topic || !grade || loading}
+        >
+          <IconFetch />
+          {loading ? 'Fetching…' : 'Fetch Questions'}
+        </button>
+      </div>
+    </div>
+  )
+}
 
+export default function SubjectsPage() {
+  const { activeSubject } = useUI()
+  const subject = SUBJECTS.find(s => s.id === activeSubject)
+
+  if (!activeSubject) {
+    return (
+      <div className="subjects-detail subjects-detail--empty">
+        <div className="subjects-detail-empty-icon">
+          <IconTeacher />
+        </div>
+        <p className="subjects-detail-empty-text">Select the subject you taught today.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="subjects-detail">
+      <div className="content-card">
+        <div className="subjects-detail-header">
+          <img src={subject?.img} alt={subject?.label} className="subjects-detail-img" draggable={false} />
+          <h2 className="content-card-title">{subject?.label}</h2>
+        </div>
+        <SubjectQuery subject={subject} />
+      </div>
     </div>
   )
 }

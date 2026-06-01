@@ -15,12 +15,18 @@ export const ROLE_LABELS = {
 const UIContext = createContext(null)
 
 export function UIProvider({ children }) {
-  const [activeRole, setActiveRole] = useState(ROLES.SUPER_ADMIN)
-  const [activePage, setActivePage]  = useState(null)   /* null = show intro */
-  const [user, setUser]              = useState(null)
+  const [activeRole, setActiveRole]     = useState(ROLES.SUPER_ADMIN)
+  const [activePage, setActivePage]     = useState(null)
+  const [activeSubject, setActiveSubject] = useState(null)
+  const [user, setUser]                 = useState(null)
 
   return (
-    <UIContext.Provider value={{ activeRole, setActiveRole, activePage, setActivePage, user, setUser }}>
+    <UIContext.Provider value={{
+      activeRole, setActiveRole,
+      activePage, setActivePage,
+      activeSubject, setActiveSubject,
+      user, setUser,
+    }}>
       {children}
     </UIContext.Provider>
   )

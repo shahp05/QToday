@@ -1,3 +1,4 @@
+/* ─── Root layout: three panels ──────────────────────────────────────────── */
 .dashboard {
   height: 100vh;
   box-sizing: border-box;
@@ -6,93 +7,65 @@
   flex-direction: row;
   overflow: hidden;
   padding: 10px;
+  gap: 8px;
 }
 
-/* ─── Top bar — darker shade distinguishes nav chrome from content ────────── */
-.dashboard-topbar {
-  display: flex;
-  align-items: stretch;
-  height: var(--topbar-height);
+/* ─── Panel 1 (icon nav) — handled entirely by LeftNav.css ───────────────── */
+
+/* ─── Panel 2 — subjects list ────────────────────────────────────────────── */
+.dashboard-panel2 {
+  width: var(--panel2-width);
   flex-shrink: 0;
-  background: var(--color-dark);
-  padding: 10px 0;
-  box-sizing: border-box;
-}
-
-/* Logo cell */
-.dashboard-topbar-logo {
-  width: var(--leftnav-width);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-}
-
-/* ─── Logo image ──────────────────────────────────────────────────────────── */
-.dashboard-logo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.dashboard-logo-img {
-  width: 48px;
-  height: 48px;
-  object-fit: contain;
-  border-radius: 50%;
-}
-
-/* ─── Left nav — full height, fixed ──────────────────────────────────────── */
-.dashboard > .leftnav {
-  flex-shrink: 0;
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
   overflow-y: auto;
-  background: var(--color-dark);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0,0,0,0.18) transparent;
 }
 
-/* ─── Right column — top bar + body ──────────────────────────────────────── */
-.dashboard-right {
+.dashboard-panel2::-webkit-scrollbar       { width: 4px; }
+.dashboard-panel2::-webkit-scrollbar-track { background: transparent; }
+.dashboard-panel2::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.18); border-radius: 2px; }
+
+/* ─── Panel 3 — main content ─────────────────────────────────────────────── */
+.dashboard-panel3 {
   flex: 1;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-/* ─── Body row ────────────────────────────────────────────────────────────── */
-.dashboard-body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  align-items: stretch;
-  overflow: hidden;
-}
-
-/* ─── Main content area — only this scrolls ──────────────────────────────── */
-.dashboard-main {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0,0,0,0.18) transparent;
 }
 
-/* ─── Demo trigger button — far right of topbar ──────────────────────────── */
+.dashboard-panel3::-webkit-scrollbar       { width: 4px; }
+.dashboard-panel3::-webkit-scrollbar-track { background: transparent; }
+.dashboard-panel3::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.18); border-radius: 2px; }
+
+/* ─── Dev bar — fixed bottom-right, Demo + RoleSwitcher ──────────────────── */
+.dev-bar {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ─── Demo trigger button ────────────────────────────────────────────────── */
 .demo-trigger {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-left: auto;
-  margin-right: 4px;
+  gap: 5px;
   background: none;
-  border: 1px solid rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.22);
   border-radius: var(--radius-full);
-  color: rgba(255,255,255,0.7);
+  color: rgba(255,255,255,0.70);
   font-family: var(--font-family);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
-  padding: 5px 12px;
+  padding: 4px 12px;
   cursor: pointer;
   transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
   white-space: nowrap;
@@ -104,13 +77,12 @@
   background: rgba(142,235,101,0.08);
 }
 
-/* ─── Reusable white card — for form/data pages ───────────────────────────── */
+/* ─── Reusable white content card ────────────────────────────────────────── */
 .content-card {
   background: var(--color-surface);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
-  padding: var(--content-padding-v) var(--content-padding-h);
-  margin: 10px;
+  padding: 16px 20px;
   flex: 1;
 }
 
