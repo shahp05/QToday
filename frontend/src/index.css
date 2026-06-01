@@ -1,0 +1,44 @@
+@import './styles/theme.css';
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  line-height: var(--line-height-tight);
+  font-weight: var(--font-weight-bold);
+}
+
+p {
+  margin: 0;
+}

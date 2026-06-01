@@ -1,0 +1,58 @@
+.home-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg);
+  padding: 24px;
+}
+
+.home-card {
+  background: var(--color-surface);
+  padding: 3rem 4rem;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+  min-width: 280px;
+}
+
+.home-title {
+  font-family: var(--font-family);
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-green-dark);
+  margin-bottom: 6px;
+}
+
+.home-subtitle {
+  font-family: var(--font-family);
+  font-size: var(--font-size-md);
+  color: var(--color-text-light);
+  margin-bottom: 2rem;
+}
+
+.login-btn {
+  background: var(--color-green-dark);
+  color: var(--color-white);
+  border: none;
+  padding: 0 var(--btn-padding-h);
+  height: var(--btn-height-lg);
+  font-family: var(--font-family);
+  font-size: var(--btn-font-size);
+  font-weight: var(--btn-font-weight);
+  border-radius: var(--btn-radius);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  width: 100%;
+}
+
+.login-btn:hover {
+  background: #0a6a0a;
+}
+
+@media (max-width: 640px) {
+  .home-card {
+    padding: 2rem 1.5rem;
+    width: 100%;
+  }
+}

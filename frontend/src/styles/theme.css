@@ -1,0 +1,125 @@
+/* ─── Design Tokens ───────────────────────────────────────────────────────── */
+:root {
+  /* Colors */
+  --color-bg:           #0F8911;   /* page background – dark green               */
+  --color-bg-accent:    #8EEB65;   /* highlight / badge – lime green              */
+  --color-surface:      #ffffff;   /* content card                                */
+  --color-surface-alt:  #f2f4f7;   /* subtle row / hover background               */
+
+  --color-green-dark:   #0F8911;
+  --color-green-light:  #8EEB65;
+  --color-red:          #D32F2F;
+  --color-yellow:       #F9A825;   /* amber – third traffic-light colour          */
+  --color-dark:         #343434;
+  --color-grey:         #cccccc;
+  --color-grey-light:   #f2f4f7;
+  --color-white:        #ffffff;
+  --color-black:        #000000;
+  --color-text:         #343434;
+  --color-text-light:   #666666;
+  --color-text-muted:   #999999;
+  --color-text-on-green:#ffffff;   /* text / icons placed on green background     */
+
+  /* Typography – Desktop (default, smaller for precision) */
+  --font-family:    'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-size-xs:   10px;
+  --font-size-sm:   11px;
+  --font-size-base: 13px;
+  --font-size-md:   14px;
+  --font-size-lg:   16px;
+  --font-size-xl:   20px;
+  --font-size-2xl:  24px;
+  --font-size-3xl:  30px;
+
+  --font-weight-normal:  400;
+  --font-weight-medium:  500;
+  --font-weight-semibold:600;
+  --font-weight-bold:    700;
+
+  --line-height-tight:  1.2;
+  --line-height-normal: 1.5;
+
+  /* Top nav */
+  --topbar-height:    88px;
+  --nav-icon-size:    40px;
+  --nav-icon-label:   11px;
+  --nav-gap:          28px;
+
+  /* Left nav */
+  --leftnav-width:    110px;
+  --leftnav-icon-size:22px;
+  --leftnav-font-size:var(--font-size-sm);
+
+  /* Dividers */
+  --divider-color:    rgba(255, 255, 255, 0.25);
+
+  /* Layout */
+  --content-padding-h:   32px;
+  --content-padding-v:   28px;
+
+  /* Borders & radius */
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   16px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm:  0 1px 3px rgba(0,0,0,0.12);
+  --shadow-md:  0 4px 12px rgba(0,0,0,0.15);
+  --shadow-lg:  0 8px 24px rgba(0,0,0,0.20);
+
+  /* Transitions */
+  --transition-fast:   150ms ease;
+  --transition-normal: 250ms ease;
+
+  /* Buttons (shared baseline – extend per variant in components) */
+  --btn-height-sm:  32px;
+  --btn-height-md:  40px;
+  --btn-height-lg:  48px;
+  --btn-radius:     var(--radius-sm);
+  --btn-font-size:  var(--font-size-md);
+  --btn-font-weight:var(--font-weight-semibold);
+  --btn-padding-h:  20px;
+}
+
+/* ─── Tablet ──────────────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  :root {
+    --font-size-xs:      12px;
+    --font-size-sm:      13px;
+    --font-size-base:    15px;
+    --font-size-md:      16px;
+    --font-size-lg:      18px;
+    --topbar-height:     80px;
+    --nav-icon-size:     44px;
+    --nav-icon-label:    12px;
+    --nav-gap:           20px;
+    --leftnav-width:     72px;   /* icons only on tablet */
+    --content-padding-h: 20px;
+    --btn-height-sm:     38px;
+    --btn-height-md:     46px;
+    --btn-height-lg:     54px;
+    --btn-font-size:     var(--font-size-lg);
+  }
+}
+
+/* ─── Mobile ──────────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  :root {
+    --font-size-xs:      13px;
+    --font-size-sm:      14px;
+    --font-size-base:    16px;
+    --font-size-md:      17px;
+    --font-size-lg:      20px;
+    --topbar-height:     64px;
+    --nav-icon-size:     36px;
+    --nav-icon-label:    11px;
+    --nav-gap:           12px;
+    --leftnav-width:     0px;   /* hidden on mobile */
+    --content-padding-h: 16px;
+    --content-padding-v: 20px;
+    --btn-height-sm:     44px;
+    --btn-height-md:     50px;
+    --btn-height-lg:     58px;
+  }
+}

@@ -1,0 +1,87 @@
+/* DEV-only role switcher – floating bottom-right */
+.roleswitcher {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9999;
+  font-family: var(--font-family);
+}
+
+.roleswitcher-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-dark);
+  color: var(--color-white);
+  border: none;
+  border-radius: var(--radius-full);
+  padding: 6px 14px 6px 8px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  transition: background var(--transition-fast);
+}
+
+.roleswitcher-trigger:hover {
+  background: #555;
+}
+
+.roleswitcher-badge {
+  background: var(--color-yellow);
+  color: var(--color-dark);
+  border-radius: var(--radius-full);
+  padding: 2px 6px;
+  font-size: 9px;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.05em;
+}
+
+.roleswitcher-current {
+  color: #ccc;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Dropdown */
+.roleswitcher-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+  background: var(--color-white);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  min-width: 180px;
+  border: 1px solid var(--color-grey-light);
+}
+
+.roleswitcher-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.roleswitcher-option:hover {
+  background: var(--color-grey-light);
+}
+
+.roleswitcher-option--active {
+  color: var(--color-green-dark);
+  font-weight: var(--font-weight-semibold);
+}
+
+.roleswitcher-option svg {
+  flex-shrink: 0;
+  color: var(--color-green-dark);
+}
