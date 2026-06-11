@@ -4,6 +4,7 @@ import IntroMessage from '../components/IntroMessage'
 import StudentsEmpty from './students/StudentsEmpty'
 import SubjectsList from './subjects/SubjectsList'
 import SubjectsPage from './subjects/SubjectsPage'
+import TeachTodayPage from './subjects/TeachTodayPage'
 import { useUI } from '../context/UIContext'
 import { useNavigate } from 'react-router-dom'
 import './Dashboard.css'
@@ -23,8 +24,9 @@ const PAGE_TITLES = {
 
 function PageContent({ activePage }) {
   switch (activePage) {
-    case 'students': return <StudentsEmpty />
-    case 'subjects': return <SubjectsPage />
+    case 'students':  return <StudentsEmpty />
+    case 'subjects':  return <SubjectsPage />
+    case 'subjects2': return <TeachTodayPage />
     default:
       return (
         <div className="content-card">

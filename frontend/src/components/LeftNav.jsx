@@ -45,10 +45,11 @@ function IconLogout() {
 }
 
 const NAV_ITEMS = [
-  { id: 'subjects', label: 'Subjects', Icon: IconSubjects },
-  { id: 'students', label: 'Students', Icon: IconStudents },
-  { id: 'teachers', label: 'Teachers', Icon: IconTeachers },
-  { id: 'account',  label: 'Account',  Icon: IconAccount  },
+  { id: 'subjects',  label: 'Subjects',  Icon: IconSubjects },
+  { id: 'subjects2', label: 'Subjects',  Icon: IconSubjects },
+  { id: 'students',  label: 'Students',  Icon: IconStudents },
+  { id: 'teachers',  label: 'Teachers',  Icon: IconTeachers },
+  { id: 'account',   label: 'Account',   Icon: IconAccount  },
 ]
 
 const INFO_ITEMS = [
