@@ -1,15 +1,52 @@
-from fastapi import FastAPI
+import jobs.app  # noqa: F401 — sets the Windows-compatible asyncio event loop
+                 # policy (SelectorEventLoop) before uvicorn creates its loop;
+                 # psycopg3 async mode can't use Windows' default ProactorEventLoop.
+import traceback
+
+from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+
+from db.database import SessionLocal, get_db
+from errors.error_codes import ErrorCode
+from routers import error_logs, qa
+from services.error_log_service import log_error
 
 app = FastAPI(title="QToday API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # React dev server
+    allow_origins=["http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(qa.router)
+app.include_router(error_logs.router)
+
+
+@app.exception_handler(Exception)
+async def log_unhandled_exceptions(request: Request, exc: Exception):
+    """Global safety net — any exception a route handler doesn't catch and
+    log explicitly still ends up in error_logs, with type="api". Handlers
+    can still call log_error() directly for expected/handled error
+    conditions with more specific codes and context."""
+    db = SessionLocal()
+    try:
+        log_error(
+            db,
+            type="api",
+            error_code=ErrorCode.UNKNOWN_ERROR,
+            description=str(exc),
+            stack_trace=traceback.format_exc(),
+            context={"path": str(request.url.path), "method": request.method},
+        )
+    finally:
+        db.close()
+    return JSONResponse(status_code=500, content={"detail": "An unexpected error occurred."})
 
 
 @app.get("/")
@@ -18,5 +55,6 @@ def root():
 
 
 @app.get("/api/health")
-def health():
-    return {"status": "ok"}
+def health(db: Session = Depends(get_db)):
+    db.execute(text("SELECT 1"))
+    return {"status": "ok", "db": "connected"}
