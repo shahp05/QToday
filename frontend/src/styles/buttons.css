@@ -1,0 +1,185 @@
+/* ─── Global Button System ─────────────────────────────────────────────────
+   Usage:  className="btn btn-{variant} btn-{size}"
+
+   Variants:  btn-primary | btn-accent | btn-dark | btn-outline | btn-ghost | btn-danger
+   Sizes:     btn-sm | btn-md | btn-lg   (defaults to md if omitted)
+   Special:   btn-link (text/underline, no bg)
+   Width:     btn-full (100% width)
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* ── Base ──────────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-family);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  text-decoration: none;
+  transition:
+    background    var(--transition-fast),
+    color         var(--transition-fast),
+    border-color  var(--transition-fast),
+    transform     var(--transition-fast),
+    box-shadow    var(--transition-fast),
+    opacity       var(--transition-fast);
+}
+
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: 0.40;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ── Sizes ─────────────────────────────────────────────────────────────────── */
+.btn-sm {
+  height: var(--btn-height-sm);
+  padding: 0 14px;
+  font-size: var(--font-size-sm);
+  border-radius: var(--radius-sm);
+}
+
+.btn-md,
+.btn:not(.btn-sm):not(.btn-lg):not(.btn-link) {
+  height: var(--btn-height-md);
+  padding: 0 var(--btn-padding-h);
+  font-size: var(--btn-font-size);
+  border-radius: var(--radius-sm);
+}
+
+.btn-lg {
+  height: var(--btn-height-lg);
+  padding: 0 var(--btn-padding-h);
+  font-size: var(--btn-font-size);
+  border-radius: var(--radius-sm);
+}
+
+/* ── Width modifier ────────────────────────────────────────────────────────── */
+.btn-full {
+  width: 100%;
+}
+
+/* ── Variant: primary (green — main CTA on white backgrounds) ─────────────── */
+.btn-primary {
+  background: var(--color-green-dark);
+  color: var(--color-white);
+  border: none;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #0c7a0d;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(15, 137, 17, 0.30);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* ── Variant: accent (lime pill — highlighted CTA, onboarding) ────────────── */
+.btn-accent {
+  background: var(--color-green-light);
+  color: var(--color-dark);
+  border: none;
+  border-radius: var(--radius-full) !important;  /* always pill */
+}
+
+.btn-accent:hover:not(:disabled) {
+  background: #7ade56;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(142, 235, 101, 0.45);
+}
+
+.btn-accent:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* ── Variant: dark (dark bg — CTA on coloured/green backgrounds) ──────────── */
+.btn-dark {
+  background: var(--color-dark);
+  color: var(--color-white);
+  border: none;
+}
+
+.btn-dark:hover:not(:disabled) {
+  background: #222222;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.btn-dark:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* ── Variant: outline (green border, no fill — secondary alongside primary) ── */
+.btn-outline {
+  background: transparent;
+  color: var(--color-green-dark);
+  border: 1.5px solid var(--color-green-dark);
+}
+
+.btn-outline:hover:not(:disabled) {
+  background: rgba(15, 137, 17, 0.06);
+  transform: translateY(-1px);
+}
+
+.btn-outline:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* ── Variant: ghost (grey border — dismiss / cancel / low-emphasis) ────────── */
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text);
+  border: 1.5px solid var(--color-grey);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  border-color: #aaaaaa;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+/* ── Variant: danger (red — destructive actions only) ─────────────────────── */
+.btn-danger {
+  background: var(--color-red);
+  color: var(--color-white);
+  border: none;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #b71c1c;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(211, 47, 47, 0.35);
+}
+
+.btn-danger:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* ── Variant: link (no bg/border — inline text action, underlined) ─────────── */
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--color-green-dark);
+  font-size: inherit;
+  font-weight: var(--font-weight-semibold);
+  padding: 0;
+  height: auto;
+  border-radius: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  letter-spacing: 0;
+}
+
+.btn-link:hover:not(:disabled) {
+  color: #0a6a0a;
+}

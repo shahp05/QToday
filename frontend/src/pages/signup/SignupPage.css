@@ -1,0 +1,411 @@
+/* ── Page shell ────────────────────────────────────────────────────────────── */
+.su-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg);
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── Decorative blobs ─────────────────────────────────────────────────────── */
+.su-bg-decoration {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.su-blob {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.18;
+  background: var(--color-green-light);
+}
+
+.su-blob--1 {
+  width: 420px;
+  height: 420px;
+  top: -120px;
+  right: -100px;
+}
+
+.su-blob--2 {
+  width: 300px;
+  height: 300px;
+  bottom: -80px;
+  left: -80px;
+}
+
+/* ── Card ─────────────────────────────────────────────────────────────────── */
+.su-card {
+  position: relative;
+  z-index: 1;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-width: 560px;
+  overflow: hidden;   /* clips the ghost logo and header band cleanly */
+}
+
+/* ── Green header band ────────────────────────────────────────────────────── */
+.su-card-header {
+  background: var(--color-dark);
+  padding: 24px 40px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Ghost logo — top-right of header */
+.su-logo-ghost {
+  position: absolute;
+  right: -24px;
+  top: -24px;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  object-fit: cover;
+  opacity: 0.60;
+  pointer-events: none;
+}
+
+.su-title-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  position: relative;   /* sits above the ghost */
+}
+
+.su-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-white);
+  margin: 0;
+  line-height: var(--line-height-tight);
+}
+
+.su-subtitle {
+  font-size: var(--font-size-sm);
+  color: rgba(255, 255, 255, 0.70);
+  margin: 0;
+}
+
+/* ── Form body (white area below the header) ──────────────────────────────── */
+.su-form {
+  padding: 28px 40px 8px;
+}
+
+/* ── Form grid ────────────────────────────────────────────────────────────── */
+.su-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: end;
+  gap: 14px 20px;
+  margin-bottom: 18px;
+}
+
+/* ── Field ────────────────────────────────────────────────────────────────── */
+.su-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.su-field--full {
+  grid-column: 1 / -1;
+}
+
+.su-label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+.su-required {
+  color: var(--color-red);
+  margin-left: 2px;
+}
+
+/* ── Inputs ───────────────────────────────────────────────────────────────── */
+.su-input {
+  height: var(--btn-height-md);
+  padding: 0 12px;
+  border: 1.5px solid var(--color-grey);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+  background: var(--color-surface);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  width: 100%;
+  outline: none;
+}
+
+.su-input::placeholder {
+  color: var(--color-placeholder);
+}
+
+.su-input:focus {
+  border-color: var(--color-green-dark);
+  box-shadow: 0 0 0 3px rgba(15, 137, 17, 0.12);
+}
+
+.su-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+  cursor: pointer;
+}
+
+/* ── Error banner ─────────────────────────────────────────────────────────── */
+.su-error {
+  font-size: var(--font-size-sm);
+  color: var(--color-red);
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  background: #fdecea;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--color-red);
+}
+
+/* ── Info / error message (verify step) ──────────────────────────────────── */
+.su-msg {
+  font-size: var(--font-size-sm);
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+}
+
+.su-msg--error {
+  color: var(--color-red);
+  background: #fdecea;
+  border-left: 3px solid var(--color-red);
+}
+
+.su-msg--info {
+  color: var(--color-green-dark);
+  background: #e8f5e9;
+  border-left: 3px solid var(--color-green-dark);
+}
+
+/* ── Button row ───────────────────────────────────────────────────────────── */
+.su-btn-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0;
+}
+
+/* ── CTA pill button ──────────────────────────────────────────────────────── */
+.su-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px;
+  gap: 10px;
+  background: var(--color-dark);
+  color: var(--color-white);
+  border: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  font-family: var(--font-family);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-normal);
+  white-space: nowrap;
+  width: 100%;
+  transition: background var(--transition-fast), transform var(--transition-fast),
+              box-shadow var(--transition-fast);
+}
+
+.su-cta-btn:hover:not(:disabled) {
+  background: #222222;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.30);
+}
+
+.su-cta-btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.su-cta-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.su-cta-icon {
+  background: var(--color-green-light);
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 4px;
+}
+
+.su-cta-icon svg {
+  width: 24px;
+  height: 24px;
+  stroke: var(--color-dark);
+  fill: none;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.su-cta-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 0;
+  line-height: 1;
+}
+
+.su-cta-spacer {
+  width: 32px;   /* 24px svg + 4px×2 padding */
+  flex-shrink: 0;
+}
+
+@media (max-width: 1024px) {
+  .su-cta-icon svg {
+    width: 28px;
+    height: 28px;
+  }
+
+  .su-cta-spacer {
+    width: 36px;   /* 28px svg + 4px×2 padding */
+  }
+}
+
+/* ── Login link row ───────────────────────────────────────────────────────── */
+.su-login-link {
+  text-align: center;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  padding: 0 40px 24px;
+}
+
+
+/* ── OTP step ─────────────────────────────────────────────────────────────── */
+.su-otp-wrap {
+  margin-bottom: 20px;
+}
+
+.su-otp-input {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 10px;
+  text-align: center;
+  height: 64px;
+  color: var(--color-green-dark);
+}
+
+.su-input--expired {
+  border-color: var(--color-grey);
+  color: var(--color-text-muted);
+  background: var(--color-grey-light);
+}
+
+.su-timer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin-top: 8px;
+}
+
+.su-timer--expired {
+  color: var(--color-red);
+}
+
+.su-timer-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-green-light);
+  animation: su-pulse 1s infinite;
+}
+
+.su-timer-dot--warn {
+  background: var(--color-red);
+}
+
+@keyframes su-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+/* ── Success splash ───────────────────────────────────────────────────────── */
+.su-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 32px;
+  padding-bottom: 16px;
+}
+
+.su-success-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--color-green-dark);
+  color: var(--color-white);
+  font-size: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  box-shadow: 0 0 0 6px rgba(15, 137, 17, 0.12);
+}
+
+.su-success-name {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  margin: 0 0 4px;
+}
+
+.su-success-org {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .su-card-header {
+    padding: 20px 24px;
+  }
+
+  .su-form {
+    padding: 24px 24px 8px;
+  }
+
+  .su-login-link {
+    padding: 0 24px 20px;
+  }
+
+  .su-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .su-field,
+  .su-field--full {
+    grid-column: 1;
+  }
+
+  .su-blob--1 {
+    width: 220px;
+    height: 220px;
+  }
+
+  .su-blob--2 {
+    width: 160px;
+    height: 160px;
+  }
+}

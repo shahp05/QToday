@@ -612,5 +612,36 @@ INSERT INTO app_settings (setting_key, setting_value, description) VALUES
     ('rest_countries_api_url',      '"https://api.worldbank.org/v2/country?format=json&per_page=300"', 'External source for the country_list background job (World Bank — free, no key; REST Countries deprecated its free tier)'),
     ('error_log_soft_delete_after_days', '90', 'Age in days after which error_logs rows are marked date_deleted by the purge-mark job'),
     ('error_log_purge_grace_days',  '30',   'Days after date_deleted before error_logs rows are physically deleted by the purge-delete job'),
-    ('batch_request_types',         '{"country_list":{"interval_days":90},"qa_generation":{},"qa_verification":{},"qa_scoring":{},"qa_time_recalibration":{"interval_days":7},"error_log_purge_mark":{"interval_days":1},"error_log_purge_delete":{"interval_days":1}}', 'Valid batch_jobs.request_type values and their default run interval where applicable')
+    ('batch_request_types',         '{"country_list":{"interval_days":90},"qa_generation":{},"qa_verification":{},"qa_scoring":{},"qa_time_recalibration":{"interval_days":7},"error_log_purge_mark":{"interval_days":1},"error_log_purge_delete":{"interval_days":1}}', 'Valid batch_jobs.request_type values and their default run interval where applicable'),
+    ('signup_verification_ttl_seconds', '60',  'Seconds before a signup email verification code expires'),
+    ('signup_verification_max_attempts', '5',  'Max wrong-code attempts before the code is invalidated and a new one must be requested')
 ON CONFLICT (setting_key) DO NOTHING;
+
+
+-- ------------------------------------------------------------
+-- 21. SIGNUP_VERIFICATIONS  (ephemeral — pending email verifs)
+--
+--   payload  : JSONB snapshot of the signup form so /verify can
+--              create customer+user without a session store.
+--   attempt_count : incremented on each wrong guess; locked out
+--                   once it hits signup_verification_max_attempts.
+--   expires_at    : NOW() + signup_verification_ttl_seconds at
+--                   insert time.
+--   No date_modified / is_active — rows are write-once after
+--   creation except is_verified and attempt_count.
+--   Cleanup: a background job or lazy prune on insert removes
+--   rows where expires_at < NOW() - interval '1 day'.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS signup_verifications (
+    verification_id   SERIAL          PRIMARY KEY,
+    email_id          VARCHAR(200)    NOT NULL,
+    code              VARCHAR(10)     NOT NULL,
+    payload           JSONB           NOT NULL,
+    attempt_count     SMALLINT        NOT NULL DEFAULT 0,
+    expires_at        TIMESTAMP       NOT NULL,
+    is_verified       BOOLEAN         NOT NULL DEFAULT FALSE,
+    date_created      TIMESTAMP       NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_signup_verif_email
+    ON signup_verifications (email_id, is_verified, expires_at);

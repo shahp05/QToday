@@ -1,4 +1,5 @@
 @import './styles/theme.css';
+@import './styles/buttons.css';
 
 *, *::before, *::after {
   box-sizing: border-box;

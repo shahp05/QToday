@@ -50,6 +50,28 @@
   background: #0a6a0a;
 }
 
+.home-signup-link {
+  margin-top: 16px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.home-link-btn {
+  background: none;
+  border: none;
+  color: var(--color-green-dark);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.home-link-btn:hover {
+  color: #0a6a0a;
+}
+
 @media (max-width: 640px) {
   .home-card {
     padding: 2rem 1.5rem;

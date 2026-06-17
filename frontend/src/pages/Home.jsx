@@ -12,6 +12,12 @@ export default function Home() {
         <button className="login-btn" onClick={() => navigate('/dashboard')}>
           Login
         </button>
+        <p className="home-signup-link">
+          New here?{' '}
+          <button className="home-link-btn" onClick={() => navigate('/signup')}>
+            Create an account
+          </button>
+        </p>
       </div>
     </div>
   )
