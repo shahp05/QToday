@@ -26,7 +26,7 @@ const PAGE_TITLES = {
 function StudentsIntro() {
   return (
     <div className="students-intro">
-      <p>Use xlsx to add students any time. Accounts for new students will be created automatically as <code>id@acronym</code>. When they move to the next grade, simply upload a new xlsx with their next grade.</p>
+      <p>Use xlsx to add students. Login accounts for new students will be automatically created as <code>id@acronym</code> with the same default password. When they move to the next grade, simply upload a new xlsx with their next grade.</p>
     </div>
   )
 }
