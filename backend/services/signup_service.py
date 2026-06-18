@@ -134,8 +134,8 @@ def verify_and_create(db: Session, email: str, code: str) -> dict:
     else:
         board_id = db.execute(
             text(
-                "INSERT INTO boards (board_name, board_code, country_id) "
-                "VALUES (:n, :c, :cid) RETURNING board_id"
+                "INSERT INTO boards (board_name, board_code, country_id, is_active) "
+                "VALUES (:n, :c, :cid, TRUE) RETURNING board_id"
             ),
             {"n": p["board_name"], "c": p["board_name"][:20].upper(), "cid": country_id},
         ).scalar()

@@ -435,41 +435,6 @@
   50%       { opacity: 0.3; }
 }
 
-/* ── Success splash ───────────────────────────────────────────────────────── */
-.su-success {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding-top: 32px;
-  padding-bottom: 16px;
-}
-
-.su-success-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background: var(--color-green-dark);
-  color: var(--color-white);
-  font-size: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 16px;
-  box-shadow: 0 0 0 6px rgba(15, 137, 17, 0.12);
-}
-
-.su-success-name {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
-  margin: 0 0 4px;
-}
-
-.su-success-org {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-  margin: 0;
-}
 
 /* ── Tablet: full-screen card, no backdrop, 2-col grid kept ──────────────── */
 @media (max-width: 768px) {

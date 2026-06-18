@@ -42,6 +42,29 @@
 .dashboard-panel3::-webkit-scrollbar-track { background: transparent; }
 .dashboard-panel3::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.18); border-radius: 2px; }
 
+/* ─── Students intro (panel 3, no card) ─────────────────────────────────── */
+.students-intro {
+  padding: 28px 32px;
+  max-width: 520px;
+}
+
+.students-intro p {
+  font-family: var(--font-family);
+  font-size: var(--font-size-md);
+  color: rgba(255, 255, 255, 0.80);
+  line-height: 1.7;
+  margin: 0;
+}
+
+.students-intro code {
+  font-family: 'Consolas', 'Menlo', monospace;
+  font-size: var(--font-size-sm);
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--color-green-light);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
 /* ─── Dev bar — fixed bottom-right, Demo + RoleSwitcher ──────────────────── */
 .dev-bar {
   position: fixed;

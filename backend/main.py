@@ -35,7 +35,12 @@ async def log_unhandled_exceptions(request: Request, exc: Exception):
     """Global safety net — any exception a route handler doesn't catch and
     log explicitly still ends up in error_logs, with type="api". Handlers
     can still call log_error() directly for expected/handled error
-    conditions with more specific codes and context."""
+    conditions with more specific codes and context.
+
+    This handler runs inside ServerErrorMiddleware, which is OUTSIDE the
+    CORSMiddleware layer, so we must add the CORS header manually to avoid
+    browsers receiving a cross-origin response with no Allow-Origin header
+    (which the Fetch API surfaces as a TypeError: Failed to fetch)."""
     db = SessionLocal()
     try:
         log_error(
@@ -46,9 +51,17 @@ async def log_unhandled_exceptions(request: Request, exc: Exception):
             stack_trace=traceback.format_exc(),
             context={"path": str(request.url.path), "method": request.method},
         )
+    except Exception:
+        pass
     finally:
         db.close()
-    return JSONResponse(status_code=500, content={"detail": "An unexpected error occurred."})
+    origin = request.headers.get("origin", "")
+    headers = {"Access-Control-Allow-Origin": origin} if origin else {}
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An unexpected error occurred."},
+        headers=headers,
+    )
 
 
 @app.get("/")

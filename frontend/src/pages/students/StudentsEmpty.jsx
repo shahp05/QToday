@@ -3,28 +3,13 @@ import './StudentsEmpty.css'
 
 const COLUMNS = ['ID', 'Name', 'Grade', 'Section', 'Parent 1 Email', 'Parent 2 Email']
 
-const RULES = [
-  { text: <>Student and parent accounts are <strong>created automatically</strong></> },
-  { text: <>Default student login &amp; password: <code>ID@school</code></> },
-  { text: <>Default parent login &amp; password: <code>their email address</code></> },
-  { text: <>Re-uploading updates grades and details — existing accounts are preserved</> },
-]
-
 function IconUpload() {
   return (
-    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor"
       strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
       <polyline points="17 8 12 3 7 8"/>
       <line x1="12" y1="3" x2="12" y2="15"/>
-    </svg>
-  )
-}
-
-function IconCheck() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
     </svg>
   )
 }
@@ -41,11 +26,6 @@ export default function StudentsEmpty() {
       return
     }
     setSelectedFile(file)
-    // TODO: wire to upload API
-  }
-
-  function onInputChange(e) {
-    handleFile(e.target.files[0])
   }
 
   function onDrop(e) {
@@ -57,7 +37,6 @@ export default function StudentsEmpty() {
   return (
     <div className="students-empty">
 
-      {/* ── Upload zone ──────────────────────────────────────────────────── */}
       <div
         className={`upload-zone ${dragging ? 'upload-zone--drag' : ''} ${selectedFile ? 'upload-zone--ready' : ''}`}
         onClick={() => fileRef.current.click()}
@@ -69,11 +48,9 @@ export default function StudentsEmpty() {
         onKeyDown={e => e.key === 'Enter' && fileRef.current.click()}
         aria-label="Upload student list"
       >
-        <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={onInputChange} hidden />
+        <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={e => handleFile(e.target.files[0])} hidden />
 
-        <div className="upload-zone-icon">
-          <IconUpload />
-        </div>
+        <div className="upload-zone-icon"><IconUpload /></div>
 
         {selectedFile ? (
           <>
@@ -82,13 +59,12 @@ export default function StudentsEmpty() {
           </>
         ) : (
           <>
-            <p className="upload-zone-title">Drop your student list here</p>
-            <p className="upload-zone-sub">or <span className="upload-zone-link">browse files</span> — .xlsx only</p>
+            <p className="upload-zone-title">Drop student list here</p>
+            <p className="upload-zone-sub">or <span className="upload-zone-link">browse</span> — .xlsx only</p>
           </>
         )}
       </div>
 
-      {/* ── Actions ──────────────────────────────────────────────────────── */}
       <div className="upload-actions">
         {selectedFile && (
           <button className="btn-upload" onClick={() => alert('Upload wired to API shortly')}>
@@ -100,7 +76,6 @@ export default function StudentsEmpty() {
         </button>
       </div>
 
-      {/* ── Required columns ─────────────────────────────────────────────── */}
       <div className="upload-format">
         <span className="upload-format-label">Required columns</span>
         <div className="upload-format-chips">
@@ -109,16 +84,6 @@ export default function StudentsEmpty() {
           ))}
         </div>
       </div>
-
-      {/* ── Rules ────────────────────────────────────────────────────────── */}
-      <ul className="upload-rules">
-        {RULES.map((rule, i) => (
-          <li key={i} className="upload-rule">
-            <span className="upload-rule-icon"><IconCheck /></span>
-            <span>{rule.text}</span>
-          </li>
-        ))}
-      </ul>
 
     </div>
   )

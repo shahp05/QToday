@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import LeftNav from '../components/LeftNav'
 import RoleSwitcher from '../components/RoleSwitcher'
 import IntroMessage from '../components/IntroMessage'
@@ -6,7 +8,6 @@ import SubjectsList from './subjects/SubjectsList'
 import SubjectsPage from './subjects/SubjectsPage'
 import TeachTodayPage from './subjects/TeachTodayPage'
 import { useUI } from '../context/UIContext'
-import { useNavigate } from 'react-router-dom'
 import './Dashboard.css'
 
 function IconDemo() {
@@ -22,9 +23,16 @@ const PAGE_TITLES = {
   account:  'Account',
 }
 
+function StudentsIntro() {
+  return (
+    <div className="students-intro">
+      <p>Use xlsx to add students any time. Accounts for new students will be created automatically as <code>id@acronym</code>. When they move to the next grade, simply upload a new xlsx with their next grade.</p>
+    </div>
+  )
+}
+
 function PageContent({ activePage }) {
   switch (activePage) {
-    case 'students':  return <StudentsEmpty />
     case 'subjects':  return <SubjectsPage />
     case 'subjects2': return <TeachTodayPage />
     default:
@@ -40,8 +48,15 @@ function PageContent({ activePage }) {
 }
 
 export default function Dashboard() {
-  const { activePage } = useUI()
-  const navigate       = useNavigate()
+  const { activePage, setActivePage } = useUI()
+  const navigate                      = useNavigate()
+  const location                      = useLocation()
+
+  useEffect(() => {
+    if (location.state?.firstVisit) {
+      setActivePage('students')
+    }
+  }, [])
 
   return (
     <div className="dashboard">
@@ -49,16 +64,26 @@ export default function Dashboard() {
       {/* ── Panel 1: icon nav ─────────────────────────────────────────────── */}
       <LeftNav />
 
-      {/* ── Panel 2: subjects list ────────────────────────────────────────── */}
+      {/* ── Panel 2: context list ─────────────────────────────────────────── */}
       {activePage === 'subjects' && (
         <div className="dashboard-panel2">
           <SubjectsList />
         </div>
       )}
+      {activePage === 'students' && (
+        <div className="dashboard-panel2">
+          <StudentsEmpty />
+        </div>
+      )}
 
       {/* ── Panel 3: main content ─────────────────────────────────────────── */}
       <div className="dashboard-panel3">
-        {activePage ? <PageContent activePage={activePage} /> : <IntroMessage />}
+        {activePage === 'students'
+          ? <StudentsIntro />
+          : activePage
+            ? <PageContent activePage={activePage} />
+            : <IntroMessage />
+        }
       </div>
 
       {/* ── Dev bar: Demo + Role switcher ─────────────────────────────────── */}

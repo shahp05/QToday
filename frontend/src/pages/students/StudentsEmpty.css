@@ -2,17 +2,10 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
-  padding: var(--content-padding-v) var(--content-padding-h);
-  max-width: 580px;
+  gap: 16px;
+  padding: 20px 16px;
   width: 100%;
-  flex: 1;
-  min-height: 0;          /* allows flex item to shrink below content size */
-  overflow-y: auto;       /* scroll internally, never push parent */
-  background: var(--color-surface);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-md);
-  margin: 10px;
+  overflow-y: auto;
 }
 
 /* ─── Upload zone ─────────────────────────────────────────────────────────── */

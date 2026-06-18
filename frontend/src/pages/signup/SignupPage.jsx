@@ -276,7 +276,7 @@ function VerifyForm({ formData, onSuccess }) {
 
   async function handleVerify(e) {
     e.preventDefault()
-    if (!code.trim()) { setCodeError(true); setMsg('Enter verification code'); setMsgType('error'); shake(); return }
+    if (!code.trim()) { setCodeError(true); shake(); return }
     setBusy(true)
     setMsg('')
     try {
@@ -377,25 +377,6 @@ function VerifyForm({ formData, onSuccess }) {
   )
 }
 
-// ── Success splash ─────────────────────────────────────────────────────────────
-function SuccessSplash({ formData, onContinue }) {
-  useEffect(() => {
-    const t = setTimeout(onContinue, 2500)
-    return () => clearTimeout(t)
-  }, [onContinue])
-
-  return (
-    <>
-      <CardHeader title="You're in!" subtitle="Taking you to your dashboard…" />
-      <div className="su-form su-success">
-        <div className="su-success-icon">✓</div>
-        <p className="su-success-name">Welcome, {formData.user_name}</p>
-        <p className="su-success-org">{formData.customer_name}</p>
-      </div>
-    </>
-  )
-}
-
 // ── Field helper ──────────────────────────────────────────────────────────────
 function Field({ label, required, span, error, children }) {
   return (
@@ -421,10 +402,7 @@ export default function SignupPage() {
           <SignupForm onCodeSent={data => { setFormData(data); setStep('verify') }} />
         )}
         {step === 'verify' && (
-          <VerifyForm formData={formData} onSuccess={() => setStep('success')} />
-        )}
-        {step === 'success' && (
-          <SuccessSplash formData={formData} onContinue={() => navigate('/dashboard', { replace: true })} />
+          <VerifyForm formData={formData} onSuccess={() => navigate('/dashboard', { replace: true, state: { firstVisit: true } })} />
         )}
 
         <p className="su-login-link">
