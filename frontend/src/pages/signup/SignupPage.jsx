@@ -54,7 +54,7 @@ function IconArrow() {
 }
 function IconCheck() {
   return (
-    <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+    <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
   )
 }
 function IconRefresh() {
@@ -244,8 +244,11 @@ function VerifyForm({ formData, onSuccess }) {
   const [resending, setResending] = useState(false)
   const [msg, setMsg]             = useState('')
   const [msgType, setMsgType]     = useState('error')
+  const [codeError, setCodeError] = useState(false)
+  const [isShaking, setShaking]   = useState(false)
   const inputRef                  = useRef(null)
   const timerRef                  = useRef(null)
+  const shakeTimer                = useRef(null)
 
   function startTimer() {
     clearInterval(timerRef.current)
@@ -265,9 +268,15 @@ function VerifyForm({ formData, onSuccess }) {
     return () => clearInterval(timerRef.current)
   }, [])
 
+  function shake() {
+    clearTimeout(shakeTimer.current)
+    setShaking(true)
+    shakeTimer.current = setTimeout(() => setShaking(false), 450)
+  }
+
   async function handleVerify(e) {
     e.preventDefault()
-    if (!code.trim()) return
+    if (!code.trim()) { setCodeError(true); setMsg('Enter verification code'); setMsgType('error'); shake(); return }
     setBusy(true)
     setMsg('')
     try {
@@ -328,33 +337,33 @@ function VerifyForm({ formData, onSuccess }) {
         title="Check your email"
         subtitle={`Verification code sent to ${formData.email_id}`}
       />
-      <form className="su-form" onSubmit={handleVerify} noValidate>
+      <form className={`su-form${isShaking ? ' ui-shake' : ''}`} onSubmit={handleVerify} noValidate>
         <div className="su-otp-wrap">
           <input
             ref={inputRef}
-            className={`su-input su-otp-input${expired ? ' su-input--expired' : ''}`}
+            className={`su-input su-otp-input${expired ? ' su-input--expired' : ''}${codeError ? ' su-input--error' : ''}`}
             type="text"
             inputMode="numeric"
             maxLength={6}
             placeholder="000000"
             value={code}
-            onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            onChange={e => { setCodeError(false); setMsg(''); setCode(e.target.value.replace(/\D/g, '').slice(0, 6)) }}
             disabled={expired}
           />
 
-          <div className="su-timer">
-            {!expired
-              ? <><span className="su-timer-dot" />Code expires in <strong>{mins}:{secs}</strong></>
-              : 'Code expired'
+          <div className={`su-timer${msg && msgType === 'info' ? ' su-timer--info' : ''}`}>
+            {msg
+              ? msg
+              : !expired
+                ? <><span className="su-timer-dot" />Code expires in <strong>{mins}:{secs}</strong></>
+                : 'Code expired'
             }
           </div>
         </div>
 
-        {msg && <p className={`su-msg su-msg--${msgType}`}>{msg}</p>}
-
         <div className="su-btn-wrap">
           {!expired ? (
-            <CtaBtn icon={<IconCheck />} type="submit" disabled={busy || code.length < 6}>
+            <CtaBtn icon={<IconCheck />} type="submit" disabled={busy}>
               {busy ? 'Verifying…' : 'Verify & create account'}
             </CtaBtn>
           ) : (

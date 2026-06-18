@@ -264,7 +264,8 @@
 }
 
 /* ── Field error state: red border only, no layout change ─────────────────── */
-.su-field--error .su-input {
+.su-field--error .su-input,
+.su-input--error {
   border-color: var(--color-red);
 }
 
@@ -337,8 +338,6 @@
 }
 
 .su-cta-icon {
-  background: var(--color-green-light);
-  border-radius: var(--radius-full);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -349,9 +348,9 @@
 .su-cta-icon svg {
   width: 24px;
   height: 24px;
-  stroke: var(--color-dark);
+  stroke: var(--color-green-light);
   fill: none;
-  stroke-width: 2.2;
+  stroke-width: 1.5;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -417,6 +416,10 @@
   font-size: var(--font-size-sm);
   color: var(--color-red);
   margin-top: 8px;
+}
+
+.su-timer--info {
+  color: var(--color-green-dark);
 }
 
 .su-timer-dot {
