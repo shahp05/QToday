@@ -1,10 +1,37 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import logo from '../../assets/logo_192.webp'
+import logo512      from '../../assets/logo_512.webp'
+import imgEnglish   from '../../assets/english.webp'
+import imgMaths5    from '../../assets/maths-5.webp'
+import imgEVS       from '../../assets/EVS.webp'
+import imgSocial    from '../../assets/social-studies.webp'
+import imgPhysics   from '../../assets/physics.webp'
+import imgMaths12   from '../../assets/maths-12.webp'
+import imgChem      from '../../assets/chemistry.webp'
+import imgBio       from '../../assets/biology.webp'
+import imgHistory   from '../../assets/history.webp'
+import imgGeo       from '../../assets/geography.webp'
+import imgCivics    from '../../assets/civics.webp'
+import imgEcon      from '../../assets/economics.webp'
+import imgCommerce  from '../../assets/commerce.webp'
+import imgPsych     from '../../assets/psychology.webp'
+import imgSociology from '../../assets/sociology.webp'
+import imgPolSci    from '../../assets/political-science.webp'
 import './SignupPage.css'
 
 const API = 'http://localhost:8000/api'
 const TTL = 60   // must match signup_verification_ttl_seconds in app_settings
+
+// ── Text backdrop ─────────────────────────────────────────────────────────────
+function SignupBackdrop() {
+  return (
+    <div className="su-bd-text" aria-hidden="true">
+      <span className="su-bd-w1">measure</span>
+      <span className="su-bd-w2">learning</span>
+      <span className="su-bd-w3">outcomes</span>
+    </div>
+  )
+}
 
 function IconArrow() {
   return (
@@ -34,13 +61,14 @@ function CtaBtn({ icon, children, ...props }) {
 
 // ── Shared card header ─────────────────────────────────────────────────────────
 function CardHeader({ title, subtitle }) {
+  const navigate = useNavigate()
   return (
     <div className="su-card-header">
-      <img src={logo} alt="" className="su-logo-ghost" aria-hidden="true" />
       <div className="su-title-text">
         <h1 className="su-title">{title}</h1>
         <p className="su-subtitle">{subtitle}</p>
       </div>
+      <button className="su-close-btn" onClick={() => navigate(-1)} aria-label="Go back">✕</button>
     </div>
   )
 }
@@ -99,7 +127,7 @@ function SignupForm({ onCodeSent }) {
 
   return (
     <>
-      <CardHeader title="Create your account" subtitle="Manage Learning Outcomes" />
+      <CardHeader title="Create your account" subtitle="Measure Learning Outcomes" />
       <form className="su-form" onSubmit={handleSubmit} noValidate>
         <div className="su-grid">
           <Field label="Your name" required span="full">
@@ -117,7 +145,7 @@ function SignupForm({ onCodeSent }) {
             <input
               className="su-input"
               type="email"
-              placeholder="you@school.edu"
+              placeholder="e.g. mira@dps.edu"
               value={form.email_id}
               onChange={e => set('email_id', e.target.value)}
             />
@@ -148,7 +176,7 @@ function SignupForm({ onCodeSent }) {
             <input
               className="su-input"
               type="text"
-              placeholder="1001"
+              placeholder="e.g. 1001"
               value={form.org_id}
               onChange={e => set('org_id', e.target.value)}
             />
@@ -385,8 +413,9 @@ export default function SignupPage() {
       </div>
 
       <div className="su-bg-decoration" aria-hidden="true">
-        <div className="su-blob su-blob--1" />
-        <div className="su-blob su-blob--2" />
+        <img src={logo512} className="su-blob--logo" alt="" />
+        <img src={logo512} className="su-blob--logo-2" alt="" />
+        <SignupBackdrop />
       </div>
     </div>
   )

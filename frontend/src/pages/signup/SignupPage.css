@@ -18,25 +18,95 @@
   z-index: 0;
 }
 
-.su-blob {
+.su-blob--logo {
   position: absolute;
-  border-radius: 50%;
-  opacity: 0.18;
-  background: var(--color-green-light);
-}
-
-.su-blob--1 {
   width: 420px;
   height: 420px;
   top: -120px;
   right: -100px;
+  border-radius: 50%;
+  object-fit: cover;
+  opacity: 0.18;
+  pointer-events: none;
 }
 
-.su-blob--2 {
+.su-blob--logo-2 {
+  position: absolute;
   width: 300px;
   height: 300px;
   bottom: -80px;
   left: -80px;
+  border-radius: 50%;
+  object-fit: cover;
+  opacity: 0.18;
+  pointer-events: none;
+}
+
+/* ── Text backdrop ────────────────────────────────────────────────────────── */
+.su-bd-text {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.su-bd-text span {
+  position: absolute;
+  font-family: var(--font-family);
+  font-size: clamp(36px, 9vw, 140px);
+  font-weight: 900;
+  color: #fff;
+  line-height: 1;
+  white-space: nowrap;
+  letter-spacing: -0.03em;
+  opacity: 0.18;
+}
+
+/* ── Word 1: measure ──────────────────────────────────────────────────────── */
+.su-bd-w1 {
+  top: 5vh;
+  left: -5vw;
+  animation: su-drift-1 35s ease-in-out infinite;
+}
+
+@keyframes su-drift-1 {
+  0%   { transform: translate(0vw,    0vh); }
+  25%  { transform: translate(45vw,  20vh); }
+  50%  { transform: translate(60vw,   5vh); }
+  75%  { transform: translate(25vw,  35vh); }
+  100% { transform: translate(0vw,    0vh); }
+}
+
+/* ── Word 2: learning ─────────────────────────────────────────────────────── */
+.su-bd-w2 {
+  top: 40vh;
+  left: 50vw;
+  animation: su-drift-2 60s ease-in-out infinite;
+  animation-delay: -12s;
+}
+
+@keyframes su-drift-2 {
+  0%   { transform: translate(0vw,    0vh); }
+  25%  { transform: translate(-55vw, -25vh); }
+  50%  { transform: translate(-30vw,  20vh); }
+  75%  { transform: translate(15vw,  -10vh); }
+  100% { transform: translate(0vw,    0vh); }
+}
+
+/* ── Word 3: outcomes ─────────────────────────────────────────────────────── */
+.su-bd-w3 {
+  top: 75vh;
+  left: 20vw;
+  animation: su-drift-3 55s ease-in-out infinite;
+  animation-delay: -6s;
+}
+
+@keyframes su-drift-3 {
+  0%   { transform: translate(0vw,    0vh); }
+  30%  { transform: translate(40vw,  -50vh); }
+  55%  { transform: translate(-20vw, -30vh); }
+  80%  { transform: translate(55vw,  -15vh); }
+  100% { transform: translate(0vw,    0vh); }
 }
 
 /* ── Card ─────────────────────────────────────────────────────────────────── */
@@ -57,26 +127,15 @@
   padding: 24px 40px;
   position: relative;
   overflow: hidden;
-}
-
-/* Ghost logo — top-right of header */
-.su-logo-ghost {
-  position: absolute;
-  right: -24px;
-  top: -24px;
-  width: 110px;
-  height: 110px;
-  border-radius: 50%;
-  object-fit: cover;
-  opacity: 0.60;
-  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .su-title-text {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  position: relative;   /* sits above the ghost */
 }
 
 .su-title {
@@ -91,6 +150,27 @@
   font-size: var(--font-size-sm);
   color: rgba(255, 255, 255, 0.70);
   margin: 0;
+}
+
+.su-close-btn {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--color-white);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition-fast);
+  line-height: 1;
+}
+
+.su-close-btn:hover {
+  background: rgba(255, 255, 255, 0.28);
 }
 
 /* ── Form body (white area below the header) ──────────────────────────────── */
@@ -216,6 +296,7 @@
   font-weight: var(--font-weight-normal);
   white-space: nowrap;
   width: 100%;
+  max-width: 560px;
   transition: background var(--transition-fast), transform var(--transition-fast),
               box-shadow var(--transition-fast);
 }
@@ -376,8 +457,29 @@
   margin: 0;
 }
 
-/* ── Responsive ───────────────────────────────────────────────────────────── */
-@media (max-width: 640px) {
+/* ── Tablet: full-screen card, no backdrop, 2-col grid kept ──────────────── */
+@media (max-width: 768px) {
+  .su-page {
+    padding: 0;
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+
+  .su-card {
+    max-width: none;
+    width: 100%;
+    min-width: 100%;
+    min-height: 100dvh;
+    border-radius: 0;
+    box-shadow: none;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .su-bg-decoration {
+    display: none;
+  }
+
   .su-card-header {
     padding: 20px 24px;
   }
@@ -389,7 +491,10 @@
   .su-login-link {
     padding: 0 24px 20px;
   }
+}
 
+/* ── Mobile: single-column fields ────────────────────────────────────────── */
+@media (max-width: 550px) {
   .su-grid {
     grid-template-columns: 1fr;
   }
@@ -397,15 +502,5 @@
   .su-field,
   .su-field--full {
     grid-column: 1;
-  }
-
-  .su-blob--1 {
-    width: 220px;
-    height: 220px;
-  }
-
-  .su-blob--2 {
-    width: 160px;
-    height: 160px;
   }
 }
