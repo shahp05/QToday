@@ -1,0 +1,37 @@
+/* Error text floats below the input — no layout shift */
+.ui-field-error {
+  position: absolute;
+  bottom: -17px;
+  left: 0;
+  font-size: 10px;
+  color: var(--color-red);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  white-space: nowrap;
+  pointer-events: none;
+  line-height: 1;
+}
+
+.ui-field-error--show {
+  opacity: 1;
+}
+
+/* Red border on the input/select when its field has an error */
+.su-field--error .su-input {
+  border-color: var(--color-red);
+}
+
+/* Shake — applied to the field wrapper on failed submit */
+@keyframes ui-shake {
+  0%,  100% { transform: translateX(0); }
+  15%        { transform: translateX(-5px); }
+  30%        { transform: translateX(5px); }
+  45%        { transform: translateX(-4px); }
+  60%        { transform: translateX(4px); }
+  75%        { transform: translateX(-2px); }
+  90%        { transform: translateX(2px); }
+}
+
+.ui-shake {
+  animation: ui-shake 0.45s ease;
+}

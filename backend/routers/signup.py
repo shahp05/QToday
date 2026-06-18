@@ -1,9 +1,13 @@
+import traceback
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from db.database import get_db
 from schemas.signup import SignupRequest, VerifyRequest
 from services.signup_service import request_verification, verify_and_create, VerificationError
+from services.error_log_service import log_error
+from errors.error_codes import ErrorCode
 
 router = APIRouter(prefix="/api/signup", tags=["signup"])
 
@@ -15,7 +19,15 @@ async def signup_request(payload: SignupRequest, db: Session = Depends(get_db)):
     try:
         await request_verification(db, payload.model_dump())
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Could not send email: {e}")
+        log_error(
+            db,
+            type="api",
+            error_code=ErrorCode.EXTERNAL_SERVICE_FAILED,
+            description=str(e),
+            stack_trace=traceback.format_exc(),
+            context={"email": payload.email_id},
+        )
+        raise HTTPException(status_code=500, detail="Could not send the verification email. Please try again.")
     return {"detail": "Verification code sent."}
 
 

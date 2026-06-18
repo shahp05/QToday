@@ -242,16 +242,6 @@
   cursor: pointer;
 }
 
-/* ── Error banner ─────────────────────────────────────────────────────────── */
-.su-error {
-  font-size: var(--font-size-sm);
-  color: var(--color-red);
-  margin-bottom: 14px;
-  padding: 10px 12px;
-  background: #fdecea;
-  border-radius: var(--radius-sm);
-  border-left: 3px solid var(--color-red);
-}
 
 /* ── Info / error message (verify step) ──────────────────────────────────── */
 .su-msg {
@@ -271,6 +261,35 @@
   color: var(--color-green-dark);
   background: #e8f5e9;
   border-left: 3px solid var(--color-green-dark);
+}
+
+/* ── Field error state: red border only, no layout change ─────────────────── */
+.su-field--error .su-input {
+  border-color: var(--color-red);
+}
+
+/* ── Form shake on failed submit ─────────────────────────────────────────── */
+@keyframes ui-shake {
+  0%,  100% { transform: translateX(0); }
+  15%        { transform: translateX(-5px); }
+  30%        { transform: translateX(5px); }
+  45%        { transform: translateX(-4px); }
+  60%        { transform: translateX(4px); }
+  75%        { transform: translateX(-2px); }
+  90%        { transform: translateX(2px); }
+}
+
+.ui-shake {
+  animation: ui-shake 0.45s ease;
+}
+
+/* ── Static hint below the grid ───────────────────────────────────────────── */
+.su-status-line {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  text-align: center;
+  margin: 0 0 10px;
+  pointer-events: none;
 }
 
 /* ── Button row ───────────────────────────────────────────────────────────── */
@@ -347,7 +366,7 @@
 }
 
 .su-cta-spacer {
-  width: 32px;   /* 24px svg + 4px×2 padding */
+  width: 32px;
   flex-shrink: 0;
 }
 
@@ -396,24 +415,16 @@
   align-items: center;
   gap: 6px;
   font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-  margin-top: 8px;
-}
-
-.su-timer--expired {
   color: var(--color-red);
+  margin-top: 8px;
 }
 
 .su-timer-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--color-green-light);
-  animation: su-pulse 1s infinite;
-}
-
-.su-timer-dot--warn {
   background: var(--color-red);
+  animation: su-pulse 1s infinite;
 }
 
 @keyframes su-pulse {

@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useValidation } from '../../hooks/useValidation'
+import { Toast }         from '../../components/ui/Toast'
 import logo512      from '../../assets/logo_512.webp'
 import imgEnglish   from '../../assets/english.webp'
 import imgMaths5    from '../../assets/maths-5.webp'
@@ -21,6 +23,18 @@ import './SignupPage.css'
 
 const API = 'http://localhost:8000/api'
 const TTL = 60   // must match signup_verification_ttl_seconds in app_settings
+
+// ── Validation rules ───────────────────────────────────────────────────────────
+const SIGNUP_RULES = {
+  user_name:        { label: 'Your name',           required: true },
+  email_id:         { label: 'Email',               required: true,
+                      validate: v => /\S+@\S+\.\S+/.test(v?.trim()) ? null : 'Enter a valid email address' },
+  customer_name:    { label: 'School/group name',   required: true },
+  customer_acronym: { label: 'Acronym',             required: true },
+  org_id:           { label: 'Staff ID',            required: true },
+  board_name:       { label: 'Education board',     required: true },
+  country_code:     { label: 'Country',             required: true },
+}
 
 // ── Text backdrop ─────────────────────────────────────────────────────────────
 function SignupBackdrop() {
@@ -49,9 +63,9 @@ function IconRefresh() {
   )
 }
 
-function CtaBtn({ icon, children, ...props }) {
+function CtaBtn({ icon, children, variant, ...props }) {
   return (
-    <button className="su-cta-btn" {...props}>
+    <button className={`su-cta-btn${variant ? ` su-cta-btn--${variant}` : ''}`} {...props}>
       <span className="su-cta-icon" aria-hidden="true">{icon}</span>
       <span className="su-cta-label">{children}</span>
       <span className="su-cta-spacer" aria-hidden="true" />
@@ -81,8 +95,9 @@ function SignupForm({ onCodeSent }) {
   })
   const [countries, setCountries] = useState([])
   const [busy, setBusy]           = useState(false)
-  const [error, setError]         = useState('')
+  const [toast, setToast]         = useState('')
   const firstRef                  = useRef(null)
+  const { errors, validate, clearError, isShaking, hasErrors } = useValidation(SIGNUP_RULES)
 
   useEffect(() => {
     firstRef.current?.focus()
@@ -97,15 +112,12 @@ function SignupForm({ onCodeSent }) {
 
   function set(field, value) {
     setForm(f => ({ ...f, [field]: value }))
+    clearError(field)
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
-    setError('')
-    const missing = ['email_id','user_name','customer_name','customer_acronym','org_id','board_name']
-      .filter(k => !form[k].trim())
-    if (missing.length)     { setError('Please fill in all required fields.'); return }
-    if (!form.country_code) { setError('Please select a country.'); return }
+    if (!validate(form)) return
     setBusy(true)
     try {
       const res = await fetch(`${API}/signup/request`, {
@@ -119,7 +131,7 @@ function SignupForm({ onCodeSent }) {
       }
       onCodeSent(form)
     } catch (err) {
-      setError(err.message)
+      setToast(err.message)
     } finally {
       setBusy(false)
     }
@@ -128,75 +140,75 @@ function SignupForm({ onCodeSent }) {
   return (
     <>
       <CardHeader title="Create your account" subtitle="Measure Learning Outcomes" />
-      <form className="su-form" onSubmit={handleSubmit} noValidate>
+      <form className={`su-form${isShaking ? ' ui-shake' : ''}`} onSubmit={handleSubmit} noValidate>
         <div className="su-grid">
-          <Field label="Your name" required span="full">
+          <Field label="Your name" required span="full" error={!!errors.user_name}>
             <input
               ref={firstRef}
               className="su-input"
               type="text"
               placeholder="e.g. Mira Ma'm"
               value={form.user_name}
-              onChange={e => set('user_name', e.target.value)}
+              onChange={ev => set('user_name', ev.target.value)}
             />
           </Field>
 
-          <Field label="Your email id for verification" required span="full">
+          <Field label="Your email id for verification" required span="full" error={!!errors.email_id}>
             <input
               className="su-input"
               type="email"
               placeholder="e.g. mira@dps.edu"
               value={form.email_id}
-              onChange={e => set('email_id', e.target.value)}
+              onChange={ev => set('email_id', ev.target.value)}
             />
           </Field>
 
-          <Field label="Your school/group name" required>
+          <Field label="Your school/group name" required error={!!errors.customer_name}>
             <input
               className="su-input"
               type="text"
               placeholder="e.g. Delhi Public School"
               value={form.customer_name}
-              onChange={e => set('customer_name', e.target.value)}
+              onChange={ev => set('customer_name', ev.target.value)}
             />
           </Field>
 
-          <Field label="Your school/group acronym" required>
+          <Field label="Your school/group acronym" required error={!!errors.customer_acronym}>
             <input
               className="su-input"
               type="text"
               placeholder="e.g. DPS"
               maxLength={20}
               value={form.customer_acronym}
-              onChange={e => set('customer_acronym', e.target.value.toUpperCase())}
+              onChange={ev => set('customer_acronym', ev.target.value.toUpperCase())}
             />
           </Field>
 
-          <Field label="Your staff id" required>
+          <Field label="Your staff id" required error={!!errors.org_id}>
             <input
               className="su-input"
               type="text"
               placeholder="e.g. 1001"
               value={form.org_id}
-              onChange={e => set('org_id', e.target.value)}
+              onChange={ev => set('org_id', ev.target.value)}
             />
           </Field>
 
-          <Field label="Your education board" required>
+          <Field label="Your education board" required error={!!errors.board_name}>
             <input
               className="su-input"
               type="text"
               placeholder="e.g. CBSE, IB, Cambridge IGCSE"
               value={form.board_name}
-              onChange={e => set('board_name', e.target.value)}
+              onChange={ev => set('board_name', ev.target.value)}
             />
           </Field>
 
-          <Field label="Your country" required span="full">
+          <Field label="Your country" required span="full" error={!!errors.country_code}>
             <select
               className="su-input su-select"
               value={form.country_code}
-              onChange={e => set('country_code', e.target.value)}
+              onChange={ev => set('country_code', ev.target.value)}
               disabled={countries.length === 0}
             >
               {countries.length === 0
@@ -209,14 +221,16 @@ function SignupForm({ onCodeSent }) {
           </Field>
         </div>
 
-        {error && <p className="su-error">{error}</p>}
+        <p className="su-status-line">Fields marked <span className="su-required">*</span> must be filled</p>
 
         <div className="su-btn-wrap">
           <CtaBtn icon={<IconArrow />} type="submit" disabled={busy}>
-            {busy ? 'Sending code…' : 'Continue'}
+            Continue
           </CtaBtn>
         </div>
       </form>
+
+      <Toast message={toast} onDismiss={() => setToast('')} />
     </>
   )
 }
@@ -275,8 +289,8 @@ function VerifyForm({ formData, onSuccess }) {
         return
       }
       onSuccess(j)
-    } catch {
-      setMsg('Network error. Please try again.')
+    } catch (err) {
+      setMsg(`Network error: ${err.message}`)
       setMsgType('error')
     } finally {
       setBusy(false)
@@ -312,7 +326,7 @@ function VerifyForm({ formData, onSuccess }) {
     <>
       <CardHeader
         title="Check your email"
-        subtitle={`Code sent to ${formData.email_id}`}
+        subtitle={`Verification code sent to ${formData.email_id}`}
       />
       <form className="su-form" onSubmit={handleVerify} noValidate>
         <div className="su-otp-wrap">
@@ -328,14 +342,12 @@ function VerifyForm({ formData, onSuccess }) {
             disabled={expired}
           />
 
-          {!expired ? (
-            <div className="su-timer">
-              <span className={`su-timer-dot${timeLeft <= 10 ? ' su-timer-dot--warn' : ''}`} />
-              Code expires in <strong>{mins}:{secs}</strong>
-            </div>
-          ) : (
-            <div className="su-timer su-timer--expired">Code expired</div>
-          )}
+          <div className="su-timer">
+            {!expired
+              ? <><span className="su-timer-dot" />Code expires in <strong>{mins}:{secs}</strong></>
+              : 'Code expired'
+            }
+          </div>
         </div>
 
         {msg && <p className={`su-msg su-msg--${msgType}`}>{msg}</p>}
@@ -347,7 +359,7 @@ function VerifyForm({ formData, onSuccess }) {
             </CtaBtn>
           ) : (
             <CtaBtn icon={<IconRefresh />} type="button" onClick={handleResend} disabled={resending}>
-              {resending ? 'Sending…' : 'Send a new code'}
+              {resending ? 'Sending…' : 'Send a new verification code'}
             </CtaBtn>
           )}
         </div>
@@ -376,9 +388,9 @@ function SuccessSplash({ formData, onContinue }) {
 }
 
 // ── Field helper ──────────────────────────────────────────────────────────────
-function Field({ label, required, span, children }) {
+function Field({ label, required, span, error, children }) {
   return (
-    <div className={`su-field${span === 'full' ? ' su-field--full' : ''}`}>
+    <div className={`su-field${span === 'full' ? ' su-field--full' : ''}${error ? ' su-field--error' : ''}`}>
       <label className="su-label">
         {label}{required && <span className="su-required">*</span>}
       </label>
@@ -403,7 +415,7 @@ export default function SignupPage() {
           <VerifyForm formData={formData} onSuccess={() => setStep('success')} />
         )}
         {step === 'success' && (
-          <SuccessSplash formData={formData} onContinue={() => navigate('/dashboard')} />
+          <SuccessSplash formData={formData} onContinue={() => navigate('/dashboard', { replace: true })} />
         )}
 
         <p className="su-login-link">
