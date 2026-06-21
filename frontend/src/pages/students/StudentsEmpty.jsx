@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import * as XLSX from 'xlsx'
 import { useProfileStore } from '../../store/profileStore'
 import './StudentsEmpty.css'
 
@@ -7,6 +8,86 @@ const COLUMNS = ['Id', 'Name', 'Grade', 'Section', 'Parent1 Email', 'Parent2 Ema
 const SAMPLE  = ['2026-1001', 'Aanya Sharma', '8', 'B', 'parent1@abc.com', 'parent2@abc.com']
 
 const LOGIN_COLUMNS = ['Id', 'User', 'Default Login', 'Default Password']
+
+const FORMAT_ERROR = 'Incorrect xlsx format. Check column headings and values.'
+const VALUE_ERROR = 'Id, name and grade must be entered.'
+
+const CANONICAL_FIELDS = [
+  { key: 'id', norm: 'id', required: true },
+  { key: 'name', norm: 'name', required: true },
+  { key: 'grade', norm: 'grade', required: true },
+  { key: 'section', norm: 'section', required: false },
+  { key: 'parent1email', norm: 'parent1email', required: false },
+  { key: 'parent2email', norm: 'parent2email', required: false },
+]
+
+function normalizeHeader(value) {
+  return String(value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+function levenshtein(a, b) {
+  const dp = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0))
+  for (let i = 0; i <= a.length; i++) dp[i][0] = i
+  for (let j = 0; j <= b.length; j++) dp[0][j] = j
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1])
+    }
+  }
+  return dp[a.length][b.length]
+}
+
+function matchField(rawHeader) {
+  const norm = normalizeHeader(rawHeader)
+  if (!norm) return null
+  let best = null
+  let bestDist = Infinity
+  for (const field of CANONICAL_FIELDS) {
+    const dist = levenshtein(norm, field.norm)
+    const threshold = Math.max(1, Math.ceil(field.norm.length * 0.34))
+    if (dist <= threshold && dist < bestDist) {
+      best = field
+      bestDist = dist
+    }
+  }
+  return best
+}
+
+function isBlank(value) {
+  return value === undefined || value === null || String(value).trim() === ''
+}
+
+// Parses raw sheet rows, validates headers/required values, returns { error } or { ok: true }.
+function validateRows(rows) {
+  const nonEmptyRows = rows.filter(row => row.some(cell => !isBlank(cell)))
+  if (nonEmptyRows.length < 2) return { error: FORMAT_ERROR }
+
+  const colCount = Math.max(...nonEmptyRows.map(row => row.length))
+  const usedCols = []
+  for (let c = 0; c < colCount; c++) {
+    if (nonEmptyRows.some(row => !isBlank(row[c]))) usedCols.push(c)
+  }
+
+  const [headerRow, ...dataRows] = nonEmptyRows
+  const colMap = {}
+  for (const c of usedCols) {
+    const field = matchField(headerRow[c])
+    if (!field || colMap[field.key] !== undefined) return { error: FORMAT_ERROR }
+    colMap[field.key] = c
+  }
+  for (const field of CANONICAL_FIELDS) {
+    if (field.required && colMap[field.key] === undefined) return { error: FORMAT_ERROR }
+  }
+
+  const requiredCols = ['id', 'name', 'grade'].map(key => colMap[key])
+  for (const row of dataRows) {
+    if (requiredCols.some(c => isBlank(row[c]))) return { error: VALUE_ERROR }
+  }
+
+  return { ok: true }
+}
 
 function IconDrop() {
   return (
@@ -40,20 +121,45 @@ export default function StudentsEmpty() {
   const fileRef = useRef(null)
   const [dragging, setDragging] = useState(false)
   const [selectedFile, setSelectedFile] = useState(null)
+  const [source, setSource] = useState(null) // 'drop' | 'browse'
+  const [error, setError] = useState(null)
 
-  function handleFile(file) {
+  function handleFile(file, src) {
     if (!file) return
-    if (!file.name.match(/\.(xlsx|xls)$/i)) {
-      alert('Please upload an .xlsx or .xls file.')
+    if (!file.name.match(/\.xlsx$/i)) {
+      setSelectedFile(file)
+      setSource(src)
+      setError('Please upload an .xlsx file.')
       return
     }
     setSelectedFile(file)
+    setSource(src)
+    setError(null)
   }
 
   function onDrop(e) {
     e.preventDefault()
     setDragging(false)
-    handleFile(e.dataTransfer.files[0])
+    handleFile(e.dataTransfer.files[0], 'drop')
+  }
+
+  async function handleUpload() {
+    if (!selectedFile) return
+    try {
+      const buffer = await selectedFile.arrayBuffer()
+      const workbook = XLSX.read(buffer, { type: 'array' })
+      const sheet = workbook.Sheets[workbook.SheetNames[0]]
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
+      const result = validateRows(rows)
+      if (result.error) {
+        setError(result.error)
+        return
+      }
+      setError(null)
+      alert('Success')
+    } catch {
+      setError(FORMAT_ERROR)
+    }
   }
 
   return (
@@ -86,7 +192,12 @@ export default function StudentsEmpty() {
           aria-label="Drop student list file here"
         >
           <IconDrop />
-          <span className="students-upload-box-text">Drop file here</span>
+          <span className="students-upload-box-text">
+            {selectedFile && source === 'drop' ? selectedFile.name : 'Drop file here'}
+          </span>
+          {selectedFile && source === 'drop' && error && (
+            <span className="students-upload-error">{error}</span>
+          )}
         </div>
 
         <div
@@ -97,20 +208,21 @@ export default function StudentsEmpty() {
           onKeyDown={e => e.key === 'Enter' && fileRef.current.click()}
           aria-label="Browse for student list file"
         >
-          <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={e => handleFile(e.target.files[0])} hidden />
+          <input ref={fileRef} type="file" accept=".xlsx" onChange={e => handleFile(e.target.files[0], 'browse')} hidden />
           <IconBrowse />
-          <span className="students-upload-box-text">Browse file</span>
+          <span className="students-upload-box-text">
+            {selectedFile && source === 'browse' ? selectedFile.name : 'Browse file'}
+          </span>
+          {selectedFile && source === 'browse' && error && (
+            <span className="students-upload-error">{error}</span>
+          )}
         </div>
 
       </div>
 
       {selectedFile && (
-        <p className="students-selected-file">Selected: {selectedFile.name}</p>
-      )}
-
-      {selectedFile && (
         <div className="students-upload-actions">
-          <button className="students-upload-btn" onClick={() => alert('Upload wired to API shortly')}>
+          <button className="students-upload-btn" onClick={handleUpload}>
             Upload
           </button>
         </div>

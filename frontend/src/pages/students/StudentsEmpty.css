@@ -118,12 +118,12 @@
   color: #1a1a1a;
 }
 
-/* ─── Selected file + actions ────────────────────────────────────────────── */
-.students-selected-file {
-  margin: 0;
+/* ─── Upload error ────────────────────────────────────────────────────────── */
+.students-upload-error {
   font-size: var(--font-size-sm, 11px);
-  color: var(--color-green-light, #8EEB65);
-  width: 100%;
+  color: var(--color-red, #D32F2F);
+  text-align: center;
+  padding: 0 12px;
 }
 
 /* ─── Note ────────────────────────────────────────────────────────────────── */
