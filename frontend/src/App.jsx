@@ -4,6 +4,7 @@ import Home       from './pages/Home'
 import Dashboard  from './pages/Dashboard'
 import DemoPage   from './pages/demo/DemoPage'
 import SignupPage from './pages/signup/SignupPage'
+import LoginPage  from './pages/login/LoginPage'
 
 export default function App() {
   return (
@@ -11,6 +12,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/"          element={<Home />} />
+          <Route path="/login"     element={<LoginPage />} />
           <Route path="/signup"    element={<SignupPage />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/demo"      element={<DemoPage />} />

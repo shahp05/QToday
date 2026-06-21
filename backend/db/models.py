@@ -96,11 +96,17 @@ class Customer(Base):
 
 
 class User(Base):
+    """password_date_created == date_created means the password set at
+    account creation has never been changed (both default to NOW() in the
+    same INSERT, so Postgres resolves them to the same transaction
+    timestamp). A password-change flow must bump password_date_created."""
+
     __tablename__ = "users"
 
     user_id:       Mapped[int]           = mapped_column(Integer, primary_key=True)
     login_key:     Mapped[str]           = mapped_column(String(200), nullable=False, unique=True)
     password_hash: Mapped[str]           = mapped_column(String(255), nullable=False)
+    password_date_created: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
     user_name:     Mapped[str]           = mapped_column(String(200), nullable=False)
     email_id:      Mapped[str | None]    = mapped_column(String(200), unique=True)
     country_id:    Mapped[int | None]    = mapped_column(ForeignKey("countries.country_id"))

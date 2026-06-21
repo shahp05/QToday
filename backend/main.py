@@ -11,7 +11,7 @@ from sqlalchemy import text
 
 from db.database import SessionLocal, get_db
 from errors.error_codes import ErrorCode
-from routers import countries, error_logs, qa, signup
+from routers import auth, countries, error_logs, qa, signup
 from services.error_log_service import log_error
 
 app = FastAPI(title="QToday API")
@@ -28,6 +28,7 @@ app.include_router(qa.router)
 app.include_router(error_logs.router)
 app.include_router(signup.router)
 app.include_router(countries.router)
+app.include_router(auth.router)
 
 
 @app.exception_handler(Exception)

@@ -6,14 +6,14 @@ FastAPI backend + Vite/React frontend for CBSE EdTech (Grades 1–12).
 
 Open two terminals from the project root:
 
-**Backend** (http://localhost:8000)
+**Backend** (http://localhost:8001)
 ```powershell
 .\start_backend.ps1
 ```
 Or manually:
 ```powershell
 cd backend
-.\myenv\Scripts\uvicorn.exe main:app --reload --port 8000
+.\myenv\Scripts\uvicorn.exe main:app --reload --port 8001
 ```
 
 **Frontend** (http://localhost:5173)

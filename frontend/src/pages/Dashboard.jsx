@@ -19,16 +19,11 @@ function IconDemo() {
 }
 
 const PAGE_TITLES = {
-  teachers: 'Teachers',
-  account:  'Account',
-}
-
-function StudentsIntro() {
-  return (
-    <div className="students-intro">
-      <p>Use xlsx to add students. Login accounts for new students will be automatically created as <code>id@acronym</code> with the same default password. When they move to the next grade, simply upload a new xlsx with their next grade.</p>
-    </div>
-  )
+  subjects:  'Subjects',
+  subjects2: 'Subjects',
+  students:  'Students',
+  teachers:  'Teachers',
+  account:   'Account',
 }
 
 function PageContent({ activePage }) {
@@ -70,16 +65,11 @@ export default function Dashboard() {
           <SubjectsList />
         </div>
       )}
-      {activePage === 'students' && (
-        <div className="dashboard-panel2">
-          <StudentsEmpty />
-        </div>
-      )}
 
       {/* ── Panel 3: main content ─────────────────────────────────────────── */}
       <div className="dashboard-panel3">
         {activePage === 'students'
-          ? <StudentsIntro />
+          ? <StudentsEmpty />
           : activePage
             ? <PageContent activePage={activePage} />
             : <IntroMessage />

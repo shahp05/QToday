@@ -1,5 +1,6 @@
 import { useUI } from '../context/UIContext'
 import { useNavigate } from 'react-router-dom'
+import { useProfileStore } from '../store/profileStore'
 import logo from '../assets/logo_48.webp'
 import './LeftNav.css'
 
@@ -52,18 +53,26 @@ const NAV_ITEMS = [
   { id: 'account',   label: 'Account',   Icon: IconAccount  },
 ]
 
-const INFO_ITEMS = [
-  { label: 'Board',   value: 'CBSE'  },
-  { label: 'Country', value: 'India' },
-]
-
 export default function LeftNav() {
   const { activePage, setActivePage, setActiveSubject } = useUI()
+  const profile = useProfileStore()
+  const clearProfile = useProfileStore(s => s.clearProfile)
   const navigate = useNavigate()
+
+  const infoItems = [
+    { label: 'School',  value: profile.customer_acronym || '—' },
+    { label: 'Board',   value: profile.board_code       || '—' },
+    { label: 'Country', value: profile.country_code     || '—' },
+  ]
 
   function handleNav(id) {
     setActivePage(id)
     if (id !== 'subjects') setActiveSubject(null)
+  }
+
+  function handleLogout() {
+    clearProfile()
+    navigate('/')
   }
 
   return (
@@ -91,7 +100,7 @@ export default function LeftNav() {
       <div className="leftnav-spacer" />
 
       <div className="leftnav-info">
-        {INFO_ITEMS.map(({ label, value }) => (
+        {infoItems.map(({ label, value }) => (
           <div key={label} className="leftnav-info-block">
             <span className="leftnav-info-label">{label}</span>
             <span className="leftnav-info-value">{value}</span>
@@ -101,7 +110,7 @@ export default function LeftNav() {
 
       <button
         className="leftnav-item leftnav-item--logout"
-        onClick={() => navigate('/')}
+        onClick={handleLogout}
         aria-label="Logout"
       >
         <IconLogout />

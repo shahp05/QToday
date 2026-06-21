@@ -9,7 +9,7 @@ export default function Home() {
       <div className="home-card">
         <h1 className="home-title">QToday</h1>
         <p className="home-subtitle">Welcome to QToday</p>
-        <button className="login-btn" onClick={() => navigate('/dashboard')}>
+        <button className="login-btn" onClick={() => navigate('/login')}>
           Login
         </button>
         <p className="home-signup-link">

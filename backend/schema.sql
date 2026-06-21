@@ -76,11 +76,17 @@ CREATE TABLE IF NOT EXISTS customers (
 
 -- ------------------------------------------------------------
 -- 5. USERS
+--
+--   password_date_created : defaults to NOW() at signup, same INSERT as
+--   date_created, so they share one transaction timestamp. Equal values
+--   means the password has never been changed — any password-change flow
+--   must bump this column independently of date_created/date_modified.
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS users (
     user_id         SERIAL          PRIMARY KEY,
     login_key       VARCHAR(200)    NOT NULL UNIQUE,
     password_hash   VARCHAR(255)    NOT NULL,
+    password_date_created TIMESTAMP NOT NULL DEFAULT NOW(),
     user_name       VARCHAR(200)    NOT NULL,
     email_id        VARCHAR(200)    NULL UNIQUE,
     country_id      INTEGER         NULL REFERENCES countries(country_id),

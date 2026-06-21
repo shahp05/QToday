@@ -19,9 +19,9 @@ import imgCommerce  from '../../assets/commerce.webp'
 import imgPsych     from '../../assets/psychology.webp'
 import imgSociology from '../../assets/sociology.webp'
 import imgPolSci    from '../../assets/political-science.webp'
+import { API_BASE as API } from '../../lib/api'
 import './SignupPage.css'
 
-const API = 'http://localhost:8000/api'
 const TTL = 60   // must match signup_verification_ttl_seconds in app_settings
 
 // ── Validation rules ───────────────────────────────────────────────────────────
@@ -407,7 +407,7 @@ export default function SignupPage() {
 
         <p className="su-login-link">
           Already have an account?{' '}
-          <button className="btn btn-link" onClick={() => navigate('/')}>Log in</button>
+          <button className="btn btn-link" onClick={() => navigate('/login')}>Login</button>
         </p>
       </div>
 

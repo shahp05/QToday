@@ -1,0 +1,13 @@
+@import '../signup/SignupPage.css';
+
+/* ── Single-column login form ────────────────────────────────────────────── */
+.lg-form {
+  padding: 28px 40px 8px;
+}
+
+.lg-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 16px;
+}

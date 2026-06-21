@@ -6,6 +6,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from services.email_service import send_verification_code
+from services.password_service import hash_password
 
 
 def _get_setting(db: Session, key: str, default):
@@ -156,7 +157,11 @@ def verify_and_create(db: Session, email: str, code: str) -> dict:
         },
     ).scalar()
 
-    # Create admin user (no password yet — auth comes later)
+    # Default login key / password: "<org_id>@<acronym>" (e.g. "101@TSRS")
+    org_id = p.get("org_id", "")
+    acronym = p["customer_acronym"].upper()
+    login_key = f"{org_id}@{acronym}"
+
     user_id = db.execute(
         text(
             "INSERT INTO users "
@@ -165,13 +170,13 @@ def verify_and_create(db: Session, email: str, code: str) -> dict:
             "VALUES (:lk, :ph, :un, :ei, :cid, :custid, :oid, TRUE) RETURNING user_id"
         ),
         {
-            "lk": p["email_id"],
-            "ph": "",          # placeholder — password setup deferred to auth flow
+            "lk": login_key,
+            "ph": hash_password(login_key),
             "un": p["user_name"],
             "ei": p["email_id"],
             "cid": country_id,
             "custid": customer_id,
-            "oid": p.get("org_id", ""),
+            "oid": org_id,
         },
     ).scalar()
 

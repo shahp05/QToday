@@ -34,6 +34,8 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  border-left: 1px solid var(--divider-color);
+  padding-left: 8px;
   scrollbar-width: thin;
   scrollbar-color: rgba(0,0,0,0.18) transparent;
 }
@@ -41,33 +43,6 @@
 .dashboard-panel3::-webkit-scrollbar       { width: 4px; }
 .dashboard-panel3::-webkit-scrollbar-track { background: transparent; }
 .dashboard-panel3::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.18); border-radius: 2px; }
-
-/* ─── Students intro (panel 3, no card) ─────────────────────────────────── */
-.students-intro {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  padding: 0 40px;
-}
-
-.students-intro p {
-  font-family: var(--font-family);
-  font-size: var(--font-size-xl);
-  font-weight: var(--font-weight-semibold);
-  color: #aaaaaa;
-  line-height: 1.7;
-  letter-spacing: 0.02em;
-  margin: 0;
-}
-
-.students-intro code {
-  font-family: var(--font-family);
-  font-size: var(--font-size-xl);
-  font-weight: var(--font-weight-medium);
-  background: transparent;
-  color: var(--color-green-light);
-  letter-spacing: 0.04em;
-}
 
 /* ─── Dev bar — fixed bottom-right, Demo + RoleSwitcher ──────────────────── */
 .dev-bar {

@@ -98,7 +98,7 @@
 
 .teach-today-note {
   margin: 10px 0 0;
-  font-size: var(--font-size-sm, 11px);
+  font-size: var(--font-size-md, 14px);
   color: var(--color-green-light, #8EEB65);
   line-height: 1.6;
   max-width: 420px;
