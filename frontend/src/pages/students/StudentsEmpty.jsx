@@ -59,7 +59,7 @@ function isBlank(value) {
   return value === undefined || value === null || String(value).trim() === ''
 }
 
-// Parses raw sheet rows, validates headers/required values, returns { error } or { ok: true }.
+// Parses one sheet's raw rows, validates headers/required values, returns { error } or { ok: true }.
 function validateRows(rows) {
   const nonEmptyRows = rows.filter(row => row.some(cell => !isBlank(cell)))
   if (nonEmptyRows.length < 2) return { error: FORMAT_ERROR }
@@ -74,7 +74,8 @@ function validateRows(rows) {
   const colMap = {}
   for (const c of usedCols) {
     const field = matchField(headerRow[c])
-    if (!field || colMap[field.key] !== undefined) return { error: FORMAT_ERROR }
+    if (!field) continue // unrecognized extra column — ignored
+    if (colMap[field.key] !== undefined) return { error: FORMAT_ERROR }
     colMap[field.key] = c
   }
   for (const field of CANONICAL_FIELDS) {
@@ -86,6 +87,16 @@ function validateRows(rows) {
     if (requiredCols.some(c => isBlank(row[c]))) return { error: VALUE_ERROR }
   }
 
+  return { ok: true }
+}
+
+// Every sheet in the workbook is a grade roster and must independently pass validation.
+function validateWorkbook(workbook) {
+  for (const sheetName of workbook.SheetNames) {
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '' })
+    const result = validateRows(rows)
+    if (result.error) return result
+  }
   return { ok: true }
 }
 
@@ -146,9 +157,7 @@ export default function StudentsEmpty() {
     try {
       const buffer = await file.arrayBuffer()
       const workbook = XLSX.read(buffer, { type: 'array' })
-      const sheet = workbook.Sheets[workbook.SheetNames[0]]
-      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
-      const result = validateRows(rows)
+      const result = validateWorkbook(workbook)
       if (result.error) {
         setError(result.error)
         shake()
