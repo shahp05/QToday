@@ -123,6 +123,14 @@ export default function StudentsEmpty() {
   const [selectedFile, setSelectedFile] = useState(null)
   const [source, setSource] = useState(null) // 'drop' | 'browse'
   const [error, setError] = useState(null)
+  const [shaking, setShaking] = useState(false)
+  const shakeTimer = useRef(null)
+
+  function shake() {
+    clearTimeout(shakeTimer.current)
+    setShaking(true)
+    shakeTimer.current = setTimeout(() => setShaking(false), 450)
+  }
 
   async function handleFile(file, src) {
     if (!file) return
@@ -131,6 +139,7 @@ export default function StudentsEmpty() {
 
     if (!file.name.match(/\.xlsx$/i)) {
       setError('Please upload an .xlsx file.')
+      shake()
       return
     }
 
@@ -142,12 +151,14 @@ export default function StudentsEmpty() {
       const result = validateRows(rows)
       if (result.error) {
         setError(result.error)
+        shake()
         return
       }
       setError(null)
       alert('Success')
     } catch {
       setError(FORMAT_ERROR)
+      shake()
     }
   }
 
@@ -178,7 +189,7 @@ export default function StudentsEmpty() {
       <div className="students-upload-row">
 
         <div
-          className={`students-upload-box ${dragging ? 'students-upload-box--drag' : ''}`}
+          className={`students-upload-box ${dragging ? 'students-upload-box--drag' : ''} ${shaking && source === 'drop' ? 'ui-shake' : ''}`}
           onDragOver={e => { e.preventDefault(); setDragging(true) }}
           onDragLeave={() => setDragging(false)}
           onDrop={onDrop}
@@ -196,7 +207,7 @@ export default function StudentsEmpty() {
         </div>
 
         <div
-          className="students-upload-box"
+          className={`students-upload-box ${shaking && source === 'browse' ? 'ui-shake' : ''}`}
           onClick={() => fileRef.current.click()}
           role="button"
           tabIndex={0}
