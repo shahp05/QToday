@@ -102,14 +102,14 @@
 
 .students-upload-box:hover,
 .students-upload-box:focus-visible {
-  border-color: var(--color-green-light, #8EEB65);
-  background: #f3fdef;
-  box-shadow: 0 2px 8px rgba(142,235,101,0.25);
+  border-color: var(--color-text-light, #666666);
+  background: var(--color-grey-light, #f2f4f7);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .students-upload-box--drag {
-  border-color: var(--color-green-light, #8EEB65);
-  background: #f3fdef;
+  border-color: var(--color-text-light, #666666);
+  background: var(--color-grey-light, #f2f4f7);
 }
 
 .students-upload-box-text {
