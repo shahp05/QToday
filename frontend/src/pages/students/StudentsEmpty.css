@@ -140,35 +140,6 @@
   color: var(--color-green-light, #8EEB65);
 }
 
-.students-upload-actions {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  width: 100%;
-}
-
-.students-upload-btn {
-  align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  border: 1.5px solid var(--color-green-light, #8EEB65);
-  border-radius: var(--radius-full, 9999px);
-  padding: 8px 20px;
-  background: transparent;
-  color: var(--color-green-light, #8EEB65);
-  font-size: var(--font-size-md, 14px);
-  font-weight: var(--font-weight-semibold, 600);
-  line-height: 1;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.students-upload-btn:hover {
-  background: var(--color-green-light, #8EEB65);
-  color: #1a1a1a;
-}
-
 /* ─── Mobile ──────────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .students-upload-row {

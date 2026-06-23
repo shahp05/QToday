@@ -124,29 +124,18 @@ export default function StudentsEmpty() {
   const [source, setSource] = useState(null) // 'drop' | 'browse'
   const [error, setError] = useState(null)
 
-  function handleFile(file, src) {
+  async function handleFile(file, src) {
     if (!file) return
+    setSelectedFile(file)
+    setSource(src)
+
     if (!file.name.match(/\.xlsx$/i)) {
-      setSelectedFile(file)
-      setSource(src)
       setError('Please upload an .xlsx file.')
       return
     }
-    setSelectedFile(file)
-    setSource(src)
-    setError(null)
-  }
 
-  function onDrop(e) {
-    e.preventDefault()
-    setDragging(false)
-    handleFile(e.dataTransfer.files[0], 'drop')
-  }
-
-  async function handleUpload() {
-    if (!selectedFile) return
     try {
-      const buffer = await selectedFile.arrayBuffer()
+      const buffer = await file.arrayBuffer()
       const workbook = XLSX.read(buffer, { type: 'array' })
       const sheet = workbook.Sheets[workbook.SheetNames[0]]
       const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
@@ -160,6 +149,12 @@ export default function StudentsEmpty() {
     } catch {
       setError(FORMAT_ERROR)
     }
+  }
+
+  function onDrop(e) {
+    e.preventDefault()
+    setDragging(false)
+    handleFile(e.dataTransfer.files[0], 'drop')
   }
 
   return (
@@ -219,14 +214,6 @@ export default function StudentsEmpty() {
         </div>
 
       </div>
-
-      {selectedFile && (
-        <div className="students-upload-actions">
-          <button className="students-upload-btn" onClick={handleUpload}>
-            Upload
-          </button>
-        </div>
-      )}
 
       <p className="students-note">
         Use xlsx to add students. Login accounts for students and parents will be automatically created as shown below. When they move to the next grade, simply upload a new xlsx with their next grade.
