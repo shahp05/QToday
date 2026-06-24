@@ -68,12 +68,16 @@
 
 /* ─── Grade tiles — squares, rounded corners ──────────────────────────────── */
 .students-grade-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid rgba(255,255,255,0.6);
   border-radius: var(--radius-sm, 6px);
   background: rgba(255,255,255,0.08);
   color: rgba(255,255,255,0.65);
   font-size: var(--font-size-md, 14px);
   font-weight: 600;
+  line-height: 1;
   width: 30px;
   height: 30px;
   padding: 0;
@@ -94,12 +98,16 @@
 
 /* ─── Section tiles — circles ─────────────────────────────────────────────── */
 .students-section-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 50%;
   background: rgba(255,255,255,0.08);
   color: rgba(255,255,255,0.65);
   font-size: var(--font-size-md, 14px);
   font-weight: 600;
+  line-height: 1;
   width: 30px;
   height: 30px;
   padding: 0;
