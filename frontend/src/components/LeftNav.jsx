@@ -1,6 +1,7 @@
 import { useUI } from '../context/UIContext'
 import { useNavigate } from 'react-router-dom'
 import { useProfileStore } from '../store/profileStore'
+import { useStudentsStore } from '../store/studentsStore'
 import logo from '../assets/logo_48.webp'
 import './LeftNav.css'
 
@@ -57,6 +58,7 @@ export default function LeftNav() {
   const { activePage, setActivePage, setActiveSubject } = useUI()
   const profile = useProfileStore()
   const clearProfile = useProfileStore(s => s.clearProfile)
+  const clearStudents = useStudentsStore(s => s.clearStudents)
   const navigate = useNavigate()
 
   const infoItems = [
@@ -72,6 +74,7 @@ export default function LeftNav() {
 
   function handleLogout() {
     clearProfile()
+    clearStudents()
     navigate('/')
   }
 

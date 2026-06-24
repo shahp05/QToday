@@ -3,11 +3,12 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import LeftNav from '../components/LeftNav'
 import RoleSwitcher from '../components/RoleSwitcher'
 import IntroMessage from '../components/IntroMessage'
-import StudentsEmpty from './students/StudentsEmpty'
+import StudentsPage from './students/StudentsPage'
 import SubjectsList from './subjects/SubjectsList'
 import SubjectsPage from './subjects/SubjectsPage'
 import TeachTodayPage from './subjects/TeachTodayPage'
 import { useUI } from '../context/UIContext'
+import { useStudentsStore } from '../store/studentsStore'
 import './Dashboard.css'
 
 function IconDemo() {
@@ -46,11 +47,16 @@ export default function Dashboard() {
   const { activePage, setActivePage } = useUI()
   const navigate                      = useNavigate()
   const location                      = useLocation()
+  const fetchStudents                 = useStudentsStore(s => s.fetchStudents)
 
   useEffect(() => {
     if (location.state?.firstVisit) {
       setActivePage('students')
     }
+  }, [])
+
+  useEffect(() => {
+    fetchStudents()
   }, [])
 
   return (
@@ -69,7 +75,7 @@ export default function Dashboard() {
       {/* ── Panel 3: main content ─────────────────────────────────────────── */}
       <div className="dashboard-panel3">
         {activePage === 'students'
-          ? <StudentsEmpty />
+          ? <StudentsPage />
           : activePage
             ? <PageContent activePage={activePage} />
             : <IntroMessage />

@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { useProfileStore } from '../../store/profileStore'
-import { apiFetch } from '../../lib/api'
+import { useStudentsStore } from '../../store/studentsStore'
 import './StudentsEmpty.css'
 
 
@@ -133,8 +133,9 @@ function IconBrowse() {
   )
 }
 
-export default function StudentsEmpty() {
+export default function StudentsEmpty({ onUploaded }) {
   const acronym = useProfileStore(s => s.customer_acronym)
+  const uploadAndRefresh = useStudentsStore(s => s.uploadAndRefresh)
   const studentLogin = acronym ? `${SAMPLE[0]}@${acronym}` : ''
   const [parent1Email, parent2Email] = [SAMPLE[4], SAMPLE[5]]
   const loginRows = [
@@ -177,27 +178,11 @@ export default function StudentsEmpty() {
         return
       }
 
-      const res = await apiFetch('/students/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ students: result.rows }),
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        setError(body.detail || FORMAT_ERROR)
-        shake()
-        return
-      }
-
-      const counts = await res.json()
+      await uploadAndRefresh(result.rows)
       setError(null)
-      alert(
-        `Success — students: ${counts.students_created} added, ${counts.students_updated} updated, `
-        + `${counts.students_deactivated} deactivated. Parents: ${counts.parents_created} added, `
-        + `${counts.parents_deactivated} deactivated.`
-      )
-    } catch {
-      setError(FORMAT_ERROR)
+      onUploaded?.()
+    } catch (err) {
+      setError(err.message || FORMAT_ERROR)
       shake()
     }
   }

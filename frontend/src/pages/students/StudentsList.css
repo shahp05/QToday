@@ -1,0 +1,249 @@
+.students-list {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  flex: 1;
+}
+
+/* ─── Sticky page title — matches the leftnav logo's own vertical rhythm
+   (10px pad + 56px cell, centered) so the two line up across panels ──────── */
+.students-list-header {
+  position: sticky;
+  top: 0;
+  z-index: 7;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  padding: 18px 24px 0;
+  background: var(--color-dark);
+}
+
+.students-list-title {
+  margin: 0;
+  font-family: var(--font-family);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-normal);
+  color: var(--color-white);
+}
+
+.students-list-upload-btn {
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: var(--radius-sm, 6px);
+  background: none;
+  color: var(--color-white);
+  font-size: var(--font-size-sm, 13px);
+  font-weight: 500;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.students-list-upload-btn:hover,
+.students-list-upload-btn:focus-visible {
+  border-color: var(--color-green-light, #8EEB65);
+  background: rgba(255,255,255,0.08);
+}
+
+/* ─── Grades / Sections filter bar — sticky right below the title ───────── */
+.students-filter-bar {
+  position: sticky;
+  top: 56px;
+  z-index: 6;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 24px;
+  background: var(--color-dark);
+}
+
+.students-filter-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* ─── Grade tiles — squares, rounded corners ──────────────────────────────── */
+.students-grade-pill {
+  border: 1px solid rgba(255,255,255,0.6);
+  border-radius: var(--radius-sm, 6px);
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.65);
+  font-size: var(--font-size-sm, 13px);
+  font-weight: 600;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.students-grade-pill:hover {
+  background: rgba(255,255,255,0.16);
+  color: var(--color-white);
+}
+
+.students-grade-pill--active {
+  background: var(--color-green-light, #8EEB65);
+  border-color: var(--color-green-light, #8EEB65);
+  color: var(--color-dark, #343434);
+}
+
+/* ─── Section tiles — circles ─────────────────────────────────────────────── */
+.students-section-pill {
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.65);
+  font-size: var(--font-size-sm, 13px);
+  font-weight: 600;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.students-section-pill:hover {
+  background: rgba(255,255,255,0.16);
+  border-color: rgba(255,255,255,0.16);
+  color: var(--color-white);
+}
+
+.students-section-pill--active {
+  background: var(--color-green-light, #8EEB65);
+  border-color: var(--color-green-light, #8EEB65);
+  color: var(--color-dark, #343434);
+}
+
+/* ─── Rows — two adjacent columns, bare-minimum gap, white cards ─────────── */
+.students-list-body {
+  padding: 8px 24px 24px;
+}
+
+.students-rows {
+  column-count: 2;
+  column-gap: 16px;
+}
+
+.students-row {
+  display: grid;
+  grid-template-columns: 44px 80px 1fr 24px;
+  align-items: stretch;
+  background: var(--color-white);
+  border-radius: var(--radius-sm, 6px);
+  margin-bottom: 2px;
+  break-inside: avoid;
+}
+
+/* Thumbnail sits flush against the row's own border — no padding — while
+   every other column gets its spacing via its own padding instead. Clipped
+   here (not on .students-row) so the parent popover isn't cut off too. */
+.students-row-photo {
+  display: flex;
+  overflow: hidden;
+  border-radius: var(--radius-sm, 6px) 0 0 var(--radius-sm, 6px);
+}
+
+.students-thumb {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.students-thumb--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-grey-light, #f2f4f7);
+  color: var(--color-text-light, #666666);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.students-row-id,
+.students-row-name {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  font-size: var(--font-size-md, 14px);
+  color: var(--color-text, #343434);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.students-row-id {
+  padding-left: 12px;
+}
+
+/* ─── Contact icon + popover ──────────────────────────────────────────────── */
+.students-contact-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-right: 8px;
+}
+
+.students-contact-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: var(--color-text-light, #666666);
+  padding: 2px;
+  cursor: pointer;
+}
+
+.students-contact-btn:hover {
+  color: var(--color-text, #343434);
+}
+
+.students-contact-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 10;
+  background: var(--color-white);
+  border-radius: var(--radius-sm, 6px);
+  box-shadow: var(--shadow-md);
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.students-contact-email {
+  font-size: var(--font-size-md, 14px);
+  color: var(--color-text, #343434);
+}
+
+@media (max-width: 900px) {
+  .students-rows {
+    column-count: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .students-row {
+    grid-template-columns: 44px 60px 1fr 24px;
+  }
+
+  .students-filter-row {
+    gap: 14px;
+  }
+
+  .students-grade-pill,
+  .students-section-pill {
+    width: 44px;
+    height: 44px;
+    font-size: var(--font-size-md, 15px);
+  }
+}
