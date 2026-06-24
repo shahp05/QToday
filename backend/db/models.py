@@ -91,7 +91,6 @@ class Customer(Base):
     board:             Mapped["Board"]              = relationship(back_populates="customers")
     users:             Mapped[list["User"]]          = relationship(back_populates="customer")
     students:          Mapped[list["Student"]]       = relationship(back_populates="customer")
-    customer_admins:   Mapped[list["CustomerAdmin"]] = relationship(back_populates="customer")
     parents:           Mapped[list["Parent"]]        = relationship(back_populates="customer")
 
 
@@ -99,24 +98,40 @@ class User(Base):
     """password_date_created == date_created means the password set at
     account creation has never been changed (both default to NOW() in the
     same INSERT, so Postgres resolves them to the same transaction
-    timestamp). A password-change flow must bump password_date_created."""
+    timestamp). A password-change flow must bump password_date_created.
+
+    email_id is unique only among parent accounts (see uidx_users_email_parent
+    below) — a parent and an admin/teacher can share the same email address,
+    since they are separate login identities (parents log in with their
+    email as login_key; staff/students use org_id@acronym).
+
+    is_sysadm / is_adm are read together with customer_id, which doubles as
+    the scope selector — one admin account never manages more than one
+    school, so there's no separate admin-roles join table:
+      is_sysadm=True,  customer_id set  -> that school's owner/super admin
+      is_adm=True,     customer_id set  -> that school's ordinary admin/teacher
+      is_sysadm=True,  customer_id NULL -> platform-level system admin
+      is_adm=True,     customer_id NULL -> reserved, unused for now"""
 
     __tablename__ = "users"
+    __table_args__ = (
+        Index("uidx_users_email_parent", "email_id",
+              postgresql_where=expression.text("is_parent = true"), unique=True),
+    )
 
     user_id:       Mapped[int]           = mapped_column(Integer, primary_key=True)
     login_key:     Mapped[str]           = mapped_column(String(200), nullable=False, unique=True)
     password_hash: Mapped[str]           = mapped_column(String(255), nullable=False)
     password_date_created: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
     user_name:     Mapped[str]           = mapped_column(String(200), nullable=False)
-    email_id:      Mapped[str | None]    = mapped_column(String(200), unique=True)
+    email_id:      Mapped[str | None]    = mapped_column(String(200))
     country_id:    Mapped[int | None]    = mapped_column(ForeignKey("countries.country_id"))
     customer_id:   Mapped[int | None]    = mapped_column(ForeignKey("customers.customer_id"))
     org_id:        Mapped[str | None]    = mapped_column(String(50))
     is_student:    Mapped[bool]          = mapped_column(Boolean, nullable=False, default=False)
     is_parent:     Mapped[bool]          = mapped_column(Boolean, nullable=False, default=False)
-    is_cust_adm:   Mapped[bool]          = mapped_column(Boolean, nullable=False, default=False)
     is_sysadm:     Mapped[bool]          = mapped_column(Boolean, nullable=False, default=False)
-    is_superadm:   Mapped[bool]          = mapped_column(Boolean, nullable=False, default=False)
+    is_adm:        Mapped[bool]          = mapped_column(Boolean, nullable=False, default=False)
     file_url:      Mapped[str | None]    = mapped_column(String(500))
     date_created:  Mapped[datetime]      = mapped_column(DateTime, nullable=False, server_default=func.now())
     date_modified: Mapped[datetime]      = mapped_column(DateTime, nullable=False, server_default=func.now())
@@ -126,7 +141,6 @@ class User(Base):
     country:         Mapped["Country | None"]    = relationship(back_populates="users")
     customer:        Mapped["Customer | None"]   = relationship(back_populates="users")
     student:         Mapped["Student | None"]    = relationship(back_populates="user", uselist=False)
-    customer_admin:  Mapped["CustomerAdmin | None"] = relationship(back_populates="user", uselist=False)
     parent:          Mapped["Parent | None"]     = relationship(back_populates="user", uselist=False)
 
 
@@ -164,23 +178,6 @@ class StudentGrade(Base):
 
     student: Mapped["Student"] = relationship(back_populates="student_grades")
     grade:   Mapped["Grade"]   = relationship(back_populates="student_grades")
-
-
-class CustomerAdmin(Base):
-    __tablename__ = "customer_admins"
-
-    admin_id:      Mapped[int]      = mapped_column(Integer, primary_key=True)
-    user_id:       Mapped[int]      = mapped_column(ForeignKey("users.user_id"), nullable=False)
-    customer_id:   Mapped[int]      = mapped_column(ForeignKey("customers.customer_id"), nullable=False)
-    is_superadm:   Mapped[bool]     = mapped_column(Boolean, nullable=False, default=False)
-    is_adm:        Mapped[bool]     = mapped_column(Boolean, nullable=False, default=True)
-    date_created:  Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
-    date_modified: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
-    date_deleted:  Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    is_active:     Mapped[bool]     = mapped_column(Boolean, nullable=False, default=True)
-
-    user:     Mapped["User"]     = relationship(back_populates="customer_admin")
-    customer: Mapped["Customer"] = relationship(back_populates="customer_admins")
 
 
 class Parent(Base):
@@ -503,7 +500,6 @@ Index("idx_students_user",          Student.user_id)
 Index("idx_students_customer",      Student.customer_id)
 Index("idx_student_grades_student", StudentGrade.student_id)
 Index("idx_student_grades_active",  StudentGrade.student_id, StudentGrade.is_active)
-Index("idx_cust_admins_customer",   CustomerAdmin.customer_id)
 Index("idx_parents_student",        Parent.student_id)
 Index("idx_topics_subject",         Topic.subject_id)
 Index("idx_topics_subject_area",    Topic.subject_area_id)

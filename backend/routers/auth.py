@@ -22,9 +22,9 @@ def auth_login(payload: LoginRequest, db: Session = Depends(get_db)):
         token = create_access_token({
             "user_id":           profile["user_id"],
             "customer_id":       profile["customer_id"],
-            "is_customer_admin": profile["is_customer_admin"],
-            "is_admin":          profile["is_admin"],
-            "is_super_admin":    profile["is_super_admin"],
+            "is_school_admin":   profile["is_school_admin"],
+            "is_school_teacher": profile["is_school_teacher"],
+            "is_system_admin":   profile["is_system_admin"],
         })
         return {"access_token": token, "token_type": "bearer", "profile": profile}
     except AuthError as e:

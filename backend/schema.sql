@@ -81,6 +81,19 @@ CREATE TABLE IF NOT EXISTS customers (
 --   date_created, so they share one transaction timestamp. Equal values
 --   means the password has never been changed — any password-change flow
 --   must bump this column independently of date_created/date_modified.
+--
+--   email_id is unique only among parent accounts (see uidx_users_email_parent
+--   below) — a parent and an admin/teacher can share the same email, since
+--   they're separate login identities (parent logs in with their email,
+--   staff/students use org_id@acronym).
+--
+--   is_sysadm / is_adm are read together with customer_id (one admin account
+--   never manages more than one school, so there's no admin-roles join
+--   table — customer_id doubles as the scope selector):
+--     is_sysadm=TRUE, customer_id set  -> that school's owner/super admin
+--     is_adm=TRUE,    customer_id set  -> that school's ordinary admin/teacher
+--     is_sysadm=TRUE, customer_id NULL -> platform-level system admin
+--     is_adm=TRUE,    customer_id NULL -> reserved, unused for now
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS users (
     user_id         SERIAL          PRIMARY KEY,
@@ -88,21 +101,21 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash   VARCHAR(255)    NOT NULL,
     password_date_created TIMESTAMP NOT NULL DEFAULT NOW(),
     user_name       VARCHAR(200)    NOT NULL,
-    email_id        VARCHAR(200)    NULL UNIQUE,
+    email_id        VARCHAR(200)    NULL,
     country_id      INTEGER         NULL REFERENCES countries(country_id),
     customer_id     INTEGER         NULL REFERENCES customers(customer_id),
     org_id          VARCHAR(50)     NULL,
     is_student      BOOLEAN         NOT NULL DEFAULT FALSE,
     is_parent       BOOLEAN         NOT NULL DEFAULT FALSE,
-    is_cust_adm     BOOLEAN         NOT NULL DEFAULT FALSE,
     is_sysadm       BOOLEAN         NOT NULL DEFAULT FALSE,
-    is_superadm     BOOLEAN         NOT NULL DEFAULT FALSE,
+    is_adm          BOOLEAN         NOT NULL DEFAULT FALSE,
     file_url        VARCHAR(500)    NULL,
     date_created    TIMESTAMP       NOT NULL DEFAULT NOW(),
     date_modified   TIMESTAMP       NOT NULL DEFAULT NOW(),
     date_deleted    TIMESTAMP       NULL,
     is_active       BOOLEAN         NOT NULL DEFAULT TRUE
 );
+CREATE UNIQUE INDEX IF NOT EXISTS uidx_users_email_parent ON users(email_id) WHERE is_parent = TRUE;
 
 
 -- ------------------------------------------------------------
@@ -137,22 +150,6 @@ CREATE TABLE IF NOT EXISTS student_grades (
 
 
 -- ------------------------------------------------------------
--- 8. CUSTOMER_ADMINS
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS customer_admins (
-    admin_id        SERIAL          PRIMARY KEY,
-    user_id         INTEGER         NOT NULL REFERENCES users(user_id),
-    customer_id     INTEGER         NOT NULL REFERENCES customers(customer_id),
-    is_superadm     BOOLEAN         NOT NULL DEFAULT FALSE,
-    is_adm          BOOLEAN         NOT NULL DEFAULT TRUE,
-    date_created    TIMESTAMP       NOT NULL DEFAULT NOW(),
-    date_modified   TIMESTAMP       NOT NULL DEFAULT NOW(),
-    date_deleted    TIMESTAMP       NULL,
-    is_active       BOOLEAN         NOT NULL DEFAULT TRUE
-);
-
-
--- ------------------------------------------------------------
 -- 9. PARENTS
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS parents (
@@ -176,7 +173,6 @@ CREATE INDEX IF NOT EXISTS idx_students_user           ON students(user_id);
 CREATE INDEX IF NOT EXISTS idx_students_customer       ON students(customer_id);
 CREATE INDEX IF NOT EXISTS idx_student_grades_student  ON student_grades(student_id);
 CREATE INDEX IF NOT EXISTS idx_student_grades_active   ON student_grades(student_id, is_active);
-CREATE INDEX IF NOT EXISTS idx_cust_admins_customer    ON customer_admins(customer_id);
 CREATE INDEX IF NOT EXISTS idx_parents_student         ON parents(student_id);
 
 

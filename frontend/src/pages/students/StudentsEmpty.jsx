@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { useProfileStore } from '../../store/profileStore'
+import { apiFetch } from '../../lib/api'
 import './StudentsEmpty.css'
 
 
@@ -59,7 +60,8 @@ function isBlank(value) {
   return value === undefined || value === null || String(value).trim() === ''
 }
 
-// Parses one sheet's raw rows, validates headers/required values, returns { error } or { ok: true }.
+// Parses one sheet's raw rows, validates headers/required values, returns
+// { error } or { ok: true, rows: [{ org_id, name, grade, section, parent1_email, parent2_email }] }.
 function validateRows(rows) {
   const nonEmptyRows = rows.filter(row => row.some(cell => !isBlank(cell)))
   if (nonEmptyRows.length < 2) return { error: FORMAT_ERROR }
@@ -87,17 +89,28 @@ function validateRows(rows) {
     if (requiredCols.some(c => isBlank(row[c]))) return { error: VALUE_ERROR }
   }
 
-  return { ok: true }
+  const extracted = dataRows.map(row => ({
+    org_id: String(row[colMap.id]).trim(),
+    name: String(row[colMap.name]).trim(),
+    grade: parseInt(row[colMap.grade], 10),
+    section: colMap.section !== undefined && !isBlank(row[colMap.section]) ? String(row[colMap.section]).trim() : null,
+    parent1_email: colMap.parent1email !== undefined && !isBlank(row[colMap.parent1email]) ? String(row[colMap.parent1email]).trim() : null,
+    parent2_email: colMap.parent2email !== undefined && !isBlank(row[colMap.parent2email]) ? String(row[colMap.parent2email]).trim() : null,
+  }))
+
+  return { ok: true, rows: extracted }
 }
 
 // Every sheet in the workbook is a grade roster and must independently pass validation.
 function validateWorkbook(workbook) {
+  const allRows = []
   for (const sheetName of workbook.SheetNames) {
     const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '' })
     const result = validateRows(rows)
     if (result.error) return result
+    allRows.push(...result.rows)
   }
-  return { ok: true }
+  return { ok: true, rows: allRows }
 }
 
 function IconDrop() {
@@ -163,8 +176,26 @@ export default function StudentsEmpty() {
         shake()
         return
       }
+
+      const res = await apiFetch('/students/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ students: result.rows }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        setError(body.detail || FORMAT_ERROR)
+        shake()
+        return
+      }
+
+      const counts = await res.json()
       setError(null)
-      alert('Success')
+      alert(
+        `Success — students: ${counts.students_created} added, ${counts.students_updated} updated, `
+        + `${counts.students_deactivated} deactivated. Parents: ${counts.parents_created} added, `
+        + `${counts.parents_deactivated} deactivated.`
+      )
     } catch {
       setError(FORMAT_ERROR)
       shake()

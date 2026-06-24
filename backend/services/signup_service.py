@@ -162,11 +162,13 @@ def verify_and_create(db: Session, email: str, code: str) -> dict:
     acronym = p["customer_acronym"].upper()
     login_key = f"{org_id}@{acronym}"
 
+    # The signup flow creates this customer's owner/super admin —
+    # is_sysadm=True together with a non-NULL customer_id (see models.py).
     user_id = db.execute(
         text(
             "INSERT INTO users "
             "(login_key, password_hash, user_name, email_id, country_id, "
-            " customer_id, org_id, is_cust_adm) "
+            " customer_id, org_id, is_sysadm) "
             "VALUES (:lk, :ph, :un, :ei, :cid, :custid, :oid, TRUE) RETURNING user_id"
         ),
         {
@@ -179,15 +181,6 @@ def verify_and_create(db: Session, email: str, code: str) -> dict:
             "oid": org_id,
         },
     ).scalar()
-
-    # Link user as customer admin
-    db.execute(
-        text(
-            "INSERT INTO customer_admins (user_id, customer_id, is_superadm) "
-            "VALUES (:uid, :cid, TRUE)"
-        ),
-        {"uid": user_id, "cid": customer_id},
-    )
 
     db.commit()
     return {"customer_id": customer_id, "user_id": user_id}
