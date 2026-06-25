@@ -26,12 +26,6 @@ function StudentThumbnail({ name, photoUrl }) {
   return <span className="students-thumb students-thumb--placeholder">{initials(name)}</span>
 }
 
-function IconUpload() {
-  return (
-    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-  )
-}
-
 function IconContact() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -162,10 +156,8 @@ export default function StudentsList({ onUploadNew }) {
       <div className="students-list-header">
         <h2 className="students-list-title">Students</h2>
         {isAdmin && (
-          <button className="students-cta-btn" onClick={onUploadNew}>
-            <span className="students-cta-icon" aria-hidden="true"><IconUpload /></span>
-            <span className="students-cta-label">Upload new file</span>
-            <span className="students-cta-spacer" aria-hidden="true" />
+          <button className="students-list-upload-btn" onClick={onUploadNew}>
+            Upload new file
           </button>
         )}
       </div>
