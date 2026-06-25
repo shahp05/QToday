@@ -133,7 +133,7 @@ function IconBrowse() {
   )
 }
 
-export default function StudentsEmpty({ onUploaded }) {
+export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) {
   const acronym = useProfileStore(s => s.customer_acronym)
   const uploadAndRefresh = useStudentsStore(s => s.uploadAndRefresh)
   const studentLogin = acronym ? `${SAMPLE[0]}@${acronym}` : ''
@@ -196,7 +196,14 @@ export default function StudentsEmpty({ onUploaded }) {
   return (
     <div className="students-empty">
 
-      <p className="students-empty-label">Upload students xlsx in the format below:</p>
+      <div className="students-empty-header">
+        <p className="students-empty-label">Upload students xlsx in the format below:</p>
+        {studentCount > 0 && (
+          <button className="students-empty-list-btn" onClick={onShowList}>
+            Students {studentCount}
+          </button>
+        )}
+      </div>
 
       <div className="students-format-table">
         <div className="students-format-row students-format-row--head">

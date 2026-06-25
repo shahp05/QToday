@@ -12,6 +12,14 @@
   overflow-y: auto;
 }
 
+.students-empty-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
 .students-empty-label {
   font-size: 0.85rem;
   font-weight: 500;
@@ -19,7 +27,25 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin: 0;
-  width: 100%;
+}
+
+.students-empty-list-btn {
+  flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: var(--radius-sm, 6px);
+  background: none;
+  color: var(--color-white, #ffffff);
+  font-size: var(--font-size-sm, 13px);
+  font-weight: 500;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.students-empty-list-btn:hover,
+.students-empty-list-btn:focus-visible {
+  border-color: var(--color-green-light, #8EEB65);
+  background: rgba(255,255,255,0.08);
 }
 
 /* ─── Format table (header + sample row) ─────────────────────────────────── */

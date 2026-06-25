@@ -4,11 +4,17 @@ import StudentsEmpty from './StudentsEmpty'
 import StudentsList from './StudentsList'
 
 export default function StudentsPage() {
-  const hasStudents = useStudentsStore(s => s.students.length > 0)
+  const studentCount = useStudentsStore(s => s.students.length)
   const [showUpload, setShowUpload] = useState(false)
 
-  if (hasStudents && !showUpload) {
+  if (studentCount > 0 && !showUpload) {
     return <StudentsList onUploadNew={() => setShowUpload(true)} />
   }
-  return <StudentsEmpty onUploaded={() => setShowUpload(false)} />
+  return (
+    <StudentsEmpty
+      onUploaded={() => setShowUpload(false)}
+      studentCount={studentCount}
+      onShowList={() => setShowUpload(false)}
+    />
+  )
 }
