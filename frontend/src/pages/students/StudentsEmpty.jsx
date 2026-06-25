@@ -113,6 +113,12 @@ function validateWorkbook(workbook) {
   return { ok: true, rows: allRows }
 }
 
+function IconStudentsList() {
+  return (
+    <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+  )
+}
+
 function IconDrop() {
   return (
     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -199,8 +205,10 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
       <div className="students-empty-header">
         <p className="students-empty-label">Upload students xlsx in the format below:</p>
         {studentCount > 0 && (
-          <button className="students-empty-list-btn" onClick={onShowList}>
-            Students {studentCount}
+          <button className="students-cta-btn" onClick={onShowList}>
+            <span className="students-cta-icon" aria-hidden="true"><IconStudentsList /></span>
+            <span className="students-cta-label">Students {studentCount}</span>
+            <span className="students-cta-spacer" aria-hidden="true" />
           </button>
         )}
       </div>

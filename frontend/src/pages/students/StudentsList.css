@@ -28,22 +28,69 @@
   color: var(--color-white);
 }
 
-.students-list-upload-btn {
-  border: 1px solid rgba(255,255,255,0.25);
-  border-radius: var(--radius-sm, 6px);
-  background: none;
-  color: var(--color-white);
-  font-size: var(--font-size-sm, 13px);
-  font-weight: 500;
-  padding: 8px 14px;
+/* ─── CTA pill button — same shape/format as the signup/login button, but
+   width:auto (this isn't a full-width form action) and colors flipped
+   (white pill on the dark page instead of dark pill on a white card,
+   since the surrounding background here is dark, not white) ───────────── */
+.students-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px;
+  gap: 10px;
+  background: var(--color-white);
+  color: var(--color-dark);
+  border: none;
+  border-radius: var(--radius-full);
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm, 13px);
+  font-weight: var(--font-weight-normal);
+  white-space: nowrap;
+  width: auto;
+  transition: background var(--transition-fast), transform var(--transition-fast),
+              box-shadow var(--transition-fast);
 }
 
-.students-list-upload-btn:hover,
-.students-list-upload-btn:focus-visible {
-  border-color: var(--color-green-light, #8EEB65);
-  background: rgba(255,255,255,0.08);
+.students-cta-btn:hover {
+  background: var(--color-grey-light, #f2f4f7);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.30);
+}
+
+.students-cta-btn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.students-cta-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 4px;
+}
+
+.students-cta-icon svg {
+  width: 18px;
+  height: 18px;
+  stroke: var(--color-green-dark, #0F8911);
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.students-cta-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.students-cta-spacer {
+  width: 22px;
+  flex-shrink: 0;
 }
 
 /* ─── Grades / Sections filter bar — sticky right below the title ───────── */
