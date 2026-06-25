@@ -75,7 +75,7 @@
   border-radius: var(--radius-sm, 6px);
   background: rgba(255,255,255,0.08);
   color: rgba(255,255,255,0.65);
-  font-size: var(--font-size-md, 14px);
+  font-size: 13px; /* --font-size-sm resolves to 11px on desktop — too small for a chip label */
   font-weight: 600;
   line-height: 1;
   width: 30px;
@@ -105,7 +105,7 @@
   border-radius: 50%;
   background: rgba(255,255,255,0.08);
   color: rgba(255,255,255,0.65);
-  font-size: var(--font-size-md, 14px);
+  font-size: 13px; /* --font-size-sm resolves to 11px on desktop — too small for a chip label */
   font-weight: 600;
   line-height: 1;
   width: 30px;
