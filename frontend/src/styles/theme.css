@@ -47,7 +47,7 @@
   --nav-gap:          28px;
 
   /* Left nav */
-  --leftnav-width:    110px;
+  --leftnav-width:    150px;
   --leftnav-icon-size:22px;
   --leftnav-font-size:var(--font-size-sm);
   --panel2-width:     300px;
@@ -96,7 +96,7 @@
     --nav-icon-size:     44px;
     --nav-icon-label:    12px;
     --nav-gap:           20px;
-    --leftnav-width:     110px;
+    --leftnav-width:     150px;
     --content-padding-h: 20px;
     --btn-height-sm:     38px;
     --btn-height-md:     46px;

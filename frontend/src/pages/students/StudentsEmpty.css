@@ -31,21 +31,22 @@
 
 .students-empty-list-btn {
   flex-shrink: 0;
-  border: 1px solid rgba(255,255,255,0.25);
+  border: 1px solid var(--color-green-light, #8EEB65);
   border-radius: var(--radius-sm, 6px);
-  background: none;
-  color: var(--color-white, #ffffff);
+  background: var(--color-green-light, #8EEB65);
+  color: var(--color-dark, #343434);
   font-size: var(--font-size-sm, 13px);
   font-weight: 500;
+  text-transform: capitalize;
   padding: 8px 14px;
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
 }
 
 .students-empty-list-btn:hover,
 .students-empty-list-btn:focus-visible {
-  border-color: var(--color-green-light, #8EEB65);
-  background: rgba(255,255,255,0.08);
+  background: none;
+  color: var(--color-white, #ffffff);
 }
 
 /* ─── Format table (header + sample row) ─────────────────────────────────── */
