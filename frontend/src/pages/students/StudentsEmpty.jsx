@@ -2,6 +2,8 @@ import { useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { useProfileStore } from '../../store/profileStore'
 import { useStudentsStore } from '../../store/studentsStore'
+import { resolveApiError } from '../../lib/api'
+import { ErrorCode } from '../../errors/errorCodes'
 import './StudentsEmpty.css'
 
 
@@ -10,8 +12,18 @@ const SAMPLE  = ['2026-1001', 'Aanya Sharma', '8', 'B', 'parent1@abc.com', 'pare
 
 const LOGIN_COLUMNS = ['Id', 'User', 'Default Login', 'Default Password']
 
-const FORMAT_ERROR = 'Incorrect xlsx format. Check column headings and values.'
-const VALUE_ERROR = 'Id, name and grade must be entered.'
+const FORMAT_ERROR = resolveApiError({ error_code: ErrorCode.XLSX_FORMAT_INVALID })
+const VALUE_ERROR = resolveApiError({ error_code: ErrorCode.XLSX_VALUE_MISSING, context: { field: 'grade' } })
+const FILE_TYPE_ERROR = resolveApiError({ error_code: ErrorCode.XLSX_FILE_TYPE_INVALID })
+
+function duplicateIdError(ids) {
+  const seen = new Set()
+  for (const id of ids) {
+    if (seen.has(id)) return resolveApiError({ error_code: ErrorCode.DUPLICATE_ID, context: { id } })
+    seen.add(id)
+  }
+  return null
+}
 
 const CANONICAL_FIELDS = [
   { key: 'id', norm: 'id', required: true },
@@ -98,18 +110,25 @@ function validateRows(rows) {
     parent2_email: colMap.parent2email !== undefined && !isBlank(row[colMap.parent2email]) ? String(row[colMap.parent2email]).trim() : null,
   }))
 
+  const dupError = duplicateIdError(extracted.map(r => r.org_id))
+  if (dupError) return { error: dupError }
+
   return { ok: true, rows: extracted }
 }
 
 // Every sheet in the workbook is a grade roster and must independently pass validation.
 function validateWorkbook(workbook) {
   const allRows = []
+  const allIds = []
   for (const sheetName of workbook.SheetNames) {
     const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '' })
     const result = validateRows(rows)
     if (result.error) return result
     allRows.push(...result.rows)
+    allIds.push(...result.rows.map(r => r.org_id))
   }
+  const dupError = duplicateIdError(allIds)
+  if (dupError) return { error: dupError }
   return { ok: true, rows: allRows }
 }
 
@@ -163,7 +182,7 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
     setSource(src)
 
     if (!file.name.match(/\.xlsx$/i)) {
-      setError('Please upload an .xlsx file.')
+      setError(FILE_TYPE_ERROR)
       shake()
       return
     }

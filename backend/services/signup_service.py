@@ -5,6 +5,8 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from errors.app_error import AppError
+from errors.error_codes import ErrorCode
 from services.email_service import send_verification_code
 from services.password_service import hash_password
 
@@ -58,13 +60,9 @@ async def request_verification(db: Session, payload: dict) -> None:
     await send_verification_code(email, code, ttl)
 
 
-class VerificationError(Exception):
-    pass
-
-
 def verify_and_create(db: Session, email: str, code: str) -> dict:
     """Verify the code. On success, create customer + user and return their IDs.
-    Raises VerificationError with a user-facing message on any failure."""
+    Raises AppError with a centrally-defined ErrorCode on any failure."""
     max_attempts = int(_get_setting(db, "signup_verification_max_attempts", 5))
 
     row = db.execute(
@@ -78,17 +76,17 @@ def verify_and_create(db: Session, email: str, code: str) -> dict:
     ).fetchone()
 
     if row is None:
-        raise VerificationError("No pending verification found for this email.")
+        raise AppError(ErrorCode.NO_PENDING_VERIFICATION)
 
     verif_id, stored_code, payload, expires_at, attempt_count, _ = row
 
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
     if datetime.now(timezone.utc) > expires_at:
-        raise VerificationError("expired")
+        raise AppError(ErrorCode.VERIFICATION_CODE_EXPIRED)
 
     if attempt_count >= max_attempts:
-        raise VerificationError("Too many incorrect attempts. Please request a new code.")
+        raise AppError(ErrorCode.TOO_MANY_ATTEMPTS)
 
     if code.strip() != stored_code:
         db.execute(
@@ -100,9 +98,7 @@ def verify_and_create(db: Session, email: str, code: str) -> dict:
         )
         db.commit()
         remaining = max_attempts - attempt_count - 1
-        raise VerificationError(
-            f"Incorrect code. {remaining} attempt{'s' if remaining != 1 else ''} remaining."
-        )
+        raise AppError(ErrorCode.INCORRECT_CODE, context={"remaining": remaining})
 
     # Mark verified before writing customer/user so a retry is idempotent
     db.execute(
@@ -119,7 +115,7 @@ def verify_and_create(db: Session, email: str, code: str) -> dict:
         {"c": p["country_code"]},
     ).fetchone()
     if country_row is None:
-        raise VerificationError(f"Unknown country code: {p['country_code']}")
+        raise AppError(ErrorCode.UNKNOWN_COUNTRY_CODE, context={"code": p["country_code"]})
     country_id = country_row[0]
 
     # Resolve or create board

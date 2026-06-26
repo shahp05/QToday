@@ -19,7 +19,8 @@ import imgCommerce  from '../../assets/commerce.webp'
 import imgPsych     from '../../assets/psychology.webp'
 import imgSociology from '../../assets/sociology.webp'
 import imgPolSci    from '../../assets/political-science.webp'
-import { API_BASE as API } from '../../lib/api'
+import { API_BASE as API, resolveApiError } from '../../lib/api'
+import { ErrorCode } from '../../errors/errorCodes'
 import './SignupPage.css'
 
 const TTL = 60   // must match signup_verification_ttl_seconds in app_settings
@@ -126,12 +127,12 @@ function SignupForm({ onCodeSent }) {
         body: JSON.stringify(form),
       })
       if (!res.ok) {
-        const j = await res.json().catch(() => ({}))
-        throw new Error(j.detail || 'Something went wrong. Please try again.')
+        const j = await res.json().catch(() => null)
+        throw new Error(resolveApiError(j))
       }
       onCodeSent(form)
     } catch (err) {
-      setToast(err.message)
+      setToast(err instanceof TypeError ? resolveApiError({ error_code: ErrorCode.FRONTEND_NETWORK_ERROR }) : err.message)
     } finally {
       setBusy(false)
     }
@@ -285,21 +286,21 @@ function VerifyForm({ formData, onSuccess }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email_id: formData.email_id, code: code.trim() }),
       })
-      const j = await res.json().catch(() => ({}))
-      if (res.status === 410 || j.detail === 'expired') {
+      const j = await res.json().catch(() => null)
+      if (j?.error_code === ErrorCode.VERIFICATION_CODE_EXPIRED) {
         setExpired(true)
-        setMsg('Your code has expired. Request a new one.')
+        setMsg(resolveApiError(j))
         setMsgType('error')
         return
       }
       if (!res.ok) {
-        setMsg(j.detail || 'Incorrect code. Please try again.')
+        setMsg(resolveApiError(j))
         setMsgType('error')
         return
       }
       onSuccess(j)
     } catch (err) {
-      setMsg(`Network error: ${err.message}`)
+      setMsg(err instanceof TypeError ? resolveApiError({ error_code: ErrorCode.FRONTEND_NETWORK_ERROR }) : err.message)
       setMsgType('error')
     } finally {
       setBusy(false)
@@ -316,12 +317,15 @@ function VerifyForm({ formData, onSuccess }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        const j = await res.json().catch(() => null)
+        throw new Error(resolveApiError(j))
+      }
       setMsg('A new code has been sent to your email.')
       setMsgType('info')
       startTimer()
-    } catch {
-      setMsg('Could not resend. Please try again.')
+    } catch (err) {
+      setMsg(err instanceof TypeError ? resolveApiError({ error_code: ErrorCode.FRONTEND_NETWORK_ERROR }) : err.message)
       setMsgType('error')
     } finally {
       setResending(false)

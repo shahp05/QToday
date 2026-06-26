@@ -1,6 +1,8 @@
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from errors.app_error import AppError
+from errors.error_codes import ErrorCode
 from services.password_service import hash_password
 
 
@@ -90,6 +92,13 @@ def process_students_upload(db: Session, customer_id: int, rows: list[dict]) -> 
     seen_org_ids: set[str] = set()
     seen_parent_emails: set[str] = set()
 
+    seen_in_file: set[str] = set()
+    for row in rows:
+        oid = row["org_id"].strip()
+        if oid in seen_in_file:
+            raise AppError(ErrorCode.DUPLICATE_ID, context={"id": oid})
+        seen_in_file.add(oid)
+
     try:
         for row in rows:
             org_id = row["org_id"].strip()
@@ -106,6 +115,17 @@ def process_students_upload(db: Session, customer_id: int, rows: list[dict]) -> 
             ).fetchone()
 
             if existing is None:
+                # org_id@acronym is also how teachers build their login_key
+                # (globally unique on users) — an Id already claimed by a
+                # teacher (or any other user) at this school would otherwise
+                # surface as a raw DB constraint violation on INSERT.
+                id_conflict = db.execute(
+                    text("SELECT 1 FROM users WHERE customer_id = :cid AND org_id = :oid"),
+                    {"cid": customer_id, "oid": org_id},
+                ).fetchone()
+                if id_conflict is not None:
+                    raise AppError(ErrorCode.DUPLICATE_ID, context={"id": org_id})
+
                 login_key = f"{org_id}@{acronym}"
                 user_id = db.execute(
                     text(

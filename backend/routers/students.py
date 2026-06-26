@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from db.database import get_db
+from errors.app_error import AppError
+from errors.error_codes import ErrorCode
 from schemas.students import StudentsUploadRequest
 from services.auth_service import get_current_user
 from services.students_query_service import get_my_students
@@ -25,11 +27,10 @@ def upload_students(
     db: Session = Depends(get_db),
 ):
     if not claims.get("is_school_admin"):
-        raise HTTPException(status_code=403, detail="Only a school admin can upload students.")
+        raise AppError(ErrorCode.AUTH_FORBIDDEN)
     customer_id = claims.get("customer_id")
     if not customer_id:
-        raise HTTPException(status_code=400, detail="No school is associated with this account.")
+        raise AppError(ErrorCode.SCHOOL_NOT_ASSOCIATED)
 
     rows = [r.model_dump() for r in payload.students]
-    counts = process_students_upload(db, customer_id, rows)
-    return counts
+    return process_students_upload(db, customer_id, rows)

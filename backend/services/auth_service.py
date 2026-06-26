@@ -1,14 +1,12 @@
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, Header
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from db.database import get_db
+from errors.app_error import AppError
+from errors.error_codes import ErrorCode
 from services.jwt_service import TokenError, decode_access_token
 from services.password_service import verify_password
-
-
-class AuthError(Exception):
-    pass
 
 
 def login(db: Session, login_key: str, password: str) -> int:
@@ -21,7 +19,7 @@ def login(db: Session, login_key: str, password: str) -> int:
     ).fetchone()
 
     if row is None or not verify_password(password, row.password_hash):
-        raise AuthError("Incorrect login ID or password.")
+        raise AppError(ErrorCode.INVALID_CREDENTIALS)
 
     return row.user_id
 
@@ -34,19 +32,19 @@ def get_current_user(
     Protected routes depend on this; routes that must stay public (signup,
     countries lookup, etc.) simply don't take this dependency."""
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Not authenticated.")
+        raise AppError(ErrorCode.AUTH_REQUIRED)
 
     token = authorization.removeprefix("Bearer ").strip()
     try:
         claims = decode_access_token(token)
-    except TokenError as e:
-        raise HTTPException(status_code=401, detail=str(e))
+    except TokenError:
+        raise AppError(ErrorCode.AUTH_REQUIRED)
 
     row = db.execute(
         text("SELECT user_id FROM users WHERE user_id = :uid AND is_active = TRUE"),
         {"uid": claims.get("user_id")},
     ).fetchone()
     if row is None:
-        raise HTTPException(status_code=401, detail="User no longer active.")
+        raise AppError(ErrorCode.ACCOUNT_INACTIVE)
 
     return claims
