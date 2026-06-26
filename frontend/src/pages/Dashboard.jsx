@@ -1,14 +1,16 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import LeftNav from '../components/LeftNav'
 import RoleSwitcher from '../components/RoleSwitcher'
 import IntroMessage from '../components/IntroMessage'
 import StudentsPage from './students/StudentsPage'
+import TeachersPage from './teachers/TeachersPage'
 import SubjectsList from './subjects/SubjectsList'
 import SubjectsPage from './subjects/SubjectsPage'
 import TeachTodayPage from './subjects/TeachTodayPage'
 import { useUI } from '../context/UIContext'
 import { useStudentsStore } from '../store/studentsStore'
+import { useTeachersStore } from '../store/teachersStore'
 import './Dashboard.css'
 
 function IconDemo() {
@@ -48,6 +50,10 @@ export default function Dashboard() {
   const navigate                      = useNavigate()
   const location                      = useLocation()
   const fetchStudents                 = useStudentsStore(s => s.fetchStudents)
+  const fetchTeachers                 = useTeachersStore(s => s.fetchTeachers)
+  const studentsStatus                = useStudentsStore(s => s.status)
+  const teachersStatus                = useTeachersStore(s => s.status)
+  const [displayedPage, setDisplayedPage] = useState(null)
 
   useEffect(() => {
     if (location.state?.firstVisit) {
@@ -57,7 +63,18 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchStudents()
+    fetchTeachers()
   }, [])
+
+  // Students/teachers data loads async on a left-nav button press — keep
+  // whatever panel3 is currently showing until that fetch settles (loaded
+  // or errored) instead of swapping to a blank/loading page mid-fetch. The
+  // left-nav button itself shows the spinner for this wait.
+  useEffect(() => {
+    if (activePage === 'students' && (studentsStatus === 'idle' || studentsStatus === 'loading')) return
+    if (activePage === 'teachers' && (teachersStatus === 'idle' || teachersStatus === 'loading')) return
+    setDisplayedPage(activePage)
+  }, [activePage, studentsStatus, teachersStatus])
 
   return (
     <div className="dashboard">
@@ -66,7 +83,7 @@ export default function Dashboard() {
       <LeftNav />
 
       {/* ── Panel 2: context list ─────────────────────────────────────────── */}
-      {activePage === 'subjects' && (
+      {displayedPage === 'subjects' && (
         <div className="dashboard-panel2">
           <SubjectsList />
         </div>
@@ -74,11 +91,13 @@ export default function Dashboard() {
 
       {/* ── Panel 3: main content ─────────────────────────────────────────── */}
       <div className="dashboard-panel3">
-        {activePage === 'students'
+        {displayedPage === 'students'
           ? <StudentsPage />
-          : activePage
-            ? <PageContent activePage={activePage} />
-            : <IntroMessage />
+          : displayedPage === 'teachers'
+            ? <TeachersPage />
+            : displayedPage
+              ? <PageContent activePage={displayedPage} />
+              : <IntroMessage />
         }
       </div>
 

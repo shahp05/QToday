@@ -1,0 +1,118 @@
+.teachers-list {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  flex: 1;
+}
+
+.teachers-list-header {
+  position: sticky;
+  top: 0;
+  z-index: 7;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 24px 0;
+  margin-bottom: 10px;
+  background: var(--color-dark);
+}
+
+.teachers-list-title {
+  margin: 0;
+  font-family: var(--font-family);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-normal);
+  color: rgba(255,255,255,0.65);
+}
+
+.teachers-list-upload-btn {
+  border: 1px solid var(--color-green-light, #8EEB65);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-green-light, #8EEB65);
+  color: var(--color-dark, #343434);
+  font-size: var(--font-size-sm, 13px);
+  font-weight: 500;
+  text-transform: capitalize;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+.teachers-list-upload-btn:hover,
+.teachers-list-upload-btn:focus-visible {
+  background: none;
+  color: var(--color-white);
+}
+
+/* ─── Rows — two adjacent columns, bare-minimum gap, white cards ─────────── */
+.teachers-list-body {
+  padding: 8px 24px 24px;
+}
+
+.teachers-rows {
+  column-count: 2;
+  column-gap: 16px;
+}
+
+.teachers-row {
+  display: grid;
+  grid-template-columns: 44px 90px 1fr 1.3fr;
+  align-items: stretch;
+  background: var(--color-white);
+  border-radius: var(--radius-sm, 6px);
+  margin-bottom: 2px;
+  break-inside: avoid;
+}
+
+.teachers-row-photo {
+  display: flex;
+  overflow: hidden;
+  border-radius: var(--radius-sm, 6px) 0 0 var(--radius-sm, 6px);
+}
+
+.teachers-thumb {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.teachers-thumb--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-grey-light, #f2f4f7);
+  color: var(--color-text-light, #666666);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.teachers-row-id,
+.teachers-row-name,
+.teachers-row-email {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  font-size: var(--font-size-md, 14px);
+  color: var(--color-text, #343434);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.teachers-row-id {
+  padding-left: 12px;
+}
+
+@media (max-width: 900px) {
+  .teachers-rows {
+    column-count: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .teachers-row {
+    grid-template-columns: 44px 70px 1fr 1fr;
+  }
+}

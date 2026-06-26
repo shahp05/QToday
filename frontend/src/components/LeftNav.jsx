@@ -2,6 +2,7 @@ import { useUI } from '../context/UIContext'
 import { useNavigate } from 'react-router-dom'
 import { useProfileStore } from '../store/profileStore'
 import { useStudentsStore } from '../store/studentsStore'
+import { useTeachersStore } from '../store/teachersStore'
 import logo from '../assets/logo_48.webp'
 import './LeftNav.css'
 
@@ -38,6 +39,10 @@ function IconAccount() {
   )
 }
 
+function IconSpinner() {
+  return <span className="leftnav-item-spinner" role="status" aria-label="Loading" />
+}
+
 function IconLogout() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -59,7 +64,15 @@ export default function LeftNav() {
   const profile = useProfileStore()
   const clearProfile = useProfileStore(s => s.clearProfile)
   const clearStudents = useStudentsStore(s => s.clearStudents)
+  const clearTeachers = useTeachersStore(s => s.clearTeachers)
+  const studentsStatus = useStudentsStore(s => s.status)
+  const teachersStatus = useTeachersStore(s => s.status)
   const navigate = useNavigate()
+
+  const isLoadingById = {
+    students: studentsStatus === 'idle' || studentsStatus === 'loading',
+    teachers: teachersStatus === 'idle' || teachersStatus === 'loading',
+  }
 
   const infoItems = [
     { label: 'School',  value: profile.customer_acronym || '—' },
@@ -75,6 +88,7 @@ export default function LeftNav() {
   function handleLogout() {
     clearProfile()
     clearStudents()
+    clearTeachers()
     navigate('/')
   }
 
@@ -94,7 +108,7 @@ export default function LeftNav() {
             aria-label={label}
             aria-current={activePage === id ? 'page' : undefined}
           >
-            <Icon />
+            {isLoadingById[id] ? <IconSpinner /> : <Icon />}
             <span className="leftnav-item-label">{label}</span>
           </button>
         ))}

@@ -1,0 +1,193 @@
+.teachers-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 32px;
+  width: 100%;
+  max-width: 768px;
+  margin: 0 auto;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.teachers-empty-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.teachers-empty-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #aaaaaa;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+
+.teachers-empty-list-btn {
+  flex-shrink: 0;
+  border: 1px solid var(--color-green-light, #8EEB65);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-green-light, #8EEB65);
+  color: var(--color-dark, #343434);
+  font-size: var(--font-size-sm, 13px);
+  font-weight: 500;
+  text-transform: capitalize;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+.teachers-empty-list-btn:hover,
+.teachers-empty-list-btn:focus-visible {
+  background: none;
+  color: var(--color-white, #ffffff);
+}
+
+/* ─── Format table (header + sample row) ─────────────────────────────────── */
+.teachers-format-table {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border: 1px solid #ccc;
+  border-radius: var(--radius-sm, 6px);
+  overflow: hidden;
+}
+
+.teachers-format-row {
+  display: grid;
+  grid-template-columns: 108px 1.3fr 1.6fr;
+}
+
+.teachers-login-row {
+  display: grid;
+  grid-template-columns: 108px 140px 1fr 1fr;
+}
+
+.teachers-format-cell {
+  padding: 8px 6px;
+  font-size: var(--font-size-sm, 11px);
+  text-align: center;
+  border-left: 1px solid #ccc;
+}
+
+.teachers-format-cell:first-child {
+  border-left: none;
+}
+
+.teachers-format-row--head .teachers-format-cell {
+  color: #aaaaaa;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: rgba(255,255,255,0.04);
+  border-bottom: 1px solid #ccc;
+}
+
+.teachers-format-row:not(.teachers-format-row--head) .teachers-format-cell {
+  background: #ffffff;
+  color: #1a1a1a;
+}
+
+.teachers-login-row:not(.teachers-format-row--head) .teachers-format-cell {
+  color: var(--color-green-light, #8EEB65);
+  font-weight: var(--font-weight-semibold, 600);
+}
+
+.teachers-login-row:nth-child(n+3) .teachers-format-cell:not(:first-child) {
+  border-top: 1px solid #ccc;
+}
+
+/* ─── Drop / Browse containers ───────────────────────────────────────────── */
+.teachers-upload-row {
+  display: flex;
+  gap: 20px;
+  width: 100%;
+}
+
+.teachers-upload-box {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 110px;
+  border: 1px solid #ccc;
+  border-radius: var(--radius-sm, 6px);
+  background: #ffffff;
+  color: #1a1a1a;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.teachers-upload-box:hover,
+.teachers-upload-box:focus-visible {
+  border-color: var(--color-text-light, #666666);
+  background: var(--color-grey-light, #f2f4f7);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.teachers-upload-box--drag {
+  border-color: var(--color-text-light, #666666);
+  background: var(--color-grey-light, #f2f4f7);
+}
+
+.teachers-upload-box-text {
+  font-size: var(--font-size-md, 14px);
+  font-weight: var(--font-weight-medium, 500);
+  color: #1a1a1a;
+}
+
+/* ─── Upload error ────────────────────────────────────────────────────────── */
+.teachers-upload-error {
+  font-size: var(--font-size-sm, 11px);
+  color: var(--color-red, #D32F2F);
+  text-align: center;
+  padding: 0 12px;
+}
+
+@keyframes ui-shake {
+  0%,  100% { transform: translateX(0); }
+  15%        { transform: translateX(-5px); }
+  30%        { transform: translateX(5px); }
+  45%        { transform: translateX(-4px); }
+  60%        { transform: translateX(4px); }
+  75%        { transform: translateX(-2px); }
+  90%        { transform: translateX(2px); }
+}
+
+.ui-shake {
+  animation: ui-shake 0.45s ease;
+}
+
+/* ─── Note ────────────────────────────────────────────────────────────────── */
+.teachers-note {
+  margin: 0;
+  width: 100%;
+  font-size: var(--font-size-md, 14px);
+  color: #aaaaaa;
+  line-height: 1.6;
+}
+
+.teachers-note code {
+  font-family: 'Consolas', 'Menlo', monospace;
+  color: var(--color-green-light, #8EEB65);
+}
+
+/* ─── Mobile ──────────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .teachers-upload-row {
+    flex-direction: column;
+  }
+
+  .teachers-format-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

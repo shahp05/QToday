@@ -10,8 +10,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from db.database import SessionLocal, get_db
-from errors.error_codes import ErrorCode
-from routers import auth, countries, error_logs, qa, signup, students
+from errors.app_error import AppError
+from errors.error_codes import ErrorCode, ERROR_DEFAULTS
+from routers import auth, countries, error_logs, qa, signup, students, teachers
 from services.error_log_service import log_error
 
 app = FastAPI(title="QToday API")
@@ -30,6 +31,7 @@ app.include_router(signup.router)
 app.include_router(countries.router)
 app.include_router(auth.router)
 app.include_router(students.router)
+app.include_router(teachers.router)
 
 
 @app.exception_handler(Exception)
@@ -61,8 +63,23 @@ async def log_unhandled_exceptions(request: Request, exc: Exception):
     headers = {"Access-Control-Allow-Origin": origin} if origin else {}
     return JSONResponse(
         status_code=500,
-        content={"detail": "An unexpected error occurred."},
+        content={"error_code": ErrorCode.UNKNOWN_ERROR.value, "context": {}},
         headers=headers,
+    )
+
+
+@app.exception_handler(AppError)
+async def handle_app_error(request: Request, exc: AppError):
+    """Expected, user-facing errors raised via AppError carry only an
+    ErrorCode + context — never a hardcoded message — so the response
+    body matches exactly what the frontend resolves via errorCodes.ts.
+    Unlike the bare-Exception handler above, this isn't a system failure,
+    so it's intentionally not logged to error_logs (expected validation/
+    auth rejections, not bugs)."""
+    defaults = ERROR_DEFAULTS[exc.error_code]
+    return JSONResponse(
+        status_code=defaults["http_status"],
+        content={"error_code": exc.error_code.value, "context": exc.context},
     )
 
 

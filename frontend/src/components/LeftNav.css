@@ -24,7 +24,7 @@
   height: 40px;
   object-fit: contain;
   border-radius: 50%;
-  border: 2px solid var(--color-grey);
+  border: 1px solid var(--color-grey);
 }
 
 /* ─── Nav items ───────────────────────────────────────────────────────────── */
@@ -72,6 +72,19 @@
 
 .leftnav-item--logout {
   opacity: 0.65;
+}
+
+.leftnav-item-spinner {
+  width: 22px;
+  height: 22px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: leftnav-item-spin 0.8s linear infinite;
+}
+
+@keyframes leftnav-item-spin {
+  to { transform: rotate(360deg); }
 }
 
 .leftnav-item-label {
