@@ -34,30 +34,36 @@
   gap: 2px;
 }
 
+/* ─── Same hover/selection treatment as the students-page grade pills:
+   muted bg+text by default, brighter on hover, light-green fill+dark text
+   when selected — no opacity dimming, explicit color states instead ──────── */
 .leftnav-item {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 5px;
-  background: none;
-  border: none;
-  color: var(--color-text-on-green);
+  background: rgba(255,255,255,0.08);
+  border: 1px solid transparent;
+  color: rgba(255,255,255,0.65);
   padding: 10px;
   border-radius: var(--radius-md);
   cursor: pointer;
-  opacity: 0.72;
   width: 100%;
-  transition: background var(--transition-fast), opacity var(--transition-fast);
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
 }
 
 .leftnav-item:hover {
-  background: rgba(255,255,255,0.14);
-  opacity: 1;
+  background: rgba(255,255,255,0.16);
+  color: var(--color-white);
 }
 
 .leftnav-item--active {
-  background: rgba(255,255,255,0.22);
-  opacity: 1;
+  background: var(--color-green-light, #8EEB65);
+  color: var(--color-dark, #343434);
+}
+
+.leftnav-item--active:hover {
+  border-color: var(--color-green-light, #8EEB65);
 }
 
 .leftnav-item--active .leftnav-item-label {
