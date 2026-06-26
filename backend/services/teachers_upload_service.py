@@ -61,10 +61,15 @@ def process_teachers_upload(db: Session, customer_id: int, rows: list[dict]) -> 
                 # student (or any other user) at this school would otherwise
                 # surface as a raw DB constraint violation on INSERT.
                 id_conflict = db.execute(
-                    text("SELECT 1 FROM users WHERE customer_id = :cid AND org_id = :oid"),
+                    text("SELECT is_sysadm FROM users WHERE customer_id = :cid AND org_id = :oid"),
                     {"cid": customer_id, "oid": org_id},
                 ).fetchone()
                 if id_conflict is not None:
+                    if id_conflict.is_sysadm:
+                        # The school owner's own id — already has full access
+                        # and isn't a separate teacher row; including them in
+                        # the roster is a no-op, not a conflict.
+                        continue
                     raise AppError(ErrorCode.DUPLICATE_ID, context={"id": org_id})
 
                 login_key = f"{org_id}@{acronym}"
