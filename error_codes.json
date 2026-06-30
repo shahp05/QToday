@@ -12,6 +12,8 @@
   "INVALID_CREDENTIALS":        { "message": "Incorrect login ID or password.",                                "http_status": 401 },
   "ACCOUNT_INACTIVE":           { "message": "This account is no longer active.",                              "http_status": 401 },
   "SCHOOL_NOT_ASSOCIATED":      { "message": "No school is associated with this account.",                     "http_status": 400 },
+  "LAST_SUPER_ADMIN":           { "message": "At least one super admin must remain for this school.",          "http_status": 400 },
+  "TEACHER_NOT_FOUND":          { "message": "This teacher could not be found.",                               "http_status": 404 },
   "NO_PENDING_VERIFICATION":    { "message": "No pending verification found for this email.",                  "http_status": 400 },
   "VERIFICATION_CODE_EXPIRED":  { "message": "Your code has expired. Request a new one.",                      "http_status": 410 },
   "TOO_MANY_ATTEMPTS":          { "message": "Too many incorrect attempts. Please request a new code.",        "http_status": 400 },

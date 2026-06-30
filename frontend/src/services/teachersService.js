@@ -18,3 +18,13 @@ export async function uploadTeachers(rows) {
   if (!res.ok) throw new Error(await apiErrorMessage(res))
   return res.json() // counts
 }
+
+export async function setTeacherSuperAdmin(orgId, isSuperAdmin) {
+  const res = await apiFetch(`/teachers/${encodeURIComponent(orgId)}/super-admin`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ is_super_admin: isSuperAdmin }),
+  })
+  if (!res.ok) throw new Error(await apiErrorMessage(res))
+  return res.json() // { org_id, is_super_admin }
+}

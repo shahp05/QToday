@@ -10,7 +10,7 @@ import './TeachersEmpty.css'
 const COLUMNS = ['Id', 'Name', 'Email']
 const SAMPLE  = ['T-2026-01', "Riya Ma'm", 'riya.kapoor@abc.com']
 
-const LOGIN_COLUMNS = ['Id', 'User', 'Default Login', 'Default Password']
+const LOGIN_COLUMNS = ['Id', 'Default Login', 'Default Password']
 
 const FORMAT_ERROR = resolveApiError({ error_code: ErrorCode.XLSX_FORMAT_INVALID })
 const VALUE_ERROR = resolveApiError({ error_code: ErrorCode.XLSX_VALUE_MISSING, context: { field: 'email' } })
@@ -146,12 +146,16 @@ function IconBrowse() {
   )
 }
 
+function IconSpinner() {
+  return <span className="teachers-upload-spinner" role="status" aria-label="Uploading" />
+}
+
 export default function TeachersEmpty({ onUploaded, teacherCount, onShowList }) {
   const acronym = useProfileStore(s => s.customer_acronym)
   const uploadAndRefresh = useTeachersStore(s => s.uploadAndRefresh)
   const teacherLogin = acronym ? `${SAMPLE[0]}@${acronym}` : ''
   const loginRows = [
-    [SAMPLE[0], 'Teacher', teacherLogin, teacherLogin],
+    [SAMPLE[0], teacherLogin, teacherLogin],
   ]
   const fileRef = useRef(null)
   const [dragging, setDragging] = useState(false)
@@ -159,6 +163,7 @@ export default function TeachersEmpty({ onUploaded, teacherCount, onShowList }) 
   const [source, setSource] = useState(null) // 'drop' | 'browse'
   const [error, setError] = useState(null)
   const [shaking, setShaking] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const shakeTimer = useRef(null)
 
   function shake() {
@@ -168,7 +173,7 @@ export default function TeachersEmpty({ onUploaded, teacherCount, onShowList }) 
   }
 
   async function handleFile(file, src) {
-    if (!file) return
+    if (!file || uploading) return
     setSelectedFile(file)
     setSource(src)
 
@@ -188,12 +193,15 @@ export default function TeachersEmpty({ onUploaded, teacherCount, onShowList }) 
         return
       }
 
+      setUploading(true)
       await uploadAndRefresh(result.rows)
       setError(null)
       onUploaded?.()
     } catch (err) {
       setError(err.message || FORMAT_ERROR)
       shake()
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -239,9 +247,11 @@ export default function TeachersEmpty({ onUploaded, teacherCount, onShowList }) 
           tabIndex={0}
           aria-label="Drop teacher list file here"
         >
-          <IconDrop />
+          {uploading && source === 'drop' ? <IconSpinner /> : <IconDrop />}
           <span className="teachers-upload-box-text">
-            {selectedFile && source === 'drop' ? selectedFile.name : 'Drop file here'}
+            {uploading && source === 'drop'
+              ? 'Uploading…'
+              : selectedFile && source === 'drop' ? selectedFile.name : 'Drop file here'}
           </span>
           {selectedFile && source === 'drop' && error && (
             <span className="teachers-upload-error">{error}</span>
@@ -257,9 +267,11 @@ export default function TeachersEmpty({ onUploaded, teacherCount, onShowList }) 
           aria-label="Browse for teacher list file"
         >
           <input ref={fileRef} type="file" accept=".xlsx" onChange={e => handleFile(e.target.files[0], 'browse')} hidden />
-          <IconBrowse />
+          {uploading && source === 'browse' ? <IconSpinner /> : <IconBrowse />}
           <span className="teachers-upload-box-text">
-            {selectedFile && source === 'browse' ? selectedFile.name : 'Browse file'}
+            {uploading && source === 'browse'
+              ? 'Uploading…'
+              : selectedFile && source === 'browse' ? selectedFile.name : 'Browse file'}
           </span>
           {selectedFile && source === 'browse' && error && (
             <span className="teachers-upload-error">{error}</span>

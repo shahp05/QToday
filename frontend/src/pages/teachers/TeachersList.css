@@ -57,7 +57,7 @@
 
 .teachers-row {
   display: grid;
-  grid-template-columns: 44px 90px 1fr 1.3fr;
+  grid-template-columns: 44px 90px 1fr auto;
   align-items: stretch;
   background: var(--color-white);
   border-radius: var(--radius-sm, 6px);
@@ -88,12 +88,10 @@
   font-weight: 600;
 }
 
-.teachers-row-id,
-.teachers-row-name,
-.teachers-row-email {
+.teachers-row-id {
   display: flex;
   align-items: center;
-  padding: 4px 8px;
+  padding: 4px 8px 4px 12px;
   font-size: var(--font-size-md, 14px);
   color: var(--color-text, #343434);
   white-space: nowrap;
@@ -101,8 +99,104 @@
   text-overflow: ellipsis;
 }
 
-.teachers-row-id {
-  padding-left: 12px;
+.teachers-row-namecell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 8px;
+  overflow: hidden;
+}
+
+.teachers-row-name {
+  font-size: var(--font-size-md, 14px);
+  line-height: 1.2;
+  color: var(--color-text, #343434);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.teachers-row-email {
+  font-size: var(--font-size-sm, 12px);
+  line-height: 1.2;
+  color: var(--color-text-light, #666666);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.teachers-row-superadmin {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 16px;
+  font-size: var(--font-size-sm, 13px);
+  color: var(--color-text-light, #666666);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.teachers-superadmin-control {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.teachers-superadmin-input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.teachers-superadmin-box {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #aaaaaa;
+  border-radius: 4px;
+  background: #ffffff;
+  pointer-events: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.teachers-superadmin-input:checked ~ .teachers-superadmin-box {
+  background: var(--color-green-light, #8EEB65);
+  border-color: #5fa83d;
+}
+
+.teachers-superadmin-tick {
+  width: 10px;
+  height: 10px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.teachers-superadmin-input:checked ~ .teachers-superadmin-box .teachers-superadmin-tick {
+  opacity: 1;
+}
+
+.teachers-superadmin-spinner {
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid rgba(0,0,0,0.15);
+  border-top-color: var(--color-text, #343434);
+  border-radius: 50%;
+  animation: teachers-superadmin-spin 0.7s linear infinite;
+}
+
+@keyframes teachers-superadmin-spin {
+  to { transform: rotate(360deg); }
+}
+
+.teachers-row-superadmin--locked {
+  cursor: default;
+  pointer-events: none;
 }
 
 @media (max-width: 900px) {
@@ -113,6 +207,6 @@
 
 @media (max-width: 640px) {
   .teachers-row {
-    grid-template-columns: 44px 70px 1fr 1fr;
+    grid-template-columns: 44px 70px 1fr auto;
   }
 }

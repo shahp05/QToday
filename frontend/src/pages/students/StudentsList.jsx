@@ -37,16 +37,46 @@ function IconContact() {
   )
 }
 
+function IconEmail() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 6l9 6 9-6" />
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+    </svg>
+  )
+}
+
 // Only rendered when parent emails exist — hidden entirely otherwise rather
 // than shown disabled, since there's nothing useful to click into.
+function IconInfo() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="8" strokeWidth="3" strokeLinecap="round" />
+      <line x1="12" y1="12" x2="12" y2="16" />
+    </svg>
+  )
+}
+
 function ParentsPopover({ emails }) {
   const [open, setOpen] = useState(false)
-  const ref = useRef(null)
+  const [showHint, setShowHint] = useState(false)
+  const [popoverPos, setPopoverPos] = useState({ top: 0, right: 0 })
+  const btnRef = useRef(null)
+  const popoverRef = useRef(null)
 
   useEffect(() => {
     if (!open) return
     function handleOutsideClick(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+      if (
+        btnRef.current && !btnRef.current.contains(e.target) &&
+        popoverRef.current && !popoverRef.current.contains(e.target)
+      ) {
+        setOpen(false)
+        setShowHint(false)
+      }
     }
     document.addEventListener('mousedown', handleOutsideClick)
     return () => document.removeEventListener('mousedown', handleOutsideClick)
@@ -54,21 +84,58 @@ function ParentsPopover({ emails }) {
 
   if (emails.length === 0) return null
 
+  const mailtoHref = `mailto:${emails.join(',')}?subject=${encodeURIComponent('QToday')}`
+
+  function handleOpen() {
+    if (open) { setOpen(false); setShowHint(false); return }
+    const rect = btnRef.current.getBoundingClientRect()
+    setPopoverPos({
+      top: rect.bottom + 4,
+      right: window.innerWidth - rect.right,
+    })
+    setOpen(true)
+  }
+
   return (
-    <span className="students-contact-wrap" ref={ref}>
+    <span className="students-contact-wrap">
       <button
+        ref={btnRef}
         type="button"
         className="students-contact-btn"
-        onClick={() => setOpen(o => !o)}
+        onClick={handleOpen}
         aria-label="Show parent emails"
       >
         <IconContact />
       </button>
       {open && (
-        <div className="students-contact-popover">
+        <div
+          ref={popoverRef}
+          className="students-contact-popover"
+          style={{ top: popoverPos.top, right: popoverPos.right }}
+        >
           {emails.map(email => (
-            <div key={email} className="students-contact-email">{email}</div>
+            <span key={email} className="students-contact-email">
+              <span>{email}</span>
+            </span>
           ))}
+          <div className="students-contact-mailto-row">
+            <a className="students-contact-mailto-btn" href={mailtoHref}>
+              Send Email
+            </a>
+            <button
+              type="button"
+              className="students-contact-info-btn"
+              onClick={() => setShowHint(h => !h)}
+              aria-label="How to set default email app"
+            >
+              <IconInfo />
+            </button>
+          </div>
+          {showHint && (
+            <span className="students-contact-mailto-hint">
+              Opens your default email app. If nothing happens, set your email app as the default for mailto links in your browser settings.
+            </span>
+          )}
         </div>
       )}
     </span>

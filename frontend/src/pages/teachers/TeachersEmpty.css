@@ -66,7 +66,7 @@
 
 .teachers-login-row {
   display: grid;
-  grid-template-columns: 108px 140px 1fr 1fr;
+  grid-template-columns: 108px 1.3fr 1.6fr;
 }
 
 .teachers-format-cell {
@@ -143,6 +143,19 @@
   font-size: var(--font-size-md, 14px);
   font-weight: var(--font-weight-medium, 500);
   color: #1a1a1a;
+}
+
+.teachers-upload-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(0,0,0,0.12);
+  border-top-color: var(--color-green-light, #8EEB65);
+  border-radius: 50%;
+  animation: teachers-upload-spin 0.8s linear infinite;
+}
+
+@keyframes teachers-upload-spin {
+  to { transform: rotate(360deg); }
 }
 
 /* ─── Upload error ────────────────────────────────────────────────────────── */

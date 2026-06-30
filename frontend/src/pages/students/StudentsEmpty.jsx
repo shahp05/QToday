@@ -152,6 +152,10 @@ function IconBrowse() {
   )
 }
 
+function IconSpinner() {
+  return <span className="students-upload-spinner" role="status" aria-label="Uploading" />
+}
+
 export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) {
   const acronym = useProfileStore(s => s.customer_acronym)
   const uploadAndRefresh = useStudentsStore(s => s.uploadAndRefresh)
@@ -168,6 +172,7 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
   const [source, setSource] = useState(null) // 'drop' | 'browse'
   const [error, setError] = useState(null)
   const [shaking, setShaking] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const shakeTimer = useRef(null)
 
   function shake() {
@@ -177,7 +182,7 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
   }
 
   async function handleFile(file, src) {
-    if (!file) return
+    if (!file || uploading) return
     setSelectedFile(file)
     setSource(src)
 
@@ -197,12 +202,15 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
         return
       }
 
+      setUploading(true)
       await uploadAndRefresh(result.rows)
       setError(null)
       onUploaded?.()
     } catch (err) {
       setError(err.message || FORMAT_ERROR)
       shake()
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -248,9 +256,11 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
           tabIndex={0}
           aria-label="Drop student list file here"
         >
-          <IconDrop />
+          {uploading && source === 'drop' ? <IconSpinner /> : <IconDrop />}
           <span className="students-upload-box-text">
-            {selectedFile && source === 'drop' ? selectedFile.name : 'Drop file here'}
+            {uploading && source === 'drop'
+              ? 'Uploading…'
+              : selectedFile && source === 'drop' ? selectedFile.name : 'Drop file here'}
           </span>
           {selectedFile && source === 'drop' && error && (
             <span className="students-upload-error">{error}</span>
@@ -266,9 +276,11 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
           aria-label="Browse for student list file"
         >
           <input ref={fileRef} type="file" accept=".xlsx" onChange={e => handleFile(e.target.files[0], 'browse')} hidden />
-          <IconBrowse />
+          {uploading && source === 'browse' ? <IconSpinner /> : <IconBrowse />}
           <span className="students-upload-box-text">
-            {selectedFile && source === 'browse' ? selectedFile.name : 'Browse file'}
+            {uploading && source === 'browse'
+              ? 'Uploading…'
+              : selectedFile && source === 'browse' ? selectedFile.name : 'Browse file'}
           </span>
           {selectedFile && source === 'browse' && error && (
             <span className="students-upload-error">{error}</span>

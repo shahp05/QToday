@@ -145,6 +145,19 @@
   color: #1a1a1a;
 }
 
+.students-upload-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(0,0,0,0.12);
+  border-top-color: var(--color-green-light, #8EEB65);
+  border-radius: 50%;
+  animation: students-upload-spin 0.8s linear infinite;
+}
+
+@keyframes students-upload-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* ─── Upload error ────────────────────────────────────────────────────────── */
 .students-upload-error {
   font-size: var(--font-size-sm, 11px);

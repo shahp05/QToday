@@ -14,8 +14,8 @@ def get_my_teachers(db: Session, user_id: int) -> dict:
 
     rows = db.execute(
         text(
-            "SELECT user_id, org_id, user_name AS name, email_id AS email "
-            "FROM users WHERE customer_id = :cid AND is_adm = TRUE AND is_active = TRUE "
+            "SELECT user_id, org_id, user_name AS name, email_id AS email, is_sysadm AS is_super_admin "
+            "FROM users WHERE customer_id = :cid AND (is_adm = TRUE OR is_sysadm = TRUE) AND is_active = TRUE "
             "ORDER BY user_name"
         ),
         {"cid": user.customer_id},

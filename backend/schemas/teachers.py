@@ -9,3 +9,7 @@ class TeacherUploadRow(BaseModel):
 
 class TeachersUploadRequest(BaseModel):
     teachers: list[TeacherUploadRow]
+
+
+class SetSuperAdminRequest(BaseModel):
+    is_super_admin: bool
