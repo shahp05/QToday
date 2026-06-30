@@ -5,8 +5,6 @@ import RoleSwitcher from '../components/RoleSwitcher'
 import IntroMessage from '../components/IntroMessage'
 import StudentsPage from './students/StudentsPage'
 import TeachersPage from './teachers/TeachersPage'
-import SubjectsList from './subjects/SubjectsList'
-import SubjectsPage from './subjects/SubjectsPage'
 import TeachTodayPage from './subjects/TeachTodayPage'
 import { useUI } from '../context/UIContext'
 import { useStudentsStore } from '../store/studentsStore'
@@ -22,7 +20,6 @@ function IconDemo() {
 }
 
 const PAGE_TITLES = {
-  subjects:  'Subjects',
   subjects2: 'Subjects',
   students:  'Students',
   teachers:  'Teachers',
@@ -31,7 +28,6 @@ const PAGE_TITLES = {
 
 function PageContent({ activePage }) {
   switch (activePage) {
-    case 'subjects':  return <SubjectsPage />
     case 'subjects2': return <TeachTodayPage />
     default:
       return (
@@ -81,13 +77,6 @@ export default function Dashboard() {
 
       {/* ── Panel 1: icon nav ─────────────────────────────────────────────── */}
       <LeftNav />
-
-      {/* ── Panel 2: context list ─────────────────────────────────────────── */}
-      {displayedPage === 'subjects' && (
-        <div className="dashboard-panel2">
-          <SubjectsList />
-        </div>
-      )}
 
       {/* ── Panel 3: main content ─────────────────────────────────────────── */}
       <div className="dashboard-panel3">

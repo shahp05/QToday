@@ -52,7 +52,6 @@ function IconLogout() {
 }
 
 const NAV_ITEMS = [
-  { id: 'subjects',  label: 'Subjects',  Icon: IconSubjects },
   { id: 'subjects2', label: 'Subjects',  Icon: IconSubjects },
   { id: 'students',  label: 'Students',  Icon: IconStudents },
   { id: 'teachers',  label: 'Teachers',  Icon: IconTeachers },
@@ -77,12 +76,12 @@ export default function LeftNav() {
   const infoItems = [
     { label: 'School',  value: profile.customer_acronym || '—' },
     { label: 'Board',   value: profile.board_code       || '—' },
-    { label: 'Country', value: profile.country_code     || '—' },
+    { label: 'Country', value: profile.country_name     || '—' },
   ]
 
   function handleNav(id) {
     setActivePage(id)
-    if (id !== 'subjects') setActiveSubject(null)
+    if (id !== 'subjects2') setActiveSubject(null)
   }
 
   function handleLogout() {

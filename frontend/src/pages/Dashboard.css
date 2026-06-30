@@ -25,6 +25,18 @@
 .dashboard-panel2::-webkit-scrollbar-track { background: transparent; }
 .dashboard-panel2::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.18); border-radius: 2px; }
 
+/* ─── Vertical progress-bar divider between nav/panel2 and panel3 ───────── */
+.dashboard-divider {
+  width: 4px;
+  flex-shrink: 0;
+  background: linear-gradient(
+    to bottom,
+    var(--color-green-light),
+    var(--color-yellow),
+    var(--color-red)
+  );
+}
+
 /* ─── Panel 3 — main content ─────────────────────────────────────────────── */
 .dashboard-panel3 {
   flex: 1;
@@ -32,7 +44,6 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  border-left: 1px solid var(--divider-color);
   scrollbar-width: thin;
   scrollbar-color: rgba(0,0,0,0.18) transparent;
 }
