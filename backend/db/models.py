@@ -424,6 +424,28 @@ class QuizChallenge(Base):
     qa:   Mapped["QA"]   = relationship(back_populates="quiz_challenges")
 
 
+class TeachLog(Base):
+    __tablename__ = "teach_logs"
+
+    teach_log_id:  Mapped[int]           = mapped_column(Integer, primary_key=True)
+    user_id:       Mapped[int]           = mapped_column(ForeignKey("users.user_id"), nullable=False)
+    customer_id:   Mapped[int]           = mapped_column(ForeignKey("customers.customer_id"), nullable=False)
+    subject_id:    Mapped[int]           = mapped_column(ForeignKey("subjects.subject_id"), nullable=False)
+    topic_id:      Mapped[int]           = mapped_column(ForeignKey("topics.topic_id"), nullable=False)
+    grade_id:      Mapped[int]           = mapped_column(ForeignKey("grades.grade_id"), nullable=False)
+    section:       Mapped[str|None]      = mapped_column(String(5))
+    date_created:  Mapped[datetime]      = mapped_column(DateTime, nullable=False, server_default=func.now())
+    date_modified: Mapped[datetime]      = mapped_column(DateTime, nullable=False, server_default=func.now())
+    date_deleted:  Mapped[datetime|None] = mapped_column(DateTime, nullable=True)
+    is_active:     Mapped[bool]          = mapped_column(Boolean, nullable=False, default=True)
+
+    user:     Mapped["User"]    = relationship(foreign_keys=[user_id])
+    customer: Mapped["Customer"] = relationship(foreign_keys=[customer_id])
+    subject:  Mapped["Subject"] = relationship(foreign_keys=[subject_id])
+    topic:    Mapped["Topic"]   = relationship(foreign_keys=[topic_id])
+    grade:    Mapped["Grade"]   = relationship(foreign_keys=[grade_id])
+
+
 class BatchJob(Base):
     """Generic background-job tracker — covers true LLM batch jobs and
     simple scheduled tasks alike.
@@ -527,3 +549,7 @@ Index("idx_error_logs_code",        ErrorLog.error_code)
 Index("idx_error_logs_user",        ErrorLog.user_id)
 Index("idx_error_logs_created",     ErrorLog.date_created)
 Index("idx_error_logs_correlation", ErrorLog.correlation_id)
+Index("idx_teach_logs_user",        TeachLog.user_id)
+Index("idx_teach_logs_user_date",   TeachLog.user_id, TeachLog.date_created)
+Index("idx_teach_logs_grade",       TeachLog.customer_id, TeachLog.grade_id, TeachLog.section)
+Index("idx_teach_logs_topic",       TeachLog.customer_id, TeachLog.subject_id, TeachLog.topic_id)
