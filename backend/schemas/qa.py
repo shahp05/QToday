@@ -1,23 +1,13 @@
 from typing import Any, Optional
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel
 
 
 class QARequest(BaseModel):
     subject_name: str
     topic_name: str
     grade: int
-    # TODO: source user_country_id/student_id/customer_id from the authenticated
-    # session once auth middleware exists, instead of accepting them in the request.
-    user_country_id: int
-    student_id: Optional[int] = None
-    customer_id: Optional[int] = None
-
-    @model_validator(mode="after")
-    def _exactly_one_owner(self):
-        if (self.student_id is None) == (self.customer_id is None):
-            raise ValueError("Exactly one of student_id or customer_id must be provided")
-        return self
+    section: Optional[str] = None
 
 
 class QAItem(BaseModel):
@@ -32,3 +22,4 @@ class QAItem(BaseModel):
 
 class QAResponse(BaseModel):
     items: list[QAItem]
+    warning: Optional[str] = None

@@ -5,7 +5,7 @@ import RoleSwitcher from '../components/RoleSwitcher'
 import IntroMessage from '../components/IntroMessage'
 import StudentsPage from './students/StudentsPage'
 import TeachersPage from './teachers/TeachersPage'
-import TeachTodayPage from './subjects/TeachTodayPage'
+import SubjectsHome from './subjects/SubjectsHome'
 import { useUI } from '../context/UIContext'
 import { useStudentsStore } from '../store/studentsStore'
 import { useTeachersStore } from '../store/teachersStore'
@@ -20,7 +20,7 @@ function IconDemo() {
 }
 
 const PAGE_TITLES = {
-  subjects2: 'Subjects',
+  subjects:  'Subjects',
   students:  'Students',
   teachers:  'Teachers',
   account:   'Account',
@@ -28,7 +28,7 @@ const PAGE_TITLES = {
 
 function PageContent({ activePage }) {
   switch (activePage) {
-    case 'subjects2': return <TeachTodayPage />
+    case 'subjects':  return <SubjectsHome />
     default:
       return (
         <div className="content-card">

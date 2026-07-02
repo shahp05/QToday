@@ -316,57 +316,10 @@ CREATE TABLE IF NOT EXISTS qa (
 
 
 -- ------------------------------------------------------------
--- 14. ACCOUNT_TOPICS  (tracks which subject+topic+grade each
---                      account has activated)
---
---   customer_id set for schools; student_id set for individuals
---   and customer students alike. Exactly one must be non-null
---   (chk_account) — academic context belongs to the student
---   record, not the login (user_id).
---
---   grade_id             : grade entered by the admin
---   grade_relevant_to_id : computed by app (final formula TBD,
---                          +2 recommended) —
---                          grade <= 5            → grade + 2
---                          grade IN (6, 7)        → 10
---                          grade >= 8             → 12
---   section              : null for now, ready for future use
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS account_topics (
-    account_topic_id        SERIAL      PRIMARY KEY,
-    customer_id             INTEGER     NULL REFERENCES customers(customer_id),
-    student_id              INTEGER     NULL REFERENCES students(student_id),
-    subject_id              INTEGER     NOT NULL REFERENCES subjects(subject_id),
-    topic_id                INTEGER     NOT NULL REFERENCES topics(topic_id),
-    grade_id                INTEGER     NOT NULL REFERENCES grades(grade_id),
-    grade_relevant_to_id    INTEGER     NOT NULL REFERENCES grades(grade_id),
-    section                 VARCHAR(5)  NULL,
-    date_created            TIMESTAMP   NOT NULL DEFAULT NOW(),
-    date_modified           TIMESTAMP   NOT NULL DEFAULT NOW(),
-    date_deleted            TIMESTAMP   NULL,
-    is_active               BOOLEAN     NOT NULL DEFAULT TRUE,
-    CONSTRAINT chk_account CHECK (
-        (customer_id IS NOT NULL AND student_id IS NULL) OR
-        (student_id IS NOT NULL AND customer_id IS NULL)
-    )
-);
-
--- Partial unique indexes (NULLs require partial indexes in PostgreSQL)
-CREATE UNIQUE INDEX IF NOT EXISTS uidx_acct_topics_customer
-    ON account_topics (customer_id, subject_id, topic_id, grade_id)
-    WHERE customer_id IS NOT NULL;
-
-CREATE UNIQUE INDEX IF NOT EXISTS uidx_acct_topics_student
-    ON account_topics (student_id, subject_id, topic_id, grade_id)
-    WHERE student_id IS NOT NULL;
-
-
--- ------------------------------------------------------------
 -- 15. QUIZZES
 --
 --   student_id  : the academic actor taking the quiz (not user_id —
---                 same reasoning as account_topics; a parent's login
---                 may differ from the student playing).
+--                 a parent's login may differ from the student playing).
 --   date_scored : set only once EVERY quiz_scores row for this quiz
 --                 has is_scored = true. Source of truth is the
 --                 aggregate over quiz_scores; this column is a cache
@@ -536,7 +489,7 @@ CREATE TABLE IF NOT EXISTS error_logs (
 
 
 -- ------------------------------------------------------------
--- INDEXES (subjects / topics / qa / account_topics / quizzes /
+-- INDEXES (subjects / topics / qa / quizzes /
 --          quiz_scores / quiz_challenges / batch_jobs / error_logs)
 -- ------------------------------------------------------------
 CREATE INDEX IF NOT EXISTS idx_topics_subject        ON topics(subject_id);
@@ -548,8 +501,6 @@ CREATE INDEX IF NOT EXISTS idx_qa_subject_topic      ON qa(subject_id, topic_id)
 CREATE INDEX IF NOT EXISTS idx_qa_grade              ON qa(grade_id);
 CREATE INDEX IF NOT EXISTS idx_qa_type               ON qa(question_type);
 CREATE INDEX IF NOT EXISTS idx_qa_verified           ON qa(is_verified);
-CREATE INDEX IF NOT EXISTS idx_acct_topics_customer  ON account_topics(customer_id);
-CREATE INDEX IF NOT EXISTS idx_acct_topics_student   ON account_topics(student_id);
 CREATE INDEX IF NOT EXISTS idx_quizzes_student       ON quizzes(student_id);
 CREATE INDEX IF NOT EXISTS idx_quizzes_topic         ON quizzes(topic_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_scores_quiz      ON quiz_scores(quiz_id);

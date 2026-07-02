@@ -28,8 +28,8 @@ def compute_allocation(qa_count: int, grade: int) -> dict[str, dict[int, int]]:
     summed across types) match the difficulty distribution — both computed
     independently then crossed per type.
     """
-    descriptive_pct = get_setting("descriptive_pct", 0.20)
-    mcq_pct = get_setting("mcq_pct", 0.60)
+    descriptive_pct = get_setting("descriptive_pct", 0.25)
+    mcq_pct = get_setting("mcq_pct", 0.50)
     boolean_pct = 1.0 - descriptive_pct - mcq_pct
 
     type_counts = _largest_remainder_round(
@@ -37,11 +37,9 @@ def compute_allocation(qa_count: int, grade: int) -> dict[str, dict[int, int]]:
         qa_count,
     )
 
-    skew_threshold = get_setting("difficulty_skew_grade_threshold", 9)
-    difficulty_pcts = get_setting(
-        "difficulty_skewed" if grade >= skew_threshold else "difficulty_default",
-        [0.10, 0.10, 0.10, 0.30, 0.40] if grade >= skew_threshold else [0.20] * 5,
-    )
+    # 50% of questions at the highest difficulty level, the rest spread evenly
+    # across the remaining levels — applies to every grade.
+    difficulty_pcts = get_setting("difficulty_default", [0.125, 0.125, 0.125, 0.125, 0.5])
 
     grid: dict[str, dict[int, int]] = {}
     for q_type, count in type_counts.items():

@@ -1,25 +1,34 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from db.database import get_db
+from errors.app_error import AppError
+from errors.error_codes import ErrorCode
 from schemas.qa import QARequest, QAResponse
+from services.auth_service import get_current_user
 from services.qa_service import get_or_generate_qa
 
 router = APIRouter(prefix="/api/qa", tags=["qa"])
 
 
 @router.post("", response_model=QAResponse)
-async def fetch_qa(payload: QARequest, db: Session = Depends(get_db)):
-    try:
-        items = await get_or_generate_qa(
-            db,
-            subject_name=payload.subject_name,
-            topic_name=payload.topic_name,
-            grade=payload.grade,
-            user_country_id=payload.user_country_id,
-            student_id=payload.student_id,
-            customer_id=payload.customer_id,
-        )
-        return {"items": items}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+async def fetch_qa(
+    payload: QARequest,
+    claims: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not claims.get("is_school_admin"):
+        raise AppError(ErrorCode.AUTH_FORBIDDEN)
+    customer_id = claims.get("customer_id")
+    if not customer_id:
+        raise AppError(ErrorCode.SCHOOL_NOT_ASSOCIATED)
+
+    return await get_or_generate_qa(
+        db,
+        subject_name=payload.subject_name,
+        topic_name=payload.topic_name,
+        grade=payload.grade,
+        section=payload.section,
+        user_id=claims["user_id"],
+        customer_id=customer_id,
+    )

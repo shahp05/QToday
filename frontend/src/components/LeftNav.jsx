@@ -52,7 +52,7 @@ function IconLogout() {
 }
 
 const NAV_ITEMS = [
-  { id: 'subjects2', label: 'Subjects',  Icon: IconSubjects },
+  { id: 'subjects',  label: 'Subjects',  Icon: IconSubjects },
   { id: 'students',  label: 'Students',  Icon: IconStudents },
   { id: 'teachers',  label: 'Teachers',  Icon: IconTeachers },
   { id: 'account',   label: 'Account',   Icon: IconAccount  },
@@ -81,7 +81,7 @@ export default function LeftNav() {
 
   function handleNav(id) {
     setActivePage(id)
-    if (id !== 'subjects2') setActiveSubject(null)
+    if (id !== 'subjects') setActiveSubject(null)
   }
 
   function handleLogout() {

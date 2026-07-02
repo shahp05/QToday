@@ -219,7 +219,6 @@ class Subject(Base):
     subject_areas:  Mapped[list["SubjectArea"]]  = relationship(back_populates="subject")
     topics:         Mapped[list["Topic"]]        = relationship(back_populates="subject")
     qa:             Mapped[list["QA"]]           = relationship(back_populates="subject")
-    account_topics: Mapped[list["AccountTopic"]] = relationship(back_populates="subject")
     quizzes:        Mapped[list["Quiz"]]         = relationship(back_populates="subject")
 
 
@@ -269,7 +268,6 @@ class Topic(Base):
     subject:        Mapped["Subject"]            = relationship(back_populates="topics")
     subject_area:   Mapped["SubjectArea"]        = relationship(back_populates="topics")
     qa:             Mapped[list["QA"]]           = relationship(back_populates="topic")
-    account_topics: Mapped[list["AccountTopic"]] = relationship(back_populates="topic")
     quizzes:        Mapped[list["Quiz"]]         = relationship(back_populates="topic")
 
 
@@ -295,7 +293,9 @@ class QA(Base):
     question_type:    Mapped[str]           = mapped_column(String(20), nullable=False)
     question:         Mapped[str]           = mapped_column(Text, nullable=False)
     answer:           Mapped[str]           = mapped_column(Text, nullable=False)
-    options:          Mapped[dict|None]     = mapped_column(JSONB, nullable=True)
+    # none_as_null: without it, a Python None serializes as a JSONB 'null'
+    # value (not SQL NULL), which fails chk_options for non-mcq rows.
+    options:          Mapped[dict|None]     = mapped_column(JSONB(none_as_null=True), nullable=True)
     difficulty_level: Mapped[int]           = mapped_column(SmallInteger, nullable=False, server_default=expression.literal(1))
     expected_time_seconds: Mapped[int|None] = mapped_column(Integer, nullable=True)
     is_verified:      Mapped[bool]          = mapped_column(Boolean, nullable=False, default=False)
@@ -311,44 +311,9 @@ class QA(Base):
     quiz_challenges: Mapped[list["QuizChallenge"]] = relationship(back_populates="qa")
 
 
-class AccountTopic(Base):
-    __tablename__ = "account_topics"
-    __table_args__ = (
-        CheckConstraint(
-            "(customer_id IS NOT NULL AND student_id IS NULL) OR "
-            "(student_id IS NOT NULL AND customer_id IS NULL)",
-            name="chk_account"
-        ),
-        Index("uidx_acct_topics_customer", "customer_id", "subject_id", "topic_id", "grade_id",
-              postgresql_where=expression.text("customer_id IS NOT NULL"), unique=True),
-        Index("uidx_acct_topics_student", "student_id", "subject_id", "topic_id", "grade_id",
-              postgresql_where=expression.text("student_id IS NOT NULL"), unique=True),
-    )
-
-    account_topic_id:     Mapped[int]           = mapped_column(Integer, primary_key=True)
-    customer_id:          Mapped[int|None]       = mapped_column(ForeignKey("customers.customer_id"))
-    student_id:           Mapped[int|None]       = mapped_column(ForeignKey("students.student_id"))
-    subject_id:           Mapped[int]            = mapped_column(ForeignKey("subjects.subject_id"), nullable=False)
-    topic_id:             Mapped[int]            = mapped_column(ForeignKey("topics.topic_id"), nullable=False)
-    grade_id:             Mapped[int]            = mapped_column(ForeignKey("grades.grade_id"), nullable=False)
-    grade_relevant_to_id: Mapped[int]            = mapped_column(ForeignKey("grades.grade_id"), nullable=False)
-    section:              Mapped[str|None]        = mapped_column(String(5))
-    date_created:         Mapped[datetime]        = mapped_column(DateTime, nullable=False, server_default=func.now())
-    date_modified:        Mapped[datetime]        = mapped_column(DateTime, nullable=False, server_default=func.now())
-    date_deleted:         Mapped[datetime|None]   = mapped_column(DateTime, nullable=True)
-    is_active:            Mapped[bool]            = mapped_column(Boolean, nullable=False, default=True)
-
-    customer: Mapped["Customer|None"] = relationship(foreign_keys=[customer_id])
-    student:  Mapped["Student|None"]  = relationship(foreign_keys=[student_id])
-    subject:  Mapped["Subject"]       = relationship(back_populates="account_topics")
-    topic:    Mapped["Topic"]         = relationship(back_populates="account_topics")
-    grade:    Mapped["Grade"]         = relationship(foreign_keys=[grade_id])
-    grade_relevant_to: Mapped["Grade"] = relationship(foreign_keys=[grade_relevant_to_id])
-
-
 class Quiz(Base):
-    """student_id (not user_id) — same reasoning as AccountTopic: the
-    academic actor taking the quiz, not the login. date_scored is a cache
+    """student_id (not user_id) — the academic actor taking the quiz,
+    not the login. date_scored is a cache
     written by the scoring-completion check once every QuizScore row for
     this quiz has is_scored=true — source of truth lives in QuizScore."""
 
@@ -532,8 +497,6 @@ Index("idx_qa_subject_topic",       QA.subject_id, QA.topic_id)
 Index("idx_qa_grade",               QA.grade_id)
 Index("idx_qa_type",                QA.question_type)
 Index("idx_qa_verified",            QA.is_verified)
-Index("idx_acct_topics_customer",   AccountTopic.customer_id)
-Index("idx_acct_topics_student",    AccountTopic.student_id)
 Index("idx_quizzes_student",        Quiz.student_id)
 Index("idx_quizzes_topic",          Quiz.topic_id)
 Index("idx_quiz_scores_quiz",       QuizScore.quiz_id)

@@ -4,6 +4,7 @@ export const ErrorCode = {
   VALIDATION_ERROR: "VALIDATION_ERROR",
   SUBJECT_TOPIC_INVALID: "SUBJECT_TOPIC_INVALID",
   GRADE_INVALID: "GRADE_INVALID",
+  GRADE_NOT_OFFERED: "GRADE_NOT_OFFERED",
   LLM_TIMEOUT: "LLM_TIMEOUT",
   LLM_GENERATION_FAILED: "LLM_GENERATION_FAILED",
   LLM_INVALID_RESPONSE: "LLM_INVALID_RESPONSE",
@@ -44,8 +45,9 @@ export interface ErrorDefault {
 
 export const ERROR_DEFAULTS: Record<ErrorCodeValue, ErrorDefault> = {
   VALIDATION_ERROR: { message: "The submitted data failed validation.", httpStatus: 400 },
-  SUBJECT_TOPIC_INVALID: { message: "This subject/topic combination could not be verified.", httpStatus: 422 },
+  SUBJECT_TOPIC_INVALID: { message: "{reason}", httpStatus: 422 },
   GRADE_INVALID: { message: "The grade provided is not valid.", httpStatus: 400 },
+  GRADE_NOT_OFFERED: { message: "No students are enrolled in Grade {grade} at your school.", httpStatus: 400 },
   LLM_TIMEOUT: { message: "The AI service did not respond in time. Please try again.", httpStatus: 504 },
   LLM_GENERATION_FAILED: { message: "Question generation failed. Please try again.", httpStatus: 502 },
   LLM_INVALID_RESPONSE: { message: "The AI service returned an unexpected response.", httpStatus: 502 },

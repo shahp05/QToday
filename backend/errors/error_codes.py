@@ -6,6 +6,7 @@ class ErrorCode(str, Enum):
     VALIDATION_ERROR = "VALIDATION_ERROR"
     SUBJECT_TOPIC_INVALID = "SUBJECT_TOPIC_INVALID"
     GRADE_INVALID = "GRADE_INVALID"
+    GRADE_NOT_OFFERED = "GRADE_NOT_OFFERED"
     LLM_TIMEOUT = "LLM_TIMEOUT"
     LLM_GENERATION_FAILED = "LLM_GENERATION_FAILED"
     LLM_INVALID_RESPONSE = "LLM_INVALID_RESPONSE"
@@ -39,8 +40,9 @@ class ErrorCode(str, Enum):
 
 ERROR_DEFAULTS = {
     ErrorCode.VALIDATION_ERROR: {"message": "The submitted data failed validation.", "http_status": 400},
-    ErrorCode.SUBJECT_TOPIC_INVALID: {"message": "This subject/topic combination could not be verified.", "http_status": 422},
+    ErrorCode.SUBJECT_TOPIC_INVALID: {"message": "{reason}", "http_status": 422},
     ErrorCode.GRADE_INVALID: {"message": "The grade provided is not valid.", "http_status": 400},
+    ErrorCode.GRADE_NOT_OFFERED: {"message": "No students are enrolled in Grade {grade} at your school.", "http_status": 400},
     ErrorCode.LLM_TIMEOUT: {"message": "The AI service did not respond in time. Please try again.", "http_status": 504},
     ErrorCode.LLM_GENERATION_FAILED: {"message": "Question generation failed. Please try again.", "http_status": 502},
     ErrorCode.LLM_INVALID_RESPONSE: {"message": "The AI service returned an unexpected response.", "http_status": 502},

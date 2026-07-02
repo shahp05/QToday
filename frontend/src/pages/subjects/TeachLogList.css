@@ -1,0 +1,232 @@
+.teach-log-list {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  flex: 1;
+}
+
+.teach-log-list-header {
+  position: sticky;
+  top: 0;
+  z-index: 7;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 24px 0;
+  margin-bottom: 10px;
+  background: var(--color-dark);
+}
+
+.teach-log-list-title {
+  margin: 0;
+  font-family: var(--font-family);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-normal);
+  color: rgba(255,255,255,0.65);
+}
+
+.teach-log-list-new-btn {
+  border: 1px solid var(--color-green-light, #8EEB65);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-green-light, #8EEB65);
+  color: var(--color-dark, #343434);
+  font-size: var(--font-size-sm, 13px);
+  font-weight: 500;
+  text-transform: capitalize;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+.teach-log-list-new-btn:hover,
+.teach-log-list-new-btn:focus-visible {
+  background: none;
+  color: var(--color-white);
+}
+
+.teach-log-list-empty {
+  padding: 0 24px;
+  font-size: var(--font-size-md, 14px);
+  color: rgba(255,255,255,0.5);
+}
+
+/* ─── Two-column layout: subject/topic accordion on the left, grade + QA on the right ─── */
+.teach-log-columns {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  padding: 8px 24px 24px;
+}
+
+.teach-log-subjects {
+  flex: 0 0 240px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: var(--radius-sm, 6px);
+  overflow: hidden;
+}
+
+.teach-log-subject-block {
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.teach-log-subject-block:last-child {
+  border-bottom: none;
+}
+
+.teach-log-subject-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: #aaaaaa;
+}
+
+.teach-log-subject-name {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  font-size: var(--font-size-md, 14px);
+  color: #aaaaaa;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teach-log-subject-count {
+  font-size: var(--font-size-sm, 11px);
+  color: rgba(255,255,255,0.35);
+}
+
+.teach-log-topic-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  padding: 8px 10px 8px 39px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.teach-log-topic-row:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+.teach-log-topic-row--active {
+  background: var(--color-green-light, #8EEB65);
+}
+
+.teach-log-topic-row--active .teach-log-topic-name {
+  color: var(--color-dark, #343434);
+  font-weight: 500;
+}
+
+.teach-log-topic-name {
+  font-size: var(--font-size-sm, 11px);
+  color: var(--color-white);
+}
+
+.teach-log-detail {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Grade pills ─────────────────────────────────────────────────────────── */
+.teach-log-filter-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.teach-log-grade-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255,255,255,0.6);
+  border-radius: var(--radius-sm, 6px);
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.65);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.teach-log-grade-pill:hover {
+  background: rgba(255,255,255,0.16);
+  color: var(--color-white);
+}
+
+.teach-log-grade-pill--active {
+  background: var(--color-green-light, #8EEB65);
+  border-color: var(--color-green-light, #8EEB65);
+  color: var(--color-dark, #343434);
+}
+
+/* ─── QA list ─────────────────────────────────────────────────────────────── */
+.teach-log-qa-divider {
+  height: 1px;
+  background: rgba(255,255,255,0.06);
+  margin: 4px 0;
+}
+
+.teach-log-qa-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  background: var(--color-white);
+  border-radius: var(--radius-sm, 6px);
+}
+
+.teach-log-qa-item + .teach-log-qa-item,
+.teach-log-qa-divider + .teach-log-qa-item {
+  margin-top: 8px;
+}
+
+.teach-log-qa-question-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.teach-log-qa-question {
+  font-size: var(--font-size-md, 14px);
+  color: var(--color-text, #343434);
+  font-weight: 500;
+}
+
+.teach-log-qa-level {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-green-dark);
+  white-space: nowrap;
+}
+
+.teach-log-qa-options {
+  margin: 0;
+  padding-left: 18px;
+  font-size: var(--font-size-sm, 13px);
+  color: var(--color-text, #343434);
+}
+
+.teach-log-qa-answer {
+  margin: 0;
+  font-size: var(--font-size-sm, 13px);
+  color: var(--color-text-light, #666666);
+}
