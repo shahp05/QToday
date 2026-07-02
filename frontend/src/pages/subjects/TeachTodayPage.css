@@ -85,8 +85,10 @@
   color: var(--color-placeholder);
 }
 
-.teach-today-input--error {
+.teach-today-input--error,
+.teach-today-input--error:focus {
   border-color: var(--color-red);
+  box-shadow: 0 0 0 3px rgba(211, 47, 47, 0.12);
 }
 
 .teach-today-arrow-row {

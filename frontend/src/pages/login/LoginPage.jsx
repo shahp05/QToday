@@ -24,35 +24,35 @@ function IconArrow() {
 export default function LoginPage() {
   const [loginKey, setLoginKey] = useState('')
   const [password, setPassword] = useState('')
-  const [busy, setBusy]         = useState(false)
-  const [isShaking, setShaking] = useState(false)
-  const [hasError, setHasError] = useState(false)
-  const firstRef                = useRef(null)
-  const shakeTimer              = useRef(null)
-  const navigate                = useNavigate()
-  const setProfile              = useProfileStore(s => s.setProfile)
+  const [busy, setBusy]               = useState(false)
+  const [isShaking, setShaking]       = useState(false)
+  const [loginKeyError, setLoginKeyError] = useState(false)
+  const [passwordError, setPasswordError] = useState(false)
+  const firstRef                      = useRef(null)
+  const shakeTimer                    = useRef(null)
+  const navigate                      = useNavigate()
+  const setProfile                    = useProfileStore(s => s.setProfile)
 
   useEffect(() => {
     firstRef.current?.focus()
     return () => clearTimeout(shakeTimer.current)
   }, [])
 
-  function shake() {
+  function shake(focusFirst = true) {
     clearTimeout(shakeTimer.current)
-    setHasError(true)
     setShaking(true)
-    firstRef.current?.focus()
+    if (focusFirst) firstRef.current?.focus()
     shakeTimer.current = setTimeout(() => setShaking(false), 450)
-  }
-
-  function clearError() {
-    if (hasError) setHasError(false)
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!loginKey.trim() || !password) {
-      shake()
+    const emptyKey = !loginKey.trim()
+    const emptyPwd = !password
+    if (emptyKey || emptyPwd) {
+      setLoginKeyError(emptyKey)
+      setPasswordError(emptyPwd)
+      shake(emptyKey)
       return
     }
     setBusy(true)
@@ -63,14 +63,14 @@ export default function LoginPage() {
         body: JSON.stringify({ login_key: loginKey.trim(), password }),
       })
       if (!res.ok) {
-        shake()
+        shake(true)
         return
       }
       const j = await res.json()
       setProfile(j.profile, j.access_token)
       navigate('/dashboard')
     } catch {
-      shake()
+      shake(true)
     } finally {
       setBusy(false)
     }
@@ -88,7 +88,7 @@ export default function LoginPage() {
         </div>
 
         <form className={`lg-form${isShaking ? ' ui-shake' : ''}`} onSubmit={handleSubmit} noValidate>
-          <div className={`lg-field${hasError ? ' su-field--error' : ''}`}>
+          <div className={`lg-field${loginKeyError ? ' su-field--error' : ''}`}>
             <label className="su-label">Login ID</label>
             <input
               ref={firstRef}
@@ -96,18 +96,18 @@ export default function LoginPage() {
               type="text"
               placeholder="e.g. 101@TSRS"
               value={loginKey}
-              onChange={e => { setLoginKey(e.target.value); clearError() }}
+              onChange={e => { setLoginKey(e.target.value); setLoginKeyError(false) }}
             />
           </div>
 
-          <div className={`lg-field${hasError ? ' su-field--error' : ''}`}>
+          <div className={`lg-field${passwordError ? ' su-field--error' : ''}`}>
             <label className="su-label">Password</label>
             <input
               className="su-input"
               type="password"
               placeholder="Enter your password"
               value={password}
-              onChange={e => { setPassword(e.target.value); clearError() }}
+              onChange={e => { setPassword(e.target.value); setPasswordError(false) }}
             />
           </div>
 

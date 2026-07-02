@@ -67,6 +67,7 @@ function parseGradeSection(raw, availableGrades, studentGrades) {
 
 export default function TeachTodayPage() {
   const [subject, setSubject] = useState('')
+  const [subjectError, setSubjectError] = useState(false)
   const [committedSubject, setCommittedSubject] = useState('')
   const [showDetails, setShowDetails] = useState(false)
   const [topic, setTopic] = useState('')
@@ -75,6 +76,7 @@ export default function TeachTodayPage() {
   const [gradeError, setGradeError] = useState(false)
   const [gradeErrorMsg, setGradeErrorMsg] = useState('')
 
+  const [subjectShaking, shakeSubject] = useShake()
   const [topicShaking, shakeTopic] = useShake()
   const [gradeShaking, shakeGrade] = useShake()
 
@@ -85,6 +87,14 @@ export default function TeachTodayPage() {
   )].sort((a, b) => a - b)
 
   const customerHasSections = studentGrades.some(g => g.is_active && g.section)
+
+  const gradePlaceholder = (() => {
+    const example = studentGrades.find(g => g.is_active && g.grade_name && g.section)
+    if (example) return `e.g. ${example.grade_name}${example.section}`
+    const gradeOnly = studentGrades.find(g => g.is_active && g.grade_name)
+    if (gradeOnly) return `e.g. ${gradeOnly.grade_name}`
+    return 'e.g. 9'
+  })()
 
   const parsed = parseGradeSection(gradeInput, availableGrades, studentGrades)
   const gradeValid = parsed.grade !== null && availableGrades.includes(parsed.grade)
@@ -115,6 +125,18 @@ export default function TeachTodayPage() {
   const subjectRef = useRef(null)
 
   useEffect(() => { subjectRef.current?.focus() }, [])
+
+  function handleNext() {
+    if (!subject.trim()) {
+      setSubjectError(true)
+      shakeSubject()
+      subjectRef.current?.focus()
+      return
+    }
+    setSubjectError(false)
+    setCommittedSubject(subject.trim())
+    setShowDetails(true)
+  }
 
   function handleGradeBlur() {
     if (!gradeInput.trim()) return
@@ -169,14 +191,15 @@ export default function TeachTodayPage() {
 
       <div className="teach-today-content">
 
-        <div className="teach-today-row">
+        <div className={`teach-today-row${subjectShaking ? ' ui-shake' : ''}`}>
           <label className="teach-today-label">Which subject did you teach today?</label>
           <input
             ref={subjectRef}
-            className="teach-today-input"
+            className={`teach-today-input${subjectError ? ' teach-today-input--error' : ''}`}
             type="text"
             value={subject}
-            onChange={e => setSubject(e.target.value)}
+            onChange={e => { setSubject(e.target.value); setSubjectError(false) }}
+            onKeyDown={e => { if (e.key === 'Enter') handleNext() }}
             placeholder="e.g. Mathematics"
           />
         </div>
@@ -202,7 +225,7 @@ export default function TeachTodayPage() {
                   value={gradeInput}
                   onChange={handleGradeChange}
                   onBlur={handleGradeBlur}
-                  placeholder={customerHasSections ? 'e.g. 9B or 9 B' : 'e.g. 9'}
+                  placeholder={gradePlaceholder}
                 />
               </div>
             </div>
@@ -233,7 +256,7 @@ export default function TeachTodayPage() {
       <div className="teach-today-arrow-row">
         <button
           className="teach-today-arrow-btn"
-          onClick={() => { if (subject.trim()) { setCommittedSubject(subject.trim()); setShowDetails(true) } else { subjectRef.current?.focus() } }}
+          onClick={handleNext}
           aria-label="Continue"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
