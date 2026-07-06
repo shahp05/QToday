@@ -376,8 +376,13 @@ async def _generate_type_batch(
             f"{exam_level_instruction}\n\n"
             f"Difficulty guidance: levels 1-2 are recall/basic application. Levels 3-5 must be "
             f"long-tail, computational, analytical, and complex — level 5 being the most demanding.\n\n"
-            f'Respond as JSON: {{"items": [{{"question": "...", "answer": ..., '
+            f"For each item, work out the correct answer step-by-step (e.g. show the actual "
+            f"arithmetic/logic) in a 'reasoning' field BEFORE writing 'answer' — commit to the "
+            f"worked-out result rather than guessing, and make sure 'question'/'options'/'answer' "
+            f"are all consistent with that reasoning.\n\n"
+            f'Respond as JSON: {{"items": [{{"question": "...", '
             f'"options": {{"a":"...","b":"...","c":"...","d":"..."}} or null, '
+            f'"reasoning": "<step-by-step work>", "answer": ..., '
             f'"difficulty_level": N}}, ...]}}'
         ),
         temperature=0.7,
