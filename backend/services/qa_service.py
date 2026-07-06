@@ -381,10 +381,15 @@ async def _generate_type_batch(
             f"arithmetic/logic) in a 'reasoning' field BEFORE writing 'answer' — commit to the "
             f"worked-out result rather than guessing, and make sure 'question'/'options'/'answer' "
             f"are all consistent with that reasoning.\n\n"
-            f"Also consider the subject, topic, grade, and difficulty level together and estimate "
-            f"'eta' — the time in seconds a student of that grade would realistically need to read "
-            f"and answer this specific question (factor in reading length and reasoning/computation "
-            f"required, not just a flat per-difficulty number).\n\n"
+            f"Also estimate 'eta' — the time in seconds a student of that grade would realistically "
+            f"need to read and answer THIS SPECIFIC question. Judge it per-question, weighing: "
+            f"(a) how long-tail the question or expected answer is (a one-word/one-number answer "
+            f"needs far less time than a multi-step written response), and (b) how conceptually "
+            f"complex it is — whether answering requires combining multiple distinct concepts or "
+            f"knowledge areas versus a single fact or operation. Do not default to a fixed number "
+            f"per difficulty level or question type — a difficulty-5 question with a short, simple "
+            f"answer should still get a low eta, and a difficulty-1 question should not be padded "
+            f"up to some assumed minimum.\n\n"
             f'Respond as JSON: {{"items": [{{"question": "...", '
             f'"options": {{"a":"...","b":"...","c":"...","d":"..."}} or null, '
             f'"reasoning": "<step-by-step work>", "answer": ..., '
