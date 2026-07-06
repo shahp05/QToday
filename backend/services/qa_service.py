@@ -315,6 +315,7 @@ async def _generate_and_save_qa(
                     answer=_format_answer(item["answer"]),
                     options=item.get("options"),
                     difficulty_level=item["difficulty_level"],
+                    expected_time_seconds=item.get("eta"),
                     is_verified=False,  # verification runs as a separate batch process
                 )
             )
@@ -380,10 +381,14 @@ async def _generate_type_batch(
             f"arithmetic/logic) in a 'reasoning' field BEFORE writing 'answer' — commit to the "
             f"worked-out result rather than guessing, and make sure 'question'/'options'/'answer' "
             f"are all consistent with that reasoning.\n\n"
+            f"Also consider the subject, topic, grade, and difficulty level together and estimate "
+            f"'eta' — the time in seconds a student of that grade would realistically need to read "
+            f"and answer this specific question (factor in reading length and reasoning/computation "
+            f"required, not just a flat per-difficulty number).\n\n"
             f'Respond as JSON: {{"items": [{{"question": "...", '
             f'"options": {{"a":"...","b":"...","c":"...","d":"..."}} or null, '
             f'"reasoning": "<step-by-step work>", "answer": ..., '
-            f'"difficulty_level": N}}, ...]}}'
+            f'"difficulty_level": N, "eta": <seconds>}}, ...]}}'
         ),
         temperature=0.7,
     )
