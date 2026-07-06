@@ -1,7 +1,16 @@
 import { useState, useRef, useEffect } from 'react'
 import { useStudentGradesStore } from '../../store/studentGradesStore'
-import { fetchOrGenerateQA } from '../../services/qaService'
+import { fetchOrGenerateQA, fetchMyTeachLogs } from '../../services/qaService'
 import './SubjectsPage.css'
+
+// MCQ items already carry an options object; true/false items don't, so
+// synthesize one here to render both the same way (two boxed rows, correct
+// one highlighted) instead of a plain "Answer: True/False" line.
+function getRenderOptions(item) {
+  if (item.options) return item.options
+  if (item.question_type === 'true_false') return { T: 'True', F: 'False' }
+  return null
+}
 
 function useShake() {
   const [shaking, setShaking] = useState(false)
@@ -80,6 +89,15 @@ export default function SubjectsPage({ onShowList }) {
   const [submitError, setSubmitError] = useState('')
   const [warning, setWarning] = useState('')
   const [qaItems, setQaItems] = useState(null)
+  const [hasSubjects, setHasSubjects] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchMyTeachLogs()
+      .then(data => { if (!cancelled) setHasSubjects(data.subjects.length > 0) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   const [subjectShaking, shakeSubject] = useShake()
   const [topicShaking, shakeTopic] = useShake()
@@ -193,6 +211,7 @@ export default function SubjectsPage({ onShowList }) {
       })
       setQaItems(data.items)
       setWarning(data.warning || '')
+      setHasSubjects(true)
     } catch (err) {
       setSubmitError(err.message)
     } finally {
@@ -216,7 +235,7 @@ export default function SubjectsPage({ onShowList }) {
         <div className={`teach-today-row${subjectShaking ? ' ui-shake' : ''}`}>
           <div className="teach-today-header">
             <label className="teach-today-label">Which subject did you teach today?</label>
-            {onShowList && (
+            {onShowList && hasSubjects && (
               <button className="teach-today-list-btn" onClick={onShowList}>
                 Subjects Taught
               </button>
@@ -285,16 +304,31 @@ export default function SubjectsPage({ onShowList }) {
                   <div key={item.qa_id} className="teach-today-qa-item">
                     <div className="teach-today-qa-question-row">
                       <span className="teach-today-qa-question">{item.question}</span>
-                      <span className="teach-today-qa-level">Level {item.difficulty_level}</span>
+                      <span className="teach-today-qa-level">L{item.difficulty_level}</span>
                     </div>
-                    {item.options && (
-                      <ul className="teach-today-qa-options">
-                        {Object.entries(item.options).map(([key, text]) => (
-                          <li key={key}>{key.toUpperCase()}. {text}</li>
-                        ))}
-                      </ul>
-                    )}
-                    <p className="teach-today-qa-answer">Answer: {item.answer}</p>
+                    {(() => {
+                      const renderOptions = getRenderOptions(item)
+                      if (!renderOptions) {
+                        return <p className="teach-today-qa-answer">Answer: {item.answer}</p>
+                      }
+                      return (
+                        <ul className="teach-today-qa-options">
+                          {Object.entries(renderOptions).map(([key, text]) => {
+                            const isCorrect = item.options
+                              ? item.answer.toLowerCase().split(',').includes(key.toLowerCase())
+                              : item.answer.toLowerCase() === text.toLowerCase()
+                            return (
+                              <li key={key}>
+                                <span className={`teach-today-qa-option-label${isCorrect ? ' teach-today-qa-option-label--correct' : ''}`}>
+                                  {key.toUpperCase()}
+                                </span>
+                                <span>{text}</span>
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      )
+                    })()}
                   </div>
                 ))}
               </div>

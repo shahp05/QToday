@@ -33,7 +33,7 @@ def list_my_teach_logs(db: Session, user_id: int) -> list[dict]:
             SELECT topic_id, grade_id, qa_id, question_type, question, answer, options, difficulty_level
             FROM qa
             WHERE topic_id = ANY(:topic_ids) AND grade_id = ANY(:grade_ids) AND is_active = TRUE
-            ORDER BY difficulty_level DESC, qa_id
+            ORDER BY qa_id
         """),
         {"topic_ids": topic_ids, "grade_ids": grade_ids},
     ).fetchall()

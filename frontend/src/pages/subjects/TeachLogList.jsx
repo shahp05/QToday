@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { fetchMyTeachLogs } from '../../services/qaService'
 import './TeachLogList.css'
 
@@ -10,6 +10,15 @@ function IconBook() {
       <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
     </svg>
   )
+}
+
+// MCQ items already carry an options object; true/false items don't, so
+// synthesize one here to render both the same way (two boxed rows, correct
+// one highlighted) instead of a plain "Answer: True/False" line.
+function getRenderOptions(qa) {
+  if (qa.options) return qa.options
+  if (qa.question_type === 'true_false') return { T: 'True', F: 'False' }
+  return null
 }
 
 function IconChevron({ open }) {
@@ -36,14 +45,16 @@ export default function TeachLogList({ onLogNew }) {
       .then(data => {
         if (cancelled) return
         setSubjects(data.subjects)
-        // Auto-expand + auto-select when there's exactly one subject with one topic —
-        // nothing to browse, so jump straight to the questions.
-        if (data.subjects.length === 1 && data.subjects[0].topics.length === 1) {
+        // Auto-expand + auto-select the first topic when there's only one
+        // subject — nothing to choose between, so skip straight to it.
+        if (data.subjects.length === 1) {
           const subject = data.subjects[0]
           const topic = subject.topics[0]
           setExpandedSubjectId(subject.subject_id)
-          setSelectedTopicId(topic.topic_id)
-          setSelectedGradeId(topic.grades[0]?.grade_id ?? null)
+          if (topic) {
+            setSelectedTopicId(topic.topic_id)
+            setSelectedGradeId(topic.grades[0]?.grade_id ?? null)
+          }
         }
         setStatus('loaded')
       })
@@ -145,24 +156,36 @@ export default function TeachLogList({ onLogNew }) {
                   <p className="teach-log-list-empty">No questions generated for this grade yet.</p>
                 )}
 
-                {currentGrade?.qa_items.map((qa, qi) => (
-                  <Fragment key={qa.qa_id}>
-                    {qi > 0 && <div className="teach-log-qa-divider" />}
-                    <div className="teach-log-qa-item">
-                      <div className="teach-log-qa-question-row">
-                        <span className="teach-log-qa-question">{qa.question}</span>
-                        <span className="teach-log-qa-level">Level {qa.difficulty_level}</span>
-                      </div>
-                      {qa.options && (
-                        <ul className="teach-log-qa-options">
-                          {Object.entries(qa.options).map(([key, text]) => (
-                            <li key={key}>{key.toUpperCase()}. {text}</li>
-                          ))}
-                        </ul>
-                      )}
-                      <p className="teach-log-qa-answer">Answer: {qa.answer}</p>
+                {currentGrade?.qa_items.map(qa => (
+                  <div key={qa.qa_id} className="teach-log-qa-item">
+                    <div className="teach-log-qa-question-row">
+                      <span className="teach-log-qa-question">{qa.question}</span>
+                      <span className="teach-log-qa-level">L{qa.difficulty_level}</span>
                     </div>
-                  </Fragment>
+                    {(() => {
+                      const renderOptions = getRenderOptions(qa)
+                      if (!renderOptions) {
+                        return <p className="teach-log-qa-answer">Answer: {qa.answer}</p>
+                      }
+                      return (
+                        <ul className="teach-log-qa-options">
+                          {Object.entries(renderOptions).map(([key, text]) => {
+                            const isCorrect = qa.options
+                              ? qa.answer.toLowerCase().split(',').includes(key.toLowerCase())
+                              : qa.answer.toLowerCase() === text.toLowerCase()
+                            return (
+                              <li key={key}>
+                                <span className={`teach-log-qa-option-label${isCorrect ? ' teach-log-qa-option-label--correct' : ''}`}>
+                                  {key.toUpperCase()}
+                                </span>
+                                <span>{text}</span>
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      )
+                    })()}
+                  </div>
                 ))}
               </>
             )}
