@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { updateQA } from '../../services/qaService'
+import MathText, { containsMath } from '../../components/MathText'
 import './QaCard.css'
 
 function IconX() {
@@ -132,13 +133,21 @@ export default function QaCard({ qa, onUpdated, onFlagged }) {
     <div className="qa-card">
       <div className="qa-card-question-row">
         {editing ? (
-          <textarea
-            className="qa-card-edit-question"
-            value={draftQuestion}
-            onChange={e => setDraftQuestion(e.target.value)}
-          />
+          <div className="qa-card-edit-field">
+            <textarea
+              className="qa-card-edit-question"
+              value={draftQuestion}
+              onChange={e => setDraftQuestion(e.target.value)}
+            />
+            {containsMath(draftQuestion) && (
+              <div className="qa-card-preview">
+                <span className="qa-card-preview-label">Preview</span>
+                <MathText text={draftQuestion} />
+              </div>
+            )}
+          </div>
         ) : (
-          <span className="qa-card-question">{qa.question}</span>
+          <MathText className="qa-card-question" text={qa.question} />
         )}
       </div>
 
@@ -153,14 +162,14 @@ export default function QaCard({ qa, onUpdated, onFlagged }) {
                 <span className={`qa-card-option-label${isCorrect ? ' qa-card-option-label--correct' : ''}`}>
                   {key.toUpperCase()}
                 </span>
-                <span>{text}</span>
+                <MathText text={text} />
               </li>
             )
           })}
         </ul>
       )}
       {!editing && !renderOptions && (
-        <p className="qa-card-answer">Answer: {qa.answer}</p>
+        <p className="qa-card-answer">Answer: <MathText text={qa.answer} /></p>
       )}
 
       {editing && renderOptions && (
@@ -178,12 +187,20 @@ export default function QaCard({ qa, onUpdated, onFlagged }) {
                   {key.toUpperCase()}
                 </button>
                 {isMcq ? (
-                  <input
-                    type="text"
-                    className="qa-card-edit-option"
-                    value={draftOptions[key] ?? text}
-                    onChange={e => setDraftOptions(prev => ({ ...prev, [key]: e.target.value }))}
-                  />
+                  <div className="qa-card-edit-field qa-card-edit-field--option">
+                    <input
+                      type="text"
+                      className="qa-card-edit-option"
+                      value={draftOptions[key] ?? text}
+                      onChange={e => setDraftOptions(prev => ({ ...prev, [key]: e.target.value }))}
+                    />
+                    {containsMath(draftOptions[key] ?? text) && (
+                      <div className="qa-card-preview">
+                        <span className="qa-card-preview-label">Preview</span>
+                        <MathText text={draftOptions[key] ?? text} />
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <span>{text}</span>
                 )}
@@ -193,11 +210,19 @@ export default function QaCard({ qa, onUpdated, onFlagged }) {
         </ul>
       )}
       {editing && !renderOptions && (
-        <textarea
-          className="qa-card-edit-answer"
-          value={draftAnswer}
-          onChange={e => setDraftAnswer(e.target.value)}
-        />
+        <div className="qa-card-edit-field">
+          <textarea
+            className="qa-card-edit-answer"
+            value={draftAnswer}
+            onChange={e => setDraftAnswer(e.target.value)}
+          />
+          {containsMath(draftAnswer) && (
+            <div className="qa-card-preview">
+              <span className="qa-card-preview-label">Preview</span>
+              <MathText text={draftAnswer} />
+            </div>
+          )}
+        </div>
       )}
 
       <div className="qa-card-actions-row">

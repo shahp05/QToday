@@ -194,6 +194,38 @@ button.qa-card-option-label:hover {
 }
 
 /* ─── Inline edit fields ──────────────────────────────────────────────────── */
+.qa-card-edit-field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.qa-card-edit-field--option {
+  flex: 1;
+}
+
+.qa-card-preview {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-grey-light, #f2f4f7);
+  font-size: var(--font-size-sm, 13px);
+  color: var(--color-text, #343434);
+}
+
+.qa-card-preview-label {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-light, #666666);
+}
+
 .qa-card-edit-question,
 .qa-card-edit-answer {
   width: 100%;
