@@ -25,6 +25,12 @@ class QAItem(BaseModel):
 class QAResponse(BaseModel):
     items: list[QAItem]
     warning: Optional[str] = None
+    # Lets the frontend jump straight to this subject/topic/grade in the
+    # Subjects Taught list after generating, instead of rendering a separate
+    # inline QA display.
+    subject_id: int
+    topic_id: int
+    grade_id: int
 
 
 class QAUpdateRequest(BaseModel):

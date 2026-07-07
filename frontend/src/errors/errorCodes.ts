@@ -47,7 +47,7 @@ export const ERROR_DEFAULTS: Record<ErrorCodeValue, ErrorDefault> = {
   VALIDATION_ERROR: { message: "The submitted data failed validation.", httpStatus: 400 },
   SUBJECT_TOPIC_INVALID: { message: "{reason}", httpStatus: 422 },
   GRADE_INVALID: { message: "The grade provided is not valid.", httpStatus: 400 },
-  GRADE_NOT_OFFERED: { message: "No students are enrolled in Grade {grade} at your school.", httpStatus: 400 },
+  GRADE_NOT_OFFERED: { message: "No grade {grade} students in {acronym}", httpStatus: 400 },
   LLM_TIMEOUT: { message: "The AI service did not respond in time. Please try again.", httpStatus: 504 },
   LLM_GENERATION_FAILED: { message: "Question generation failed. Please try again.", httpStatus: 502 },
   LLM_INVALID_RESPONSE: { message: "The AI service returned an unexpected response.", httpStatus: 502 },

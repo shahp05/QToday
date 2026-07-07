@@ -11,7 +11,7 @@ export async function fetchOrGenerateQA({ subjectName, topicName, grade, section
     body: JSON.stringify({ subject_name: subjectName, topic_name: topicName, grade, section }),
   })
   if (!res.ok) throw new Error(await apiErrorMessage(res))
-  return res.json() // { items, warning }
+  return res.json() // { items, warning, subject_id, topic_id, grade_id }
 }
 
 export async function fetchSubjectsTaught() {

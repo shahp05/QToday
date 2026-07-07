@@ -72,7 +72,7 @@ async def get_or_generate_qa(
         raise AppError(ErrorCode.GRADE_INVALID, {"grade": grade})
 
     if grade_row.grade_id not in _get_customer_grade_ids(db, customer_id):
-        raise AppError(ErrorCode.GRADE_NOT_OFFERED, {"grade": grade})
+        raise AppError(ErrorCode.GRADE_NOT_OFFERED, {"grade": grade, "acronym": customer.customer_acronym})
 
     subject, subject_area = await _resolve_subject_input(db, subject_name, user_country_id)
     topic = (
@@ -89,10 +89,14 @@ async def get_or_generate_qa(
     # Something unresolved (subject, area, and/or topic) — validate via LLM, then create.
     validation = await _validate_subject_topic(subject_name, topic_name, grade, user_country_id, db)
     if not validation.get("valid"):
-        raise AppError(
-            ErrorCode.SUBJECT_TOPIC_INVALID,
-            {"reason": validation.get("reason", "This subject/topic combination could not be verified.")},
-        )
+        # Surface a fixed, generic message rather than the LLM's free-text
+        # reason — the LLM's raw wording isn't something to show a teacher
+        # verbatim, and it isn't specific about subject vs. topic either.
+        if not validation.get("subject_valid", True):
+            reason = "Check the subject you have entered"
+        else:
+            reason = "Check the topic you have entered"
+        raise AppError(ErrorCode.SUBJECT_TOPIC_INVALID, {"reason": reason})
 
     canonical_subject_name = title_case(validation["canonical_subject_name"])
     canonical_area_name = (
@@ -201,7 +205,12 @@ async def _finalize(
         )
         db.commit()
 
-    result = {"items": _serialize(qa_rows)}
+    result = {
+        "items": _serialize(qa_rows),
+        "subject_id": subject.subject_id,
+        "topic_id": topic.topic_id,
+        "grade_id": grade_row.grade_id,
+    }
     if not qa_rows and not warning:
         warning = "No verified questions are available for this topic yet. Please try again."
     if warning:
@@ -395,21 +404,25 @@ async def _validate_subject_topic(
             f'Topic: "{topic_name}"\n'
             f"Grade: {grade}\n"
             f"Student's country: {country_name}\n\n"
-            f'1. Is "{subject_name}" a standalone academic subject (e.g. "Mathematics", "Biology"), '
-            f'or is it a specialized AREA within a broader subject (e.g. "Calculus" is an area '
-            f'within "Mathematics", "Macroeconomics" is an area within "Economics")?\n'
+            f'1. Is "{subject_name}" a real, standalone academic subject (e.g. "Mathematics", '
+            f'"Biology"), or a specialized AREA within a broader subject (e.g. "Calculus" is an '
+            f'area within "Mathematics", "Macroeconomics" is an area within "Economics")? Set '
+            f'subject_valid to false only if "{subject_name}" is neither — not a real subject nor '
+            f"a real area of one.\n"
             f"2. Give the canonical title-cased name of the SUBJECT — the broader subject, even "
             f"if the input itself was an area name.\n"
             f'3. If the input was an area (not the subject itself), give the canonical title-cased '
             f"area name. Otherwise this field should be null.\n"
             f'4. Is "{topic_name}" a valid, real topic within that subject (and area, if any) '
-            f"for grade {grade}?\n"
+            f"for grade {grade}? Set topic_valid to false if it is not a real topic, regardless of "
+            f"whether the subject itself is valid.\n"
             f"5. Give the canonical title-cased topic name.\n"
             f"6. Is the SUBJECT itself inherently specific to {country_name} (rare — only true "
             f"if the subject has no meaning outside that country)?\n"
             f"7. Is the SUBJECT universal, but THIS TOPIC specific to {country_name} "
             f"(e.g. currency, regional context) even though the subject is universal?\n\n"
             f'Respond as JSON: {{"valid": true/false, "reason": "<if invalid, why>", '
+            f'"subject_valid": true/false, "topic_valid": true/false, '
             f'"canonical_subject_name": "...", "canonical_area_name": "..." or null, '
             f'"canonical_topic_name": "...", '
             f'"subject_is_country_specific": true/false, "topic_is_country_specific": true/false}}'

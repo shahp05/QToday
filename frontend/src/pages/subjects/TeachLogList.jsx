@@ -23,15 +23,15 @@ function IconChevron({ open }) {
   )
 }
 
-export default function TeachLogList({ onLogNew }) {
+export default function TeachLogList({ onLogNew, initialSelection }) {
   const subjects = useSubjectsTaughtStore(s => s.subjects)
   const status = useSubjectsTaughtStore(s => s.status)
   const error = useSubjectsTaughtStore(s => s.error)
   const handleQaUpdated = useSubjectsTaughtStore(s => s.handleQaUpdated)
   const handleQaFlagged = useSubjectsTaughtStore(s => s.handleQaFlagged)
-  const [expandedSubjectId, setExpandedSubjectId] = useState(null)
-  const [selectedTopicId, setSelectedTopicId] = useState(null)
-  const [selectedGradeId, setSelectedGradeId] = useState(null)
+  const [expandedSubjectId, setExpandedSubjectId] = useState(initialSelection?.subjectId ?? null)
+  const [selectedTopicId, setSelectedTopicId] = useState(initialSelection?.topicId ?? null)
+  const [selectedGradeId, setSelectedGradeId] = useState(initialSelection?.gradeId ?? null)
   const qaScrollRef = useRef(null)
 
   // Switching subject/topic/grade shows an entirely different QA list —
@@ -43,11 +43,13 @@ export default function TeachLogList({ onLogNew }) {
   }, [selectedTopicId, selectedGradeId])
 
   // Auto-expand + auto-select the first topic when there's only one subject
-  // — nothing to choose between, so skip straight to it. The store is
-  // usually already loaded (fetched at login), so this typically fires on
-  // the very first render; the ref just guards against re-running it later
-  // if the store data changes while the user has already navigated around.
-  const didAutoExpand = useRef(false)
+  // and nothing was explicitly requested via initialSelection (e.g. arriving
+  // fresh via "Subjects Taught" rather than right after generating QA) —
+  // nothing to choose between, so skip straight to it. The store is usually
+  // already loaded (fetched at login), so this typically fires on the very
+  // first render; the ref just guards against re-running it later if the
+  // store data changes while the user has already navigated around.
+  const didAutoExpand = useRef(Boolean(initialSelection))
   useEffect(() => {
     if (didAutoExpand.current || status !== 'loaded') return
     didAutoExpand.current = true

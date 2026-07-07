@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { useStudentGradesStore } from '../../store/studentGradesStore'
 import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
+import { useProfileStore } from '../../store/profileStore'
 import { fetchOrGenerateQA } from '../../services/qaService'
-import QaCard from './QaCard'
 import './SubjectsPage.css'
 
 function useShake() {
@@ -68,7 +68,15 @@ function parseGradeSection(raw, availableGrades, studentGrades) {
   return { grade, section }
 }
 
-export default function SubjectsPage({ onShowList }) {
+// Builds a section error that always shows a real example section for this
+// grade (from the store), rather than a hardcoded or missing placeholder.
+function buildSectionErrorMsg(grade, section, gradeSections) {
+  const example = `${grade}${gradeSections[0]}`
+  if (!section) return `Enter section also (e.g. ${example})`
+  return `Section ${section} does not exist in Grade ${grade} (e.g. ${example})`
+}
+
+export default function SubjectsPage({ onShowList, onGenerated }) {
   const [subject, setSubject] = useState('')
   const [subjectError, setSubjectError] = useState(false)
   const [committedSubject, setCommittedSubject] = useState('')
@@ -81,7 +89,6 @@ export default function SubjectsPage({ onShowList }) {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [warning, setWarning] = useState('')
-  const [qaItems, setQaItems] = useState(null)
 
   const subjectsTaught = useSubjectsTaughtStore(s => s.subjects)
   const refetchSubjectsTaught = useSubjectsTaughtStore(s => s.fetchSubjectsTaught)
@@ -95,6 +102,7 @@ export default function SubjectsPage({ onShowList }) {
   const [gradeShaking, shakeGrade] = useShake()
 
   const studentGrades = useStudentGradesStore(s => s.studentGrades)
+  const customerAcronym = useProfileStore(s => s.customer_acronym)
 
   const availableGrades = [...new Set(
     studentGrades.filter(g => g.is_active).map(g => g.grade_name)
@@ -146,11 +154,11 @@ export default function SubjectsPage({ onShowList }) {
   function handleGradeBlur() {
     if (!gradeInput.trim()) return
     if (!gradeValid) {
-      setGradeErrorMsg(`Grade "${gradeInput.trim()}" is not recognised.`)
+      setGradeErrorMsg(`No grade ${parsed.grade ?? gradeInput.trim()} students in ${customerAcronym}`)
       setGradeError(true)
       shakeGrade()
     } else if (!sectionValid) {
-      setGradeErrorMsg(`Section "${parsed.section}" does not exist in Grade ${parsed.grade}.`)
+      setGradeErrorMsg(buildSectionErrorMsg(parsed.grade, parsed.section, gradeSections))
       setGradeError(true)
       shakeGrade()
     } else {
@@ -177,11 +185,11 @@ export default function SubjectsPage({ onShowList }) {
     if (!gradeInput.trim() || !gradeValid) {
       setGradeError(true)
       if (gradeInput.trim() && !gradeValid)
-        setGradeErrorMsg(`Grade "${gradeInput.trim()}" is not recognised.`)
+        setGradeErrorMsg(`No grade ${parsed.grade ?? gradeInput.trim()} students in ${customerAcronym}`)
       shakeGrade()
       hasError = true
     } else if (!sectionValid) {
-      setGradeErrorMsg(`Section "${parsed.section}" does not exist in Grade ${parsed.grade}.`)
+      setGradeErrorMsg(buildSectionErrorMsg(parsed.grade, parsed.section, gradeSections))
       setGradeError(true)
       shakeGrade()
       hasError = true
@@ -191,7 +199,6 @@ export default function SubjectsPage({ onShowList }) {
 
     setSubmitError('')
     setWarning('')
-    setQaItems(null)
     setSubmitting(true)
     try {
       const data = await fetchOrGenerateQA({
@@ -200,9 +207,12 @@ export default function SubjectsPage({ onShowList }) {
         grade: parsed.grade,
         section: (customerHasSections && gradeHasSections) ? parsed.section : null,
       })
-      setQaItems(data.items)
-      setWarning(data.warning || '')
-      refetchSubjectsTaught()
+      await refetchSubjectsTaught()
+      if (data.items.length > 0) {
+        onGenerated?.({ subjectId: data.subject_id, topicId: data.topic_id, gradeId: data.grade_id })
+      } else {
+        setWarning(data.warning || '')
+      }
     } catch (err) {
       setSubmitError(err.message)
     } finally {
@@ -287,21 +297,6 @@ export default function SubjectsPage({ onShowList }) {
             {warning && (
               <div className="teach-today-row">
                 <p className="teach-today-warning">{warning}</p>
-              </div>
-            )}
-
-            {qaItems && qaItems.length > 0 && (
-              <div className="teach-today-qa-list">
-                {qaItems.map(item => (
-                  <QaCard
-                    key={item.qa_id}
-                    qa={item}
-                    onUpdated={updated => setQaItems(prev =>
-                      prev.map(q => (q.qa_id === updated.qa_id ? { ...q, ...updated } : q))
-                    )}
-                    onFlagged={qaId => setQaItems(prev => prev.filter(q => q.qa_id !== qaId))}
-                  />
-                ))}
               </div>
             )}
 
