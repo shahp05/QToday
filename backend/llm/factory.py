@@ -34,7 +34,11 @@ _PROVIDER_DEFAULTS = {
 
 
 def get_llm_client(purpose: LLMPurpose) -> LLMClient:
-    provider_map = get_setting("llm_provider_map", {"validate": "groq", "generate": "openai"})
+    # Both purposes default to a strong model: VALIDATE decides structural,
+    # hard-to-reverse things (subject/topic existence, canonical naming,
+    # country-specificity) that persist into the taxonomy — not a place to
+    # cut cost with a weaker model.
+    provider_map = get_setting("llm_provider_map", {"validate": "openai", "generate": "openai"})
     provider = provider_map.get(purpose.value, "openai")
 
     if provider not in _PROVIDER_DEFAULTS:

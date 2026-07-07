@@ -41,7 +41,9 @@ _TYPE_INSTRUCTIONS = {
         "Each item needs 'question', exactly 4 'options' (object with keys a/b/c/d, each a string), "
         "and 'answer' as the single correct option key (e.g. \"b\") — write the options so that "
         "EXACTLY ONE is correct. Never phrase the question or options such that more than one "
-        "option is defensibly correct."
+        "option is defensibly correct. Every distractor must be plausible but clearly wrong on "
+        "inspection — never silly, never a paraphrase/subset of another option, and never rely on "
+        "'All of the above' or 'None of the above' as an option."
     ),
     "true_false": (
         "Each item needs 'question' phrased as a true/false statement, and 'answer' as the string "
@@ -104,7 +106,10 @@ async def get_or_generate_qa(
         subject = await match_subject(db, canonical_subject_name, user_country_id)
     if subject is None:
         subject_country_id = user_country_id if validation.get("subject_is_country_specific") else None
-        subject = Subject(subject_name=canonical_subject_name, country_id=subject_country_id, is_verified=True)
+        # is_verified=False: this row exists on the validate-LLM's say-so, not
+        # a human's — same "pending review" meaning as QA.is_verified, not
+        # "an LLM decided this is fine."
+        subject = Subject(subject_name=canonical_subject_name, country_id=subject_country_id, is_verified=False)
         db.add(subject)
         db.flush()
 
@@ -113,7 +118,7 @@ async def get_or_generate_qa(
             subject_area = await match_subject_area(db, subject.subject_id, canonical_area_name)
             if subject_area is None:
                 subject_area = SubjectArea(
-                    subject_id=subject.subject_id, area_name=canonical_area_name, is_verified=True
+                    subject_id=subject.subject_id, area_name=canonical_area_name, is_verified=False
                 )
                 db.add(subject_area)
                 db.flush()
@@ -129,7 +134,7 @@ async def get_or_generate_qa(
             subject_area_id=subject_area.subject_area_id,
             topic_name=canonical_topic_name,
             country_id=topic_country_id,
-            is_verified=True,
+            is_verified=False,
         )
         db.add(topic)
         db.flush()
@@ -179,8 +184,7 @@ async def _finalize(
 
     warning = None
     try:
-        existing = _find_existing_qa(db, subject, topic, grade_row)
-        qa_rows = existing or await _generate_and_save_qa(db, subject, topic, subject_area, grade_row, grade)
+        qa_rows = await _get_verified_qa(db, subject, topic, subject_area, grade_row, grade)
         db.commit()
     except Exception as exc:
         db.rollback()
@@ -198,6 +202,8 @@ async def _finalize(
         db.commit()
 
     result = {"items": _serialize(qa_rows)}
+    if not qa_rows and not warning:
+        warning = "No verified questions are available for this topic yet. Please try again."
     if warning:
         result["warning"] = warning
     return result
@@ -245,6 +251,131 @@ def _find_existing_qa(db: Session, subject: Subject, topic: Topic, grade_row: Gr
     ).scalars().all()
 
 
+async def _get_verified_qa(
+    db: Session, subject: Subject, topic: Topic, subject_area: SubjectArea, grade_row: Grade, grade: int
+) -> list[QA]:
+    """Only is_verified=True rows are ever handed back to a student — see
+    _verify_qa_batch. Verification runs synchronously in this same request
+    (rather than a detached background batch) so a topic is never served
+    content nobody has checked, even on the very first lesson for it.
+    Existing rows are already verified from a prior request, or still
+    pending if a previous request died before verification ran; either way
+    they're reused before generating anything new. A batch that fails
+    verification entirely naturally falls through to a fresh generate
+    attempt on the next call, since failed rows are marked is_active=False."""
+    existing = _find_existing_qa(db, subject, topic, grade_row)
+    verified = [q for q in existing if q.is_verified]
+    pending = [q for q in existing if not q.is_verified]
+
+    if pending:
+        verified += await _verify_qa_batch(pending)
+        db.commit()
+
+    if verified:
+        return verified
+
+    new_rows = await _generate_and_save_qa(db, subject, topic, subject_area, grade_row, grade)
+    db.commit()
+    return await _verify_qa_batch(new_rows)
+
+
+async def _verify_qa_batch(qa_rows: list[QA]) -> list[QA]:
+    """Generator/verifier pattern: an independent LLM call answers each
+    question blind (never shown the stored answer, see _blind_solve) and its
+    answer is graded against what's actually stored. Passing sets
+    is_verified=True. Failing — either the question itself was unanswerable/
+    ambiguous, or the derived answer doesn't match the stored one — retires
+    the row (is_active=False, flag_reason) the same way a teacher's manual
+    flag does, rather than leaving it to sit unverified and unserved
+    forever. A verifier-call error (network/parse failure, not a content
+    problem) leaves the row untouched so it's simply retried on a later
+    request, instead of being punished for an infra hiccup."""
+    results = await asyncio.gather(*[_verify_one(qa) for qa in qa_rows], return_exceptions=True)
+
+    passed = []
+    for qa, result in zip(qa_rows, results):
+        if isinstance(result, BaseException):
+            continue
+        ok, flag_reason = result
+        if ok:
+            qa.is_verified = True
+            passed.append(qa)
+        else:
+            qa.is_verified = False
+            qa.is_active = False
+            qa.flag_reason = flag_reason
+    return passed
+
+
+async def _verify_one(qa: QA) -> tuple[bool, str | None]:
+    solved = await _blind_solve(qa)
+    if not solved.get("answerable", True):
+        return False, "unclear"
+
+    derived = solved.get("answer")
+    if qa.question_type == "descriptive":
+        equivalent = await _check_equivalence(qa.question, derived, qa.answer)
+        return (True, None) if equivalent else (False, "incorrect")
+
+    matches = isinstance(derived, str) and derived.strip().lower() == qa.answer.strip().lower()
+    return (True, None) if matches else (False, "incorrect")
+
+
+async def _blind_solve(qa: QA) -> dict:
+    """Independently answers the question WITHOUT ever seeing the stored
+    answer — the model only sees what a student would see. Sending the
+    'correct' answer alongside the question in the same call would make
+    this a rubber stamp instead of a real check (anchoring bias)."""
+    if qa.question_type == "mcq":
+        options_block = "\n".join(f"{k}) {v}" for k, v in sorted(qa.options.items()))
+        question_block = f'Question: "{qa.question}"\nOptions:\n{options_block}'
+        answer_format = '"answer" as the single correct option key ("a", "b", "c", or "d")'
+    elif qa.question_type == "true_false":
+        question_block = f'Statement: "{qa.question}"\nIs this statement True or False?'
+        answer_format = '"answer" as the string "True" or "False"'
+    else:
+        question_block = f'Question: "{qa.question}"'
+        answer_format = '"answer" as your free-text answer'
+
+    llm = get_llm_client(LLMPurpose.VALIDATE)
+    return await llm.generate_json(
+        system=(
+            "You are a diligent student answering a practice question independently, without "
+            "knowing what answer is expected. Solve it carefully and show your reasoning. If the "
+            "question is ambiguous, has no single correct answer, or cannot be answered as "
+            "written, say so honestly rather than guessing."
+        ),
+        user=(
+            f"{question_block}\n\n"
+            f'Respond as JSON: {{"answerable": true/false, "reasoning": "<your work>", {answer_format}}}'
+        ),
+        temperature=0.2,
+        max_tokens=1000,
+    )
+
+
+async def _check_equivalence(question: str, derived_answer, stored_answer: str) -> bool:
+    """Free-text answers can be phrased differently while meaning the same
+    thing (e.g. "12" vs "twelve"), so equivalence is judged by the model
+    rather than a string comparison that would false-negative on wording."""
+    llm = get_llm_client(LLMPurpose.VALIDATE)
+    result = await llm.generate_json(
+        system=(
+            "You judge whether two answers to the same question are substantively equivalent, "
+            "allowing for different wording, formatting, or equivalent units — not exact text match."
+        ),
+        user=(
+            f'Question: "{question}"\n'
+            f'Answer A: "{derived_answer}"\n'
+            f'Answer B: "{stored_answer}"\n\n'
+            f'Respond as JSON: {{"equivalent": true/false}}'
+        ),
+        temperature=0.0,
+        max_tokens=200,
+    )
+    return bool(result.get("equivalent"))
+
+
 async def _validate_subject_topic(
     subject_name: str, topic_name: str, grade: int, user_country_id: int, db: Session
 ) -> dict:
@@ -283,6 +414,7 @@ async def _validate_subject_topic(
             f'"canonical_topic_name": "...", '
             f'"subject_is_country_specific": true/false, "topic_is_country_specific": true/false}}'
         ),
+        max_tokens=800,
     )
     return result
 
@@ -294,11 +426,13 @@ async def _generate_and_save_qa(
     allocation = compute_allocation(qa_count, grade)
     is_country_specific = subject.country_id is not None or topic.country_id is not None
     area_name = subject_area.area_name if subject_area.area_name != _GENERAL_AREA else None
+    prior_failures = _get_prior_failures(db, topic, grade_row)
 
     results = await asyncio.gather(
         *[
             _generate_type_batch(
-                subject.subject_name, area_name, topic.topic_name, grade, q_type, counts, is_country_specific
+                subject.subject_name, area_name, topic.topic_name, grade, q_type, counts,
+                is_country_specific, prior_failures,
             )
             for q_type, counts in allocation.items()
         ]
@@ -318,12 +452,44 @@ async def _generate_and_save_qa(
                     options=item.get("options"),
                     difficulty_level=item["difficulty_level"],
                     expected_time_seconds=item.get("eta"),
-                    is_verified=False,  # verification runs as a separate batch process
+                    is_verified=False,  # confirmed by _verify_qa_batch before being served
                 )
             )
     db.add_all(qa_rows)
     db.flush()
     return qa_rows
+
+
+_PRIOR_FAILURE_LIMIT = 5
+
+
+def _get_prior_failures(db: Session, topic: Topic, grade_row: Grade) -> list[dict]:
+    """Previously generated items for this exact topic/grade that were pulled
+    by _verify_qa_batch (is_active=False, flag_reason set) — fed back into the
+    generation prompt so a systematic mistake isn't regenerated identically."""
+    rows = db.execute(
+        select(QA.question, QA.flag_reason)
+        .where(
+            QA.topic_id == topic.topic_id,
+            QA.grade_id == grade_row.grade_id,
+            QA.is_active == False,  # noqa: E712
+            QA.flag_reason.in_(("incorrect", "unclear")),
+        )
+        .order_by(QA.date_modified.desc())
+        .limit(_PRIOR_FAILURE_LIMIT)
+    ).all()
+    return [{"question": q, "reason": r} for q, r in rows]
+
+
+def _prior_failures_block(prior_failures: list[dict]) -> str:
+    if not prior_failures:
+        return ""
+    lines = "\n".join(f'- "{f["question"]}" (rejected: {f["reason"]})' for f in prior_failures)
+    return (
+        f"\nThe following previously generated questions for this exact topic and grade were "
+        f"rejected during verification — do not repeat them, and avoid the same underlying "
+        f"mistake:\n{lines}\n"
+    )
 
 
 def _format_answer(answer) -> str:
@@ -334,6 +500,55 @@ def _format_answer(answer) -> str:
     return str(answer)
 
 
+def _generation_max_tokens(total_items: int) -> int:
+    """Sized to the largest expected batch so a big qa_count doesn't get
+    silently cut off mid-JSON — LLMClient.generate_json treats a truncated
+    response (finish_reason == 'length') as a retryable failure rather than
+    letting json.loads parse a partial payload."""
+    return min(16000, 1000 + 400 * total_items)
+
+
+def _validate_items(items: list, question_type: str) -> list[dict]:
+    """Drop any item that doesn't structurally match what was requested.
+    The LLM's JSON is otherwise trusted as-is — a malformed item (wrong
+    option keys, an answer key that doesn't exist among the options, an
+    out-of-range difficulty) would otherwise reach the DB and students
+    unchecked."""
+    valid = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        if not isinstance(item.get("question"), str) or not item["question"].strip():
+            continue
+        if not isinstance(item.get("difficulty_level"), int) or not (1 <= item["difficulty_level"] <= 5):
+            continue
+        if item.get("answer") in (None, ""):
+            continue
+
+        if question_type == "mcq":
+            options = item.get("options")
+            if not isinstance(options, dict) or set(options.keys()) != {"a", "b", "c", "d"}:
+                continue
+            if not all(isinstance(v, str) and v.strip() for v in options.values()):
+                continue
+            if not isinstance(item["answer"], str) or item["answer"] not in options:
+                continue
+        elif question_type == "true_false":
+            if item["answer"] not in ("True", "False"):
+                continue
+
+        valid.append(item)
+    return valid
+
+
+def _shortfall_by_level(requested: dict[int, int], valid_items: list[dict]) -> dict[int, int]:
+    have: dict[int, int] = {}
+    for item in valid_items:
+        level = item["difficulty_level"]
+        have[level] = have.get(level, 0) + 1
+    return {level: max(0, count - have.get(level, 0)) for level, count in requested.items()}
+
+
 async def _generate_type_batch(
     subject_name: str,
     area_name: str | None,
@@ -342,6 +557,40 @@ async def _generate_type_batch(
     question_type: str,
     difficulty_counts: dict[int, int],
     is_country_specific: bool,
+    prior_failures: list[dict],
+) -> list[dict]:
+    total = sum(difficulty_counts.values())
+    if total == 0:
+        return []
+
+    items = await _call_generate(
+        subject_name, area_name, topic_name, grade, question_type, difficulty_counts,
+        is_country_specific, prior_failures,
+    )
+    valid_items = _validate_items(items, question_type)
+
+    # One bounded retry for whatever fell out of validation, requesting
+    # exactly the shortfall per difficulty level — not the whole batch again.
+    remaining = _shortfall_by_level(difficulty_counts, valid_items)
+    if sum(remaining.values()) > 0:
+        retry_items = await _call_generate(
+            subject_name, area_name, topic_name, grade, question_type, remaining,
+            is_country_specific, prior_failures,
+        )
+        valid_items += _validate_items(retry_items, question_type)
+
+    return valid_items
+
+
+async def _call_generate(
+    subject_name: str,
+    area_name: str | None,
+    topic_name: str,
+    grade: int,
+    question_type: str,
+    difficulty_counts: dict[int, int],
+    is_country_specific: bool,
+    prior_failures: list[dict],
 ) -> list[dict]:
     total = sum(difficulty_counts.values())
     if total == 0:
@@ -365,7 +614,10 @@ async def _generate_type_batch(
             "not exam-board-specific phrasing or wording. Generate content in English only. "
             "Use LaTeX only for mathematical notation, restricted to syntax supported by KaTeX — "
             "avoid \\begin{align}, \\newcommand, and other unsupported environments. "
-            "Wrap inline math in $...$ and block math in $$...$$."
+            "Wrap inline math in $...$ and block math in $$...$$. "
+            "Do not invent or guess facts, statistics, dates, quotes, or attributions. Only use "
+            "real-world facts you are confident are accurate; if you are not certain of a fact, "
+            "write a question that does not depend on it."
         ),
         user=(
             f'Subject: "{subject_name}"\n'
@@ -376,7 +628,8 @@ async def _generate_type_batch(
             f"Generate exactly: {counts_str}\n"
             f"{_TYPE_INSTRUCTIONS[question_type]}\n"
             f"{locale_instruction}\n"
-            f"{exam_level_instruction}\n\n"
+            f"{exam_level_instruction}\n"
+            f"{_prior_failures_block(prior_failures)}\n"
             f"Difficulty guidance: levels 1-2 are recall/basic application. Levels 3-5 must be "
             f"long-tail, computational, analytical, and complex — level 5 being the most demanding.\n\n"
             f"For each item, work out the correct answer step-by-step (e.g. show the actual "
@@ -397,7 +650,8 @@ async def _generate_type_batch(
             f'"reasoning": "<step-by-step work>", "answer": ..., '
             f'"difficulty_level": N, "eta": <seconds>}}, ...]}}'
         ),
-        temperature=0.7,
+        temperature=0.3,
+        max_tokens=_generation_max_tokens(total),
     )
     return result["items"]
 
@@ -405,15 +659,18 @@ async def _generate_type_batch(
 def _exam_level_instruction(grade: int) -> str:
     """Grades 9-10 and 11-12 must target India's exam standards regardless
     of the student's actual country — per product spec, these grades are
-    universally benchmarked against the India curriculum."""
+    universally benchmarked against the India curriculum. Phrased as a
+    difficulty/rigor target rather than naming exam boards, so the model
+    calibrates depth without mimicking exam-paper phrasing or notation."""
     if grade in (9, 10):
         return (
-            "This must be at India's CBSE/ICSE Board exam level, regardless of the "
-            "student's actual country."
+            "Match the difficulty and depth expected of a strong Grade 9-10 student in India "
+            "under CBSE/ICSE-level rigor, regardless of the student's actual country."
         )
     if grade in (11, 12):
         return (
-            "This must be at India's IIT-JEE, CUET, NEET, and Board exam level, "
+            "Match the difficulty and depth expected of a strong Grade 11-12 student in India "
+            "preparing for competitive entrance exams (IIT-JEE/NEET/CUET) and board-level rigor, "
             "regardless of the student's actual country."
         )
     return ""

@@ -18,11 +18,16 @@ class LLMClient:
         self._client = AsyncOpenAI(api_key=api_key, base_url=base_url)
         self.model = model
 
-    async def generate_json(self, *, system: str, user: str, temperature: float = 0.3) -> dict:
+    async def generate_json(
+        self, *, system: str, user: str, temperature: float = 0.3, max_tokens: int | None = None
+    ) -> dict:
         """Call the model and parse its response as JSON.
 
         Raises json.JSONDecodeError if the model didn't return valid JSON —
         callers should treat that as a retryable failure, not a silent default.
+        Raises RuntimeError if the response was cut off by the token limit —
+        a truncated JSON payload can otherwise parse as valid-but-incomplete
+        data instead of failing loudly.
         """
         response = await self._client.chat.completions.create(
             model=self.model,
@@ -32,6 +37,11 @@ class LLMClient:
             ],
             response_format={"type": "json_object"},
             temperature=temperature,
+            max_tokens=max_tokens,
         )
-        content = response.choices[0].message.content
-        return json.loads(content)
+        choice = response.choices[0]
+        if choice.finish_reason == "length":
+            raise RuntimeError(
+                f"LLM response truncated at max_tokens={max_tokens} — treat as a retryable failure."
+            )
+        return json.loads(choice.message.content)
