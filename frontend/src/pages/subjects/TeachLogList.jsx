@@ -36,9 +36,11 @@ export default function TeachLogList({ onLogNew }) {
 
   // Switching subject/topic/grade shows an entirely different QA list —
   // don't leave it scrolled to wherever the previous list happened to be.
+  // Both selectedTopicId and selectedGradeId are needed: two different
+  // topics can share the same first grade_id, so grade alone can miss it.
   useEffect(() => {
     if (qaScrollRef.current) qaScrollRef.current.scrollTop = 0
-  }, [selectedGradeId])
+  }, [selectedTopicId, selectedGradeId])
 
   // Auto-expand + auto-select the first topic when there's only one subject
   // — nothing to choose between, so skip straight to it. The store is
