@@ -22,7 +22,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from config.app_config import get_setting
-from db.models import Country, Customer, Grade, QA, Student, StudentGrade, Subject, SubjectArea, TeachLog, Topic
+from db.models import Country, Customer, Grade, QA, Student, StudentGrade, Subject, SubjectArea, TeachLog, Topic, User
 from errors.app_error import AppError
 from errors.error_codes import ErrorCode
 from llm.factory import LLMPurpose, get_llm_client
@@ -39,7 +39,9 @@ _TYPE_INSTRUCTIONS = {
     ),
     "mcq": (
         "Each item needs 'question', exactly 4 'options' (object with keys a/b/c/d, each a string), "
-        "and 'answer' as an array of the correct option key(s) — one or more may be correct."
+        "and 'answer' as the single correct option key (e.g. \"b\") — write the options so that "
+        "EXACTLY ONE is correct. Never phrase the question or options such that more than one "
+        "option is defensibly correct."
     ),
     "true_false": (
         "Each item needs 'question' phrased as a true/false statement, and 'answer' as the string "
@@ -417,6 +419,51 @@ def _exam_level_instruction(grade: int) -> str:
     return ""
 
 
+def update_qa(db: Session, *, qa_id: int, user_id: int, customer_id: int, payload) -> dict:
+    """Teacher-facing correction/flag path. Any teacher at a customer who has
+    actually taught this (subject, topic) may edit or flag it — content
+    edits assume good faith and mark the row verified; a flag pulls it out
+    of future serving instead (is_active=False) but keeps the row for audit."""
+    qa = db.get(QA, qa_id)
+    if qa is None or not qa.is_active:
+        raise AppError(ErrorCode.QA_NOT_FOUND)
+
+    taught = db.execute(
+        select(TeachLog.teach_log_id).where(
+            TeachLog.customer_id == customer_id,
+            TeachLog.subject_id == qa.subject_id,
+            TeachLog.topic_id == qa.topic_id,
+        )
+    ).first()
+    if taught is None:
+        raise AppError(ErrorCode.AUTH_FORBIDDEN)
+
+    if payload.flag_reason is not None:
+        qa.is_active = False
+        qa.flag_reason = payload.flag_reason
+        db.commit()
+        return {"qa_id": qa.qa_id, "is_active": False, "flag_reason": qa.flag_reason}
+
+    if payload.question is not None:
+        qa.question = payload.question
+    if payload.answer is not None:
+        qa.answer = payload.answer
+    if payload.options is not None:
+        qa.options = payload.options
+    qa.is_verified = True
+
+    # Frozen attribution footnote, visible to every school this QA is shared
+    # with — not a live join, so it still reads correctly if the editor's
+    # name or school changes later.
+    user = db.get(User, user_id)
+    customer = db.get(Customer, customer_id)
+    qa.edited_by_name = user.user_name if user else None
+    qa.edited_by_school = customer.customer_acronym if customer else None
+
+    db.commit()
+    return _serialize([qa])[0]
+
+
 def _serialize(qa_rows: list[QA]) -> list[dict]:
     return [
         {
@@ -427,6 +474,8 @@ def _serialize(qa_rows: list[QA]) -> list[dict]:
             "options": q.options,
             "difficulty_level": q.difficulty_level,
             "is_verified": q.is_verified,
+            "edited_by_name": q.edited_by_name,
+            "edited_by_school": q.edited_by_school,
         }
         for q in qa_rows
     ]

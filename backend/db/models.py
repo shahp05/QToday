@@ -284,6 +284,10 @@ class QA(Base):
             name="chk_options"
         ),
         CheckConstraint("difficulty_level BETWEEN 1 AND 5", name="chk_difficulty"),
+        CheckConstraint(
+            "flag_reason IS NULL OR flag_reason IN ('incorrect', 'unclear', 'irrelevant')",
+            name="chk_flag_reason"
+        ),
     )
 
     qa_id:            Mapped[int]           = mapped_column(Integer, primary_key=True)
@@ -299,6 +303,16 @@ class QA(Base):
     difficulty_level: Mapped[int]           = mapped_column(SmallInteger, nullable=False, server_default=expression.literal(1))
     expected_time_seconds: Mapped[int|None] = mapped_column(Integer, nullable=True)
     is_verified:      Mapped[bool]          = mapped_column(Boolean, nullable=False, default=False)
+    # Set when a teacher flags this QA as bad instead of editing it — paired
+    # with is_active=False so the row drops out of future serving but stays
+    # around for audit (why it was pulled), instead of a hard delete.
+    flag_reason:      Mapped[str|None]      = mapped_column(String(20), nullable=True)
+    # Denormalized attribution footnote for the last content edit — frozen
+    # text at edit time (not a live join to users/customers), same reasoning
+    # as a print footnote: it should read the same later even if the editor
+    # is renamed or leaves the school.
+    edited_by_name:   Mapped[str|None]      = mapped_column(String(200), nullable=True)
+    edited_by_school: Mapped[str|None]      = mapped_column(String(20), nullable=True)
     date_created:     Mapped[datetime]      = mapped_column(DateTime, nullable=False, server_default=func.now())
     date_modified:    Mapped[datetime]      = mapped_column(DateTime, nullable=False, server_default=func.now())
     date_deleted:     Mapped[datetime|None] = mapped_column(DateTime, nullable=True)
