@@ -138,13 +138,15 @@ export default function TeachLogList({ onLogNew }) {
                   ))}
                 </div>
 
-                {currentGrade?.qa_items.length === 0 && (
-                  <p className="teach-log-list-empty">No questions generated for this grade yet.</p>
-                )}
+                <div className="teach-log-qa-scroll">
+                  {currentGrade?.qa_items.length === 0 && (
+                    <p className="teach-log-list-empty">No questions generated for this grade yet.</p>
+                  )}
 
-                {currentGrade?.qa_items.map(qa => (
-                  <QaCard key={qa.qa_id} qa={qa} onUpdated={handleQaUpdated} onFlagged={handleQaFlagged} />
-                ))}
+                  {currentGrade?.qa_items.map(qa => (
+                    <QaCard key={qa.qa_id} qa={qa} onUpdated={handleQaUpdated} onFlagged={handleQaFlagged} />
+                  ))}
+                </div>
               </>
             )}
           </div>
