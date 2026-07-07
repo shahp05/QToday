@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
-import { fetchMyTeachLogs } from '../../services/qaService'
+import { useEffect, useRef, useState } from 'react'
+import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
+import QaCard from './QaCard'
 import './TeachLogList.css'
 
 function IconBook() {
@@ -10,15 +11,6 @@ function IconBook() {
       <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
     </svg>
   )
-}
-
-// MCQ items already carry an options object; true/false items don't, so
-// synthesize one here to render both the same way (two boxed rows, correct
-// one highlighted) instead of a plain "Answer: True/False" line.
-function getRenderOptions(qa) {
-  if (qa.options) return qa.options
-  if (qa.question_type === 'true_false') return { T: 'True', F: 'False' }
-  return null
 }
 
 function IconChevron({ open }) {
@@ -32,39 +24,34 @@ function IconChevron({ open }) {
 }
 
 export default function TeachLogList({ onLogNew }) {
-  const [status, setStatus] = useState('loading') // loading | loaded | error
-  const [subjects, setSubjects] = useState([])
-  const [error, setError] = useState('')
+  const subjects = useSubjectsTaughtStore(s => s.subjects)
+  const status = useSubjectsTaughtStore(s => s.status)
+  const error = useSubjectsTaughtStore(s => s.error)
+  const handleQaUpdated = useSubjectsTaughtStore(s => s.handleQaUpdated)
+  const handleQaFlagged = useSubjectsTaughtStore(s => s.handleQaFlagged)
   const [expandedSubjectId, setExpandedSubjectId] = useState(null)
   const [selectedTopicId, setSelectedTopicId] = useState(null)
   const [selectedGradeId, setSelectedGradeId] = useState(null)
 
+  // Auto-expand + auto-select the first topic when there's only one subject
+  // — nothing to choose between, so skip straight to it. The store is
+  // usually already loaded (fetched at login), so this typically fires on
+  // the very first render; the ref just guards against re-running it later
+  // if the store data changes while the user has already navigated around.
+  const didAutoExpand = useRef(false)
   useEffect(() => {
-    let cancelled = false
-    fetchMyTeachLogs()
-      .then(data => {
-        if (cancelled) return
-        setSubjects(data.subjects)
-        // Auto-expand + auto-select the first topic when there's only one
-        // subject — nothing to choose between, so skip straight to it.
-        if (data.subjects.length === 1) {
-          const subject = data.subjects[0]
-          const topic = subject.topics[0]
-          setExpandedSubjectId(subject.subject_id)
-          if (topic) {
-            setSelectedTopicId(topic.topic_id)
-            setSelectedGradeId(topic.grades[0]?.grade_id ?? null)
-          }
-        }
-        setStatus('loaded')
-      })
-      .catch(err => {
-        if (cancelled) return
-        setError(err.message)
-        setStatus('error')
-      })
-    return () => { cancelled = true }
-  }, [])
+    if (didAutoExpand.current || status !== 'loaded') return
+    didAutoExpand.current = true
+    if (subjects.length === 1) {
+      const subject = subjects[0]
+      const topic = subject.topics[0]
+      setExpandedSubjectId(subject.subject_id)
+      if (topic) {
+        setSelectedTopicId(topic.topic_id)
+        setSelectedGradeId(topic.grades[0]?.grade_id ?? null)
+      }
+    }
+  }, [status, subjects])
 
   function toggleSubject(subjectId) {
     if (expandedSubjectId === subjectId) {
@@ -95,7 +82,6 @@ export default function TeachLogList({ onLogNew }) {
         </button>
       </div>
 
-      {status === 'loading' && <p className="teach-log-list-empty">Loading…</p>}
       {status === 'error' && <p className="teach-log-list-empty">{error}</p>}
 
       {status === 'loaded' && subjects.length === 0 && (
@@ -157,35 +143,7 @@ export default function TeachLogList({ onLogNew }) {
                 )}
 
                 {currentGrade?.qa_items.map(qa => (
-                  <div key={qa.qa_id} className="teach-log-qa-item">
-                    <div className="teach-log-qa-question-row">
-                      <span className="teach-log-qa-question">{qa.question}</span>
-                      <span className="teach-log-qa-level">L{qa.difficulty_level}</span>
-                    </div>
-                    {(() => {
-                      const renderOptions = getRenderOptions(qa)
-                      if (!renderOptions) {
-                        return <p className="teach-log-qa-answer">Answer: {qa.answer}</p>
-                      }
-                      return (
-                        <ul className="teach-log-qa-options">
-                          {Object.entries(renderOptions).map(([key, text]) => {
-                            const isCorrect = qa.options
-                              ? qa.answer.toLowerCase().split(',').includes(key.toLowerCase())
-                              : qa.answer.toLowerCase() === text.toLowerCase()
-                            return (
-                              <li key={key}>
-                                <span className={`teach-log-qa-option-label${isCorrect ? ' teach-log-qa-option-label--correct' : ''}`}>
-                                  {key.toUpperCase()}
-                                </span>
-                                <span>{text}</span>
-                              </li>
-                            )
-                          })}
-                        </ul>
-                      )
-                    })()}
-                  </div>
+                  <QaCard key={qa.qa_id} qa={qa} onUpdated={handleQaUpdated} onFlagged={handleQaFlagged} />
                 ))}
               </>
             )}

@@ -14,8 +14,18 @@ export async function fetchOrGenerateQA({ subjectName, topicName, grade, section
   return res.json() // { items, warning }
 }
 
-export async function fetchMyTeachLogs() {
-  const res = await apiFetch('/teach-logs/mine')
+export async function fetchSubjectsTaught() {
+  const res = await apiFetch('/teach-logs/subjects-taught')
   if (!res.ok) throw new Error(await apiErrorMessage(res))
   return res.json() // { subjects }
+}
+
+export async function updateQA(qaId, payload) {
+  const res = await apiFetch(`/qa/${qaId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) throw new Error(await apiErrorMessage(res))
+  return res.json() // updated QAItem, or { qa_id, is_active, flag_reason } for a flag
 }

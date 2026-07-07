@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useProfileStore } from '../store/profileStore'
 import { useStudentsStore } from '../store/studentsStore'
 import { useTeachersStore } from '../store/teachersStore'
+import { useSubjectsTaughtStore } from '../store/subjectsTaughtStore'
 import logo from '../assets/logo_48.webp'
 import './LeftNav.css'
 
@@ -64,6 +65,7 @@ export default function LeftNav() {
   const clearProfile = useProfileStore(s => s.clearProfile)
   const clearStudents = useStudentsStore(s => s.clearStudents)
   const clearTeachers = useTeachersStore(s => s.clearTeachers)
+  const clearSubjectsTaught = useSubjectsTaughtStore(s => s.clearSubjectsTaught)
   const studentsStatus = useStudentsStore(s => s.status)
   const teachersStatus = useTeachersStore(s => s.status)
   const navigate = useNavigate()
@@ -88,6 +90,7 @@ export default function LeftNav() {
     clearProfile()
     clearStudents()
     clearTeachers()
+    clearSubjectsTaught()
     navigate('/')
   }
 

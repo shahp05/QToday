@@ -26,6 +26,8 @@ def auth_login(payload: LoginRequest, db: Session = Depends(get_db)):
             "is_school_admin":   profile["is_school_admin"],
             "is_school_teacher": profile["is_school_teacher"],
             "is_system_admin":   profile["is_system_admin"],
+            "is_student":        profile["is_student"],
+            "is_parent":         profile["is_parent"],
         })
         return {"access_token": token, "token_type": "bearer", "profile": profile}
     except AppError:

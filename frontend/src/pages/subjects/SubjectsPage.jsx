@@ -1,16 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { useStudentGradesStore } from '../../store/studentGradesStore'
-import { fetchOrGenerateQA, fetchMyTeachLogs } from '../../services/qaService'
+import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
+import { fetchOrGenerateQA } from '../../services/qaService'
+import QaCard from './QaCard'
 import './SubjectsPage.css'
-
-// MCQ items already carry an options object; true/false items don't, so
-// synthesize one here to render both the same way (two boxed rows, correct
-// one highlighted) instead of a plain "Answer: True/False" line.
-function getRenderOptions(item) {
-  if (item.options) return item.options
-  if (item.question_type === 'true_false') return { T: 'True', F: 'False' }
-  return null
-}
 
 function useShake() {
   const [shaking, setShaking] = useState(false)
@@ -89,15 +82,13 @@ export default function SubjectsPage({ onShowList }) {
   const [submitError, setSubmitError] = useState('')
   const [warning, setWarning] = useState('')
   const [qaItems, setQaItems] = useState(null)
-  const [hasSubjects, setHasSubjects] = useState(false)
 
-  useEffect(() => {
-    let cancelled = false
-    fetchMyTeachLogs()
-      .then(data => { if (!cancelled) setHasSubjects(data.subjects.length > 0) })
-      .catch(() => {})
-    return () => { cancelled = true }
-  }, [])
+  const subjectsTaught = useSubjectsTaughtStore(s => s.subjects)
+  const refetchSubjectsTaught = useSubjectsTaughtStore(s => s.fetchSubjectsTaught)
+  const subjectsTaughtCount = subjectsTaught.reduce(
+    (acc, subject) => acc + subject.topics.reduce((a, topic) => a + topic.grades.length, 0),
+    0
+  )
 
   const [subjectShaking, shakeSubject] = useShake()
   const [topicShaking, shakeTopic] = useShake()
@@ -211,7 +202,7 @@ export default function SubjectsPage({ onShowList }) {
       })
       setQaItems(data.items)
       setWarning(data.warning || '')
-      setHasSubjects(true)
+      refetchSubjectsTaught()
     } catch (err) {
       setSubmitError(err.message)
     } finally {
@@ -235,9 +226,10 @@ export default function SubjectsPage({ onShowList }) {
         <div className={`teach-today-row${subjectShaking ? ' ui-shake' : ''}`}>
           <div className="teach-today-header">
             <label className="teach-today-label">Which subject did you teach today?</label>
-            {onShowList && hasSubjects && (
+            {onShowList && subjectsTaughtCount > 0 && (
               <button className="teach-today-list-btn" onClick={onShowList}>
                 Subjects Taught
+                <span className="teach-today-list-count">{subjectsTaughtCount}</span>
               </button>
             )}
           </div>
@@ -301,35 +293,14 @@ export default function SubjectsPage({ onShowList }) {
             {qaItems && qaItems.length > 0 && (
               <div className="teach-today-qa-list">
                 {qaItems.map(item => (
-                  <div key={item.qa_id} className="teach-today-qa-item">
-                    <div className="teach-today-qa-question-row">
-                      <span className="teach-today-qa-question">{item.question}</span>
-                      <span className="teach-today-qa-level">L{item.difficulty_level}</span>
-                    </div>
-                    {(() => {
-                      const renderOptions = getRenderOptions(item)
-                      if (!renderOptions) {
-                        return <p className="teach-today-qa-answer">Answer: {item.answer}</p>
-                      }
-                      return (
-                        <ul className="teach-today-qa-options">
-                          {Object.entries(renderOptions).map(([key, text]) => {
-                            const isCorrect = item.options
-                              ? item.answer.toLowerCase().split(',').includes(key.toLowerCase())
-                              : item.answer.toLowerCase() === text.toLowerCase()
-                            return (
-                              <li key={key}>
-                                <span className={`teach-today-qa-option-label${isCorrect ? ' teach-today-qa-option-label--correct' : ''}`}>
-                                  {key.toUpperCase()}
-                                </span>
-                                <span>{text}</span>
-                              </li>
-                            )
-                          })}
-                        </ul>
-                      )
-                    })()}
-                  </div>
+                  <QaCard
+                    key={item.qa_id}
+                    qa={item}
+                    onUpdated={updated => setQaItems(prev =>
+                      prev.map(q => (q.qa_id === updated.qa_id ? { ...q, ...updated } : q))
+                    )}
+                    onFlagged={qaId => setQaItems(prev => prev.filter(q => q.qa_id !== qaId))}
+                  />
                 ))}
               </div>
             )}
