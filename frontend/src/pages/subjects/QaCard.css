@@ -7,6 +7,15 @@
   border-radius: var(--radius-sm, 6px);
 }
 
+/* KaTeX sizes itself in em relative to its container, but its math-font
+   metrics (plus further scaling inside fraction numerators/denominators)
+   read visually smaller than surrounding text at the same font-size —
+   bump it up rather than bolding, since the math webfonts don't have a
+   real bold variant and synthetic bolding distorts the glyphs. */
+.qa-card .katex {
+  font-size: 1.2em;
+}
+
 .qa-card + .qa-card {
   margin-top: 2px;
 }

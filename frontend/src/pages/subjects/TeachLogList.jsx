@@ -32,6 +32,13 @@ export default function TeachLogList({ onLogNew }) {
   const [expandedSubjectId, setExpandedSubjectId] = useState(null)
   const [selectedTopicId, setSelectedTopicId] = useState(null)
   const [selectedGradeId, setSelectedGradeId] = useState(null)
+  const qaScrollRef = useRef(null)
+
+  // Switching subject/topic/grade shows an entirely different QA list —
+  // don't leave it scrolled to wherever the previous list happened to be.
+  useEffect(() => {
+    if (qaScrollRef.current) qaScrollRef.current.scrollTop = 0
+  }, [selectedGradeId])
 
   // Auto-expand + auto-select the first topic when there's only one subject
   // — nothing to choose between, so skip straight to it. The store is
@@ -138,7 +145,7 @@ export default function TeachLogList({ onLogNew }) {
                   ))}
                 </div>
 
-                <div className="teach-log-qa-scroll">
+                <div className="teach-log-qa-scroll" ref={qaScrollRef}>
                   {currentGrade?.qa_items.length === 0 && (
                     <p className="teach-log-list-empty">No questions generated for this grade yet.</p>
                   )}
