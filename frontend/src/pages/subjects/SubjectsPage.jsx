@@ -92,10 +92,7 @@ export default function SubjectsPage({ onShowList, onGenerated }) {
 
   const subjectsTaught = useSubjectsTaughtStore(s => s.subjects)
   const refetchSubjectsTaught = useSubjectsTaughtStore(s => s.fetchSubjectsTaught)
-  const subjectsTaughtCount = subjectsTaught.reduce(
-    (acc, subject) => acc + subject.topics.reduce((a, topic) => a + topic.grades.length, 0),
-    0
-  )
+  const topicsCoveredCount = subjectsTaught.reduce((acc, subject) => acc + subject.topics.length, 0)
 
   const [subjectShaking, shakeSubject] = useShake()
   const [topicShaking, shakeTopic] = useShake()
@@ -236,10 +233,10 @@ export default function SubjectsPage({ onShowList, onGenerated }) {
         <div className={`teach-today-row${subjectShaking ? ' ui-shake' : ''}`}>
           <div className="teach-today-header">
             <label className="teach-today-label">Which subject did you teach today?</label>
-            {onShowList && subjectsTaughtCount > 0 && (
+            {onShowList && topicsCoveredCount > 0 && (
               <button className="teach-today-list-btn" onClick={onShowList}>
-                Subjects Taught
-                <span className="teach-today-list-count">{subjectsTaughtCount}</span>
+                Topics Covered
+                <span className="teach-today-list-count">{topicsCoveredCount}</span>
               </button>
             )}
           </div>
