@@ -18,6 +18,28 @@ class AppSetting(Base):
     date_modified:  Mapped[datetime]      = mapped_column(DateTime, nullable=False, server_default=func.now())
 
 
+class SignupVerification(Base):
+    """No app code constructs this via the ORM — services/signup_service.py
+    reads/writes it with raw SQL for tight control over the verify-then-create
+    transaction. Declared here anyway so Alembic autogenerate can see it and
+    stops proposing to drop the table as unmanaged drift."""
+
+    __tablename__ = "signup_verifications"
+    __table_args__ = (
+        Index("idx_sv_email", "email_id"),
+        Index("idx_sv_expires", "expires_at"),
+    )
+
+    verification_id: Mapped[int]      = mapped_column(Integer, primary_key=True)
+    email_id:         Mapped[str]      = mapped_column(String(255), nullable=False)
+    code:             Mapped[str]      = mapped_column(String(6), nullable=False)
+    payload:          Mapped[dict]     = mapped_column(JSONB, nullable=False)
+    expires_at:       Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    is_verified:      Mapped[bool]     = mapped_column(Boolean, nullable=False, default=False)
+    attempt_count:    Mapped[int]      = mapped_column(Integer, nullable=False, default=0)
+    date_created:     Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class Board(Base):
     __tablename__ = "boards"
     __table_args__ = (UniqueConstraint("board_code", "country_id"),)
@@ -208,6 +230,7 @@ class Subject(Base):
 
     subject_id:    Mapped[int]           = mapped_column(Integer, primary_key=True)
     subject_name:  Mapped[str]           = mapped_column(String(200), nullable=False)
+    icon_key:      Mapped[str|None]      = mapped_column(String(50), nullable=True)
     country_id:    Mapped[int|None]      = mapped_column(ForeignKey("countries.country_id"))
     is_verified:   Mapped[bool]          = mapped_column(Boolean, nullable=False, default=False)
     date_created:  Mapped[datetime]      = mapped_column(DateTime, nullable=False, server_default=func.now())

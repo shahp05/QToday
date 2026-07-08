@@ -72,7 +72,7 @@ def list_subjects_taught(
 
     log_rows = db.execute(
         text(f"""
-            SELECT tl.subject_id, s.subject_name, tl.topic_id, t.topic_name,
+            SELECT tl.subject_id, s.subject_name, s.icon_key, tl.topic_id, t.topic_name,
                    tl.grade_id, g.grade_name, tl.section
             FROM teach_logs tl
             JOIN grades g ON g.grade_id = tl.grade_id
@@ -123,6 +123,7 @@ def list_subjects_taught(
         subject_entry = subjects.setdefault(log["subject_id"], {
             "subject_id": log["subject_id"],
             "subject_name": log["subject_name"],
+            "icon_key": log["icon_key"],
             "topics": [],
         })
         topic_key = (log["subject_id"], log["topic_id"])

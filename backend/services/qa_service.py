@@ -28,6 +28,7 @@ from errors.error_codes import ErrorCode
 from llm.factory import LLMPurpose, get_llm_client
 from services.allocation_service import compute_allocation
 from services.error_log_service import log_error
+from services.subject_icon_service import resolve_icon_key
 from services.matching_service import match_subject, match_subject_area, match_subject_area_globally, match_topic
 from services.text_utils import title_case
 
@@ -113,7 +114,12 @@ async def get_or_generate_qa(
         # is_verified=False: this row exists on the validate-LLM's say-so, not
         # a human's — same "pending review" meaning as QA.is_verified, not
         # "an LLM decided this is fine."
-        subject = Subject(subject_name=canonical_subject_name, country_id=subject_country_id, is_verified=False)
+        subject = Subject(
+            subject_name=canonical_subject_name,
+            country_id=subject_country_id,
+            icon_key=resolve_icon_key(canonical_subject_name),
+            is_verified=False,
+        )
         db.add(subject)
         db.flush()
 

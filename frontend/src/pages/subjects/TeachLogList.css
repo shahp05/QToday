@@ -111,7 +111,7 @@
   width: 100%;
   display: flex;
   align-items: center;
-  padding: 8px 10px 8px 39px;
+  padding: 8px 10px 8px 35px;
   border: none;
   background: none;
   cursor: pointer;
@@ -132,8 +132,25 @@
 }
 
 .teach-log-topic-name {
+  flex: 1;
+  min-width: 0;
   font-size: var(--font-size-sm, 11px);
   color: var(--color-white);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teach-log-topic-count {
+  font-size: var(--font-size-sm, 11px);
+  color: rgba(255,255,255,0.35);
+  /* the chevron icon's visible tip sits inset from its box edge, so nudge
+     the count left by the same amount for a visual (not just DOM) match */
+  padding-right: 2px;
+}
+
+.teach-log-topic-row--active .teach-log-topic-count {
+  color: rgba(52,52,52,0.6);
 }
 
 .teach-log-detail {

@@ -1,17 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
 import QaCard from './QaCard'
+import { getSubjectIcon } from './subjectIcons'
 import './TeachLogList.css'
-
-function IconBook() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-    </svg>
-  )
-}
 
 function IconChevron({ open }) {
   return (
@@ -104,27 +95,32 @@ export default function TeachLogList({ onLogNew, initialSelection }) {
           <div className="teach-log-subjects">
             {subjects.map(subject => {
               const isOpen = subject.subject_id === expandedSubjectId
+              const SubjectIcon = getSubjectIcon(subject.subject_name, subject.icon_key)
               return (
                 <div key={subject.subject_id} className="teach-log-subject-block">
                   <button
                     className="teach-log-subject-row"
                     onClick={() => toggleSubject(subject.subject_id)}
                   >
-                    <IconBook />
+                    <SubjectIcon />
                     <span className="teach-log-subject-name">{subject.subject_name}</span>
                     <span className="teach-log-subject-count">{subject.topics.length}</span>
                     <IconChevron open={isOpen} />
                   </button>
 
-                  {isOpen && subject.topics.map(topic => (
-                    <button
-                      key={topic.topic_id}
-                      className={`teach-log-topic-row ${topic.topic_id === selectedTopicId ? 'teach-log-topic-row--active' : ''}`}
-                      onClick={() => selectTopic(subject.subject_id, topic)}
-                    >
-                      <span className="teach-log-topic-name">{topic.topic_name}</span>
-                    </button>
-                  ))}
+                  {isOpen && subject.topics.map(topic => {
+                    const qaCount = topic.grades.reduce((a, g) => a + g.qa_items.length, 0)
+                    return (
+                      <button
+                        key={topic.topic_id}
+                        className={`teach-log-topic-row ${topic.topic_id === selectedTopicId ? 'teach-log-topic-row--active' : ''}`}
+                        onClick={() => selectTopic(subject.subject_id, topic)}
+                      >
+                        <span className="teach-log-topic-name">{topic.topic_name}</span>
+                        <span className="teach-log-topic-count">{qaCount}</span>
+                      </button>
+                    )
+                  })}
                 </div>
               )
             })}

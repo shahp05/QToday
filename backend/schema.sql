@@ -193,6 +193,7 @@ CREATE INDEX IF NOT EXISTS idx_parents_student         ON parents(student_id);
 CREATE TABLE IF NOT EXISTS subjects (
     subject_id      SERIAL          PRIMARY KEY,
     subject_name    VARCHAR(200)    NOT NULL,
+    icon_key        VARCHAR(50)     NULL,
     country_id      INTEGER         NULL REFERENCES countries(country_id),
     is_verified     BOOLEAN         NOT NULL DEFAULT FALSE,
     date_created    TIMESTAMP       NOT NULL DEFAULT NOW(),
