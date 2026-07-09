@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
 import QaCard from './QaCard'
 import { getSubjectIcon } from './subjectIcons'
+import TeachLogCalendar from './TeachLogCalendar'
 import './TeachLogList.css'
 
 function IconChevron({ open }) {
@@ -10,6 +11,18 @@ function IconChevron({ open }) {
       strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
       style={{ transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>
       <path d="M9 6l6 6-6 6" />
+    </svg>
+  )
+}
+
+function IconHistory() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="17" rx="2" />
+      <line x1="3" y1="9" x2="21" y2="9" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="16" y1="2" x2="16" y2="6" />
     </svg>
   )
 }
@@ -23,6 +36,7 @@ export default function TeachLogList({ onLogNew, initialSelection }) {
   const [expandedSubjectId, setExpandedSubjectId] = useState(initialSelection?.subjectId ?? null)
   const [selectedTopicId, setSelectedTopicId] = useState(initialSelection?.topicId ?? null)
   const [selectedGradeId, setSelectedGradeId] = useState(initialSelection?.gradeId ?? null)
+  const [showCalendar, setShowCalendar] = useState(false)
   const qaScrollRef = useRef(null)
 
   // Switching subject/topic/grade shows an entirely different QA list —
@@ -79,18 +93,30 @@ export default function TeachLogList({ onLogNew, initialSelection }) {
     <div className="teach-log-list">
       <div className="teach-log-list-header">
         <h2 className="teach-log-list-title">Subjects</h2>
-        <button className="teach-log-list-new-btn" onClick={onLogNew}>
-          New Subject
-        </button>
+        <div className="teach-log-list-header-actions">
+          <button
+            className={`teach-log-list-history-btn ${showCalendar ? 'teach-log-list-history-btn--active' : ''}`}
+            onClick={() => setShowCalendar(s => !s)}
+            aria-label="View log history"
+            title="View log history"
+          >
+            <IconHistory />
+          </button>
+          <button className="teach-log-list-new-btn" onClick={onLogNew}>
+            New Subject
+          </button>
+        </div>
       </div>
 
-      {status === 'error' && <p className="teach-log-list-empty">{error}</p>}
+      {showCalendar && <TeachLogCalendar />}
 
-      {status === 'loaded' && subjects.length === 0 && (
+      {!showCalendar && status === 'error' && <p className="teach-log-list-empty">{error}</p>}
+
+      {!showCalendar && status === 'loaded' && subjects.length === 0 && (
         <p className="teach-log-list-empty">Nothing logged yet — log the first topic you taught today.</p>
       )}
 
-      {status === 'loaded' && subjects.length > 0 && (
+      {!showCalendar && status === 'loaded' && subjects.length > 0 && (
         <div className="teach-log-columns">
           <div className="teach-log-subjects">
             {subjects.map(subject => {
@@ -127,10 +153,6 @@ export default function TeachLogList({ onLogNew, initialSelection }) {
           </div>
 
           <div className="teach-log-detail">
-            {!currentTopic && (
-              <p className="teach-log-list-empty">Select a topic on the left to see its questions.</p>
-            )}
-
             {currentTopic && (
               <>
                 <div className="teach-log-filter-row">

@@ -73,7 +73,7 @@ def list_subjects_taught(
     log_rows = db.execute(
         text(f"""
             SELECT tl.subject_id, s.subject_name, s.icon_key, tl.topic_id, t.topic_name,
-                   tl.grade_id, g.grade_name, tl.section
+                   tl.grade_id, g.grade_name, tl.section, tl.date_created::date AS log_date
             FROM teach_logs tl
             JOIN grades g ON g.grade_id = tl.grade_id
             JOIN subjects s ON s.subject_id = tl.subject_id
@@ -140,12 +140,17 @@ def list_subjects_taught(
                 "grade_id": log["grade_id"],
                 "grade_name": log["grade_name"],
                 "sections": set(),
+                # One entry per teach_log row (date + section) — the calendar
+                # view groups these by day client-side; everything else here
+                # only needs the deduped "sections" set above.
+                "logs": [],
                 "qa_items": qa_by_topic_grade.get(grade_key, []),
             }
             grades_by_id[grade_key] = grade_entry
             topic_entry["grades"].append(grade_entry)
         if log["section"]:
             grade_entry["sections"].add(log["section"])
+        grade_entry["logs"].append({"date": log["log_date"].isoformat(), "section": log["section"]})
 
     for subject_entry in subjects.values():
         subject_entry["topics"].sort(key=lambda t: t["topic_name"])
@@ -153,5 +158,6 @@ def list_subjects_taught(
             topic_entry["grades"].sort(key=lambda g: g["grade_name"])
             for grade_entry in topic_entry["grades"]:
                 grade_entry["sections"] = sorted(grade_entry["sections"])
+                grade_entry["logs"].sort(key=lambda l: l["date"])
 
     return sorted(subjects.values(), key=lambda s: s["subject_name"])

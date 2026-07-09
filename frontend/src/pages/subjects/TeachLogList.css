@@ -28,6 +28,38 @@
   color: rgba(255,255,255,0.65);
 }
 
+.teach-log-list-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.teach-log-list-history-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: var(--radius-sm, 6px);
+  background: none;
+  color: rgba(255,255,255,0.65);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.teach-log-list-history-btn:hover {
+  background: rgba(255,255,255,0.08);
+  color: var(--color-white);
+}
+
+.teach-log-list-history-btn--active {
+  background: var(--color-green-light, #8EEB65);
+  border-color: var(--color-green-light, #8EEB65);
+  color: var(--color-dark, #343434);
+}
+
 .teach-log-list-new-btn {
   border: 1px solid var(--color-green-light, #8EEB65);
   border-radius: var(--radius-sm, 6px);
