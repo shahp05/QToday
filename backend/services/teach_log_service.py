@@ -51,13 +51,32 @@ def _scope_clause(db: Session, *, customer_id, user_id, is_school_admin, is_syst
     return "tl.customer_id = :cid AND tl.user_id = :uid", {"cid": customer_id, "uid": user_id}
 
 
+def _qa_row_to_dict(row) -> dict:
+    r = dict(row._mapping)
+    return {
+        "qa_id": r["qa_id"],
+        "question_type": r["question_type"],
+        "question": r["question"],
+        "answer": r["answer"],
+        "options": r["options"],
+        "difficulty_level": r["difficulty_level"],
+        "edited_by_name": r["edited_by_name"],
+        "edited_by_school": r["edited_by_school"],
+    }
+
+
 def list_subjects_taught(
     db: Session, *, customer_id: int, user_id: int,
     is_school_admin: bool = False, is_system_admin: bool = False,
     is_student: bool = False, is_parent: bool = False,
-) -> list[dict]:
+) -> dict:
     """Every (subject, topic, grade) taught, nested subject -> topics ->
-    grades, with the matching QA (question/answer/difficulty) joined in.
+    grades, with a QA *count* per grade — not the full QA text, which would
+    mean shipping a caller's entire question history (or, for admins, the
+    whole school's) on every page load even though the UI only ever shows
+    one grade's questions at a time. Only the most-recently-taught
+    (topic, grade) gets its QA eagerly attached; everything else is loaded
+    on demand via get_topic_grade_qa() as the user clicks around.
     Scope depends on caller: admins see the whole school, teachers see only
     what they logged, students see their own grade/section regardless of
     teacher, parents see their children's grade/section at this school."""
@@ -67,7 +86,7 @@ def list_subjects_taught(
         is_student=is_student, is_parent=is_parent,
     )
     if scope is None:
-        return []
+        return {"subjects": [], "most_recent": None}
     scope_sql, params = scope
 
     log_rows = db.execute(
@@ -84,37 +103,38 @@ def list_subjects_taught(
     ).fetchall()
 
     if not log_rows:
-        return []
+        return {"subjects": [], "most_recent": None}
 
     logs = [dict(row._mapping) for row in log_rows]
     topic_ids = list({row["topic_id"] for row in logs})
     grade_ids = list({row["grade_id"] for row in logs})
 
-    qa_rows = db.execute(
+    # Counts only — the actual question/answer text is fetched lazily,
+    # per (topic, grade), via get_topic_grade_qa().
+    count_rows = db.execute(
         text("""
-            SELECT topic_id, grade_id, qa_id, question_type, question, answer, options,
-                   difficulty_level, edited_by_name, edited_by_school
+            SELECT topic_id, grade_id, COUNT(*) AS qa_count
             FROM qa
             WHERE topic_id = ANY(:topic_ids) AND grade_id = ANY(:grade_ids) AND is_active = TRUE
-            ORDER BY qa_id
+            GROUP BY topic_id, grade_id
         """),
         {"topic_ids": topic_ids, "grade_ids": grade_ids},
     ).fetchall()
+    qa_count_by_topic_grade = {(r.topic_id, r.grade_id): r.qa_count for r in count_rows}
 
-    qa_by_topic_grade: dict[tuple[int, int], list[dict]] = {}
-    for row in qa_rows:
-        r = dict(row._mapping)
-        key = (r["topic_id"], r["grade_id"])
-        qa_by_topic_grade.setdefault(key, []).append({
-            "qa_id": r["qa_id"],
-            "question_type": r["question_type"],
-            "question": r["question"],
-            "answer": r["answer"],
-            "options": r["options"],
-            "difficulty_level": r["difficulty_level"],
-            "edited_by_name": r["edited_by_name"],
-            "edited_by_school": r["edited_by_school"],
-        })
+    most_recent_log = max(logs, key=lambda l: l["log_date"])
+    most_recent_key = (most_recent_log["topic_id"], most_recent_log["grade_id"])
+    most_recent_qa_rows = db.execute(
+        text("""
+            SELECT qa_id, question_type, question, answer, options,
+                   difficulty_level, edited_by_name, edited_by_school
+            FROM qa
+            WHERE topic_id = :topic_id AND grade_id = :grade_id AND is_active = TRUE
+            ORDER BY qa_id
+        """),
+        {"topic_id": most_recent_key[0], "grade_id": most_recent_key[1]},
+    ).fetchall()
+    most_recent_qa_items = [_qa_row_to_dict(row) for row in most_recent_qa_rows]
 
     subjects: dict[int, dict] = {}
     topics_by_id: dict[tuple[int, int], dict] = {}
@@ -144,7 +164,11 @@ def list_subjects_taught(
                 # view groups these by day client-side; everything else here
                 # only needs the deduped "sections" set above.
                 "logs": [],
-                "qa_items": qa_by_topic_grade.get(grade_key, []),
+                "qa_count": qa_count_by_topic_grade.get(grade_key, 0),
+                # Only populated for the most-recently-taught grade; the
+                # frontend fetches the rest on demand and null means "not
+                # loaded yet" (as opposed to "loaded and empty").
+                "qa_items": most_recent_qa_items if grade_key == most_recent_key else None,
             }
             grades_by_id[grade_key] = grade_entry
             topic_entry["grades"].append(grade_entry)
@@ -160,4 +184,53 @@ def list_subjects_taught(
                 grade_entry["sections"] = sorted(grade_entry["sections"])
                 grade_entry["logs"].sort(key=lambda l: l["date"])
 
-    return sorted(subjects.values(), key=lambda s: s["subject_name"])
+    return {
+        "subjects": sorted(subjects.values(), key=lambda s: s["subject_name"]),
+        "most_recent": {
+            "subject_id": most_recent_log["subject_id"],
+            "topic_id": most_recent_log["topic_id"],
+            "grade_id": most_recent_log["grade_id"],
+        },
+    }
+
+
+def get_topic_grade_qa(
+    db: Session, *, customer_id: int, user_id: int, topic_id: int, grade_id: int,
+    is_school_admin: bool = False, is_system_admin: bool = False,
+    is_student: bool = False, is_parent: bool = False,
+) -> list[dict] | None:
+    """QA items for one (topic, grade), fetched on demand when the user
+    clicks a topic/grade that wasn't eagerly loaded by list_subjects_taught().
+    Returns None if the caller has no teach_logs row proving they're allowed
+    to see this (topic, grade) — same scoping rules as the list endpoint."""
+    scope = _scope_clause(
+        db, customer_id=customer_id, user_id=user_id,
+        is_school_admin=is_school_admin, is_system_admin=is_system_admin,
+        is_student=is_student, is_parent=is_parent,
+    )
+    if scope is None:
+        return None
+    scope_sql, params = scope
+
+    visible = db.execute(
+        text(f"""
+            SELECT 1 FROM teach_logs tl
+            WHERE {scope_sql} AND tl.is_active = TRUE AND tl.topic_id = :topic_id AND tl.grade_id = :grade_id
+            LIMIT 1
+        """),
+        {**params, "topic_id": topic_id, "grade_id": grade_id},
+    ).first()
+    if not visible:
+        return None
+
+    qa_rows = db.execute(
+        text("""
+            SELECT qa_id, question_type, question, answer, options,
+                   difficulty_level, edited_by_name, edited_by_school
+            FROM qa
+            WHERE topic_id = :topic_id AND grade_id = :grade_id AND is_active = TRUE
+            ORDER BY qa_id
+        """),
+        {"topic_id": topic_id, "grade_id": grade_id},
+    ).fetchall()
+    return [_qa_row_to_dict(row) for row in qa_rows]

@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, model_validator
@@ -8,6 +9,9 @@ class QARequest(BaseModel):
     topic_name: str
     grade: int
     section: Optional[str] = None
+    # Backdates the teach_logs entry to a specific day (e.g. logging a
+    # lesson from an earlier date via the calendar) instead of today.
+    log_date: Optional[date] = None
 
 
 class QAItem(BaseModel):

@@ -29,6 +29,7 @@ async def fetch_qa(
         topic_name=payload.topic_name,
         grade=payload.grade,
         section=payload.section,
+        log_date=payload.log_date,
         user_id=claims["user_id"],
         customer_id=customer_id,
     )

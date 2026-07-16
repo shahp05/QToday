@@ -87,6 +87,15 @@
   color: var(--color-white);
 }
 
+.teach-log-cal-nav button:disabled {
+  color: rgba(255,255,255,0.2);
+  cursor: not-allowed;
+}
+
+.teach-log-cal-nav button:disabled:hover {
+  background: none;
+}
+
 .teach-log-cal-month {
   font-size: 13px;
   font-weight: 400;
@@ -209,6 +218,15 @@
 
 .teach-log-cal-day--today {
   border-color: rgba(255,255,255,0.6);
+}
+
+.teach-log-cal-day--clickable {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.teach-log-cal-day--clickable:hover {
+  background: rgba(255,255,255,0.1);
 }
 
 .teach-log-cal-day-num {

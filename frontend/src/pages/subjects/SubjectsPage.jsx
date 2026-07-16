@@ -5,6 +5,17 @@ import { useProfileStore } from '../../store/profileStore'
 import { fetchOrGenerateQA } from '../../services/qaService'
 import './SubjectsPage.css'
 
+const MIN_GENERATE_MS = 3000
+
+function IconSpinner() {
+  return (
+    <svg className="teach-today-arrow-spinner" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 function useShake() {
   const [shaking, setShaking] = useState(false)
   const timer = useRef(null)
@@ -76,7 +87,7 @@ function buildSectionErrorMsg(grade, section, gradeSections) {
   return `Section ${section} does not exist in Grade ${grade} (e.g. ${example})`
 }
 
-export default function SubjectsPage({ onShowList, onGenerated }) {
+export default function SubjectsPage({ onShowList, onGenerated, logDate }) {
   const [subject, setSubject] = useState('')
   const [subjectError, setSubjectError] = useState(false)
   const [committedSubject, setCommittedSubject] = useState('')
@@ -92,6 +103,7 @@ export default function SubjectsPage({ onShowList, onGenerated }) {
 
   const subjectsTaught = useSubjectsTaughtStore(s => s.subjects)
   const refetchSubjectsTaught = useSubjectsTaughtStore(s => s.fetchSubjectsTaught)
+  const setQaItems = useSubjectsTaughtStore(s => s.setQaItems)
   const topicsCoveredCount = subjectsTaught.reduce((acc, subject) => acc + subject.topics.length, 0)
 
   const [subjectShaking, shakeSubject] = useShake()
@@ -131,6 +143,10 @@ export default function SubjectsPage({ onShowList, onGenerated }) {
   const sectionValid = !gradeHasSections ||
     (parsed.section !== null &&
       gradeSections.some(s => s.toLowerCase() === parsed.section.toLowerCase()))
+
+  const dateLabel = logDate
+    ? `on ${logDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+    : 'today'
 
   const subjectRef = useRef(null)
 
@@ -197,15 +213,26 @@ export default function SubjectsPage({ onShowList, onGenerated }) {
     setSubmitError('')
     setWarning('')
     setSubmitting(true)
+    const startedAt = Date.now()
     try {
       const data = await fetchOrGenerateQA({
         subjectName: committedSubject,
         topicName: topic.trim(),
         grade: parsed.grade,
         section: (customerHasSections && gradeHasSections) ? parsed.section : null,
+        logDate,
       })
       await refetchSubjectsTaught()
       if (data.items.length > 0) {
+        // Seed the store with what we already have so the subject-list page
+        // opens straight onto this topic's questions instead of re-fetching
+        // them — refetchSubjectsTaught() above may not have eagerly attached
+        // this exact grade (see subjectsTaughtStore's "most recent" note).
+        setQaItems(data.topic_id, data.grade_id, data.items)
+        const elapsed = Date.now() - startedAt
+        if (elapsed < MIN_GENERATE_MS) {
+          await new Promise(resolve => setTimeout(resolve, MIN_GENERATE_MS - elapsed))
+        }
         onGenerated?.({ subjectId: data.subject_id, topicId: data.topic_id, gradeId: data.grade_id })
       } else {
         setWarning(data.warning || '')
@@ -232,7 +259,7 @@ export default function SubjectsPage({ onShowList, onGenerated }) {
 
         <div className={`teach-today-row${subjectShaking ? ' ui-shake' : ''}`}>
           <div className="teach-today-header">
-            <label className="teach-today-label">Which subject did you teach today?</label>
+            <label className="teach-today-label">Which subject did you teach {dateLabel}?</label>
             {onShowList && topicsCoveredCount > 0 && (
               <button className="teach-today-list-btn" onClick={onShowList}>
                 Topics Covered
@@ -303,16 +330,21 @@ export default function SubjectsPage({ onShowList, onGenerated }) {
       </div>
 
       <div className="teach-today-arrow-row">
+        {submitting && (
+          <p className="teach-today-fetching-msg">Fetching questions for students to practice</p>
+        )}
         <button
           className="teach-today-arrow-btn"
           onClick={handleArrowClick}
           disabled={submitting}
           aria-label={showDetails ? 'Generate Questions' : 'Continue'}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M5 12h14M13 6l6 6-6 6"/>
-          </svg>
+          {submitting ? <IconSpinner /> : (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12h14M13 6l6 6-6 6"/>
+            </svg>
+          )}
         </button>
       </div>
 

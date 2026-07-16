@@ -61,6 +61,10 @@
 }
 
 .teach-log-list-new-btn {
+  height: 34px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
   border: 1px solid var(--color-green-light, #8EEB65);
   border-radius: var(--radius-sm, 6px);
   background: var(--color-green-light, #8EEB65);
@@ -68,7 +72,7 @@
   font-size: var(--font-size-sm, 13px);
   font-weight: 500;
   text-transform: capitalize;
-  padding: 8px 14px;
+  padding: 0 14px;
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s, color 0.2s;
 }
@@ -158,6 +162,10 @@
   background: var(--color-green-light, #8EEB65);
 }
 
+.teach-log-topic-row--active:hover {
+  background: var(--color-green-light, #8EEB65);
+}
+
 .teach-log-topic-row--active .teach-log-topic-name {
   color: var(--color-dark, #343434);
   font-weight: 500;
@@ -183,6 +191,19 @@
 
 .teach-log-topic-row--active .teach-log-topic-count {
   color: rgba(52,52,52,0.6);
+}
+
+.teach-log-spinner {
+  color: rgba(255,255,255,0.5);
+  animation: teach-log-spin 0.7s linear infinite;
+}
+
+.teach-log-topic-row--active .teach-log-spinner {
+  color: rgba(52,52,52,0.6);
+}
+
+@keyframes teach-log-spin {
+  to { transform: rotate(360deg); }
 }
 
 .teach-log-detail {

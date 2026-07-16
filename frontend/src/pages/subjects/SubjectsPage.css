@@ -93,10 +93,26 @@
 
 .teach-today-arrow-row {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: 8px;
   width: 100%;
   max-width: 560px;
+}
+
+.teach-today-fetching-msg {
+  margin: 0;
+  margin-right: auto;
+  font-size: var(--font-size-sm, 13px);
+  color: var(--color-green-light, #8EEB65);
+}
+
+.teach-today-arrow-spinner {
+  animation: teach-today-spin 0.7s linear infinite;
+}
+
+@keyframes teach-today-spin {
+  to { transform: rotate(360deg); }
 }
 
 .teach-today-arrow-btn {
@@ -120,7 +136,6 @@
 }
 
 .teach-today-arrow-btn:disabled {
-  opacity: 0.5;
   cursor: not-allowed;
   background: var(--color-green-light, #8EEB65);
   color: var(--color-dark, #343434);
@@ -171,6 +186,10 @@
   justify-content: space-between;
   gap: 12px;
   width: 100%;
+  /* Matches teach-today-list-btn's rendered height so the row doesn't grow
+     — and push the input below it down — once the button mounts after
+     subjectsTaught finishes loading (it starts empty on first render). */
+  min-height: 34px;
 }
 
 .teach-today-list-btn {

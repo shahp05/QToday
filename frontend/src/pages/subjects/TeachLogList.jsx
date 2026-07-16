@@ -27,12 +27,38 @@ function IconHistory() {
   )
 }
 
-export default function TeachLogList({ onLogNew, initialSelection }) {
+function IconList() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="8" y1="6" x2="21" y2="6" />
+      <line x1="8" y1="12" x2="21" y2="12" />
+      <line x1="8" y1="18" x2="21" y2="18" />
+      <line x1="3" y1="6" x2="3.01" y2="6" />
+      <line x1="3" y1="12" x2="3.01" y2="12" />
+      <line x1="3" y1="18" x2="3.01" y2="18" />
+    </svg>
+  )
+}
+
+function IconSpinner() {
+  return (
+    <svg className="teach-log-spinner" width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayClick }) {
   const subjects = useSubjectsTaughtStore(s => s.subjects)
+  const mostRecent = useSubjectsTaughtStore(s => s.mostRecent)
   const status = useSubjectsTaughtStore(s => s.status)
   const error = useSubjectsTaughtStore(s => s.error)
   const handleQaUpdated = useSubjectsTaughtStore(s => s.handleQaUpdated)
   const handleQaFlagged = useSubjectsTaughtStore(s => s.handleQaFlagged)
+  const ensureQaLoaded = useSubjectsTaughtStore(s => s.ensureQaLoaded)
+  const loadingQaKeys = useSubjectsTaughtStore(s => s.loadingQaKeys)
   const [expandedSubjectId, setExpandedSubjectId] = useState(initialSelection?.subjectId ?? null)
   const [selectedTopicId, setSelectedTopicId] = useState(initialSelection?.topicId ?? null)
   const [selectedGradeId, setSelectedGradeId] = useState(initialSelection?.gradeId ?? null)
@@ -47,27 +73,36 @@ export default function TeachLogList({ onLogNew, initialSelection }) {
     if (qaScrollRef.current) qaScrollRef.current.scrollTop = 0
   }, [selectedTopicId, selectedGradeId])
 
-  // Auto-expand + auto-select the first topic when there's only one subject
-  // and nothing was explicitly requested via initialSelection (e.g. arriving
-  // fresh via "Subjects Taught" rather than right after generating QA) —
-  // nothing to choose between, so skip straight to it. The store is usually
-  // already loaded (fetched at login), so this typically fires on the very
-  // first render; the ref just guards against re-running it later if the
-  // store data changes while the user has already navigated around.
+  // initialSelection (arriving right after generating QA) isn't guaranteed
+  // to be the eagerly-loaded "most recent" grade — e.g. ties on the same
+  // day — so make sure its qa_items are actually loaded, same as any other
+  // topic/grade the user might click into.
+  useEffect(() => {
+    if (initialSelection?.topicId != null && initialSelection?.gradeId != null) {
+      ensureQaLoaded(initialSelection.topicId, initialSelection.gradeId)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Auto-expand + auto-select the most-recently-taught topic/grade when
+  // nothing was explicitly requested via initialSelection (e.g. arriving
+  // fresh via "Topics Covered" rather than right after generating QA) —
+  // land on the subject list with that topic's questions already showing.
+  // Its qa_items are eagerly attached by the subjects-taught response, so
+  // this never needs an on-demand fetch. The store is usually already
+  // loaded (fetched at login), so this typically fires on the very first
+  // render; the ref just guards against re-running it later if the store
+  // data changes while the user has already navigated around.
   const didAutoExpand = useRef(Boolean(initialSelection))
   useEffect(() => {
     if (didAutoExpand.current || status !== 'loaded') return
     didAutoExpand.current = true
-    if (subjects.length === 1) {
-      const subject = subjects[0]
-      const topic = subject.topics[0]
-      setExpandedSubjectId(subject.subject_id)
-      if (topic) {
-        setSelectedTopicId(topic.topic_id)
-        setSelectedGradeId(topic.grades[0]?.grade_id ?? null)
-      }
+    if (mostRecent) {
+      setExpandedSubjectId(mostRecent.subject_id)
+      setSelectedTopicId(mostRecent.topic_id)
+      setSelectedGradeId(mostRecent.grade_id)
     }
-  }, [status, subjects])
+  }, [status, mostRecent])
 
   function toggleSubject(subjectId) {
     if (expandedSubjectId === subjectId) {
@@ -82,7 +117,14 @@ export default function TeachLogList({ onLogNew, initialSelection }) {
   function selectTopic(subjectId, topic) {
     setExpandedSubjectId(subjectId)
     setSelectedTopicId(topic.topic_id)
-    setSelectedGradeId(topic.grades[0]?.grade_id ?? null)
+    const gradeId = topic.grades[0]?.grade_id ?? null
+    setSelectedGradeId(gradeId)
+    if (gradeId != null) ensureQaLoaded(topic.topic_id, gradeId)
+  }
+
+  function selectGrade(topicId, gradeId) {
+    setSelectedGradeId(gradeId)
+    ensureQaLoaded(topicId, gradeId)
   }
 
   const currentSubject = subjects.find(s => s.subject_id === expandedSubjectId)
@@ -95,8 +137,16 @@ export default function TeachLogList({ onLogNew, initialSelection }) {
         <h2 className="teach-log-list-title">Subjects</h2>
         <div className="teach-log-list-header-actions">
           <button
+            className={`teach-log-list-history-btn ${!showCalendar ? 'teach-log-list-history-btn--active' : ''}`}
+            onClick={() => setShowCalendar(false)}
+            aria-label="View subject list"
+            title="View subject list"
+          >
+            <IconList />
+          </button>
+          <button
             className={`teach-log-list-history-btn ${showCalendar ? 'teach-log-list-history-btn--active' : ''}`}
-            onClick={() => setShowCalendar(s => !s)}
+            onClick={() => setShowCalendar(true)}
             aria-label="View log history"
             title="View log history"
           >
@@ -108,7 +158,7 @@ export default function TeachLogList({ onLogNew, initialSelection }) {
         </div>
       </div>
 
-      {showCalendar && <TeachLogCalendar />}
+      {showCalendar && <TeachLogCalendar onEmptyDayClick={onEmptyDayClick} />}
 
       {!showCalendar && status === 'error' && <p className="teach-log-list-empty">{error}</p>}
 
@@ -135,7 +185,8 @@ export default function TeachLogList({ onLogNew, initialSelection }) {
                   </button>
 
                   {isOpen && subject.topics.map(topic => {
-                    const qaCount = topic.grades.reduce((a, g) => a + g.qa_items.length, 0)
+                    const qaCount = topic.grades.reduce((a, g) => a + g.qa_count, 0)
+                    const isLoading = topic.grades.some(g => loadingQaKeys.has(`${topic.topic_id}:${g.grade_id}`))
                     return (
                       <button
                         key={topic.topic_id}
@@ -143,7 +194,7 @@ export default function TeachLogList({ onLogNew, initialSelection }) {
                         onClick={() => selectTopic(subject.subject_id, topic)}
                       >
                         <span className="teach-log-topic-name">{topic.topic_name}</span>
-                        <span className="teach-log-topic-count">{qaCount}</span>
+                        {isLoading ? <IconSpinner /> : <span className="teach-log-topic-count">{qaCount}</span>}
                       </button>
                     )
                   })}
@@ -160,7 +211,7 @@ export default function TeachLogList({ onLogNew, initialSelection }) {
                     <button
                       key={g.grade_id}
                       className={`teach-log-grade-pill ${g.grade_id === selectedGradeId ? 'teach-log-grade-pill--active' : ''}`}
-                      onClick={() => setSelectedGradeId(g.grade_id)}
+                      onClick={() => selectGrade(currentTopic.topic_id, g.grade_id)}
                     >
                       {g.grade_name}
                     </button>
@@ -168,11 +219,11 @@ export default function TeachLogList({ onLogNew, initialSelection }) {
                 </div>
 
                 <div className="teach-log-qa-scroll" ref={qaScrollRef}>
-                  {currentGrade?.qa_items.length === 0 && (
+                  {currentGrade?.qa_items?.length === 0 && (
                     <p className="teach-log-list-empty">No questions generated for this grade yet.</p>
                   )}
 
-                  {currentGrade?.qa_items.map(qa => (
+                  {currentGrade?.qa_items?.map(qa => (
                     <QaCard key={qa.qa_id} qa={qa} onUpdated={handleQaUpdated} onFlagged={handleQaFlagged} />
                   ))}
                 </div>

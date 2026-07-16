@@ -151,7 +151,7 @@ function FilterDropdown({ label, options, isChecked, onToggle, renderOption }) {
   )
 }
 
-export default function TeachLogCalendar() {
+export default function TeachLogCalendar({ onEmptyDayClick }) {
   const subjects = useSubjectsTaughtStore(s => s.subjects)
   const status = useSubjectsTaughtStore(s => s.status)
   const error = useSubjectsTaughtStore(s => s.error)
@@ -259,16 +259,21 @@ export default function TeachLogCalendar() {
 
   const monthCells = useMemo(() => buildMonthCells(viewDate), [viewDate])
   const today = new Date()
+  const isCurrentMonth = viewDate.getFullYear() === today.getFullYear() && viewDate.getMonth() === today.getMonth()
 
   function shiftMonth(delta) {
-    setViewDate(d => new Date(d.getFullYear(), d.getMonth() + delta, 1))
+    setViewDate(d => {
+      const next = new Date(d.getFullYear(), d.getMonth() + delta, 1)
+      const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+      return next > currentMonthStart ? currentMonthStart : next
+    })
   }
 
   const subjectLabel = subjectFilter.selected === null
-    ? 'All subjects'
+    ? 'Subjects'
     : `${subjectFilter.selected.size} subject${subjectFilter.selected.size === 1 ? '' : 's'}`
   const topicLabel = topicFilter.selected === null
-    ? 'All topics'
+    ? 'Topics'
     : `${topicFilter.selected.size} topic${topicFilter.selected.size === 1 ? '' : 's'}`
 
   return (
@@ -309,7 +314,7 @@ export default function TeachLogCalendar() {
             <div className="teach-log-cal-nav">
               <button aria-label="Previous month" onClick={() => shiftMonth(-1)}><IconChevronLeft /></button>
               <span className="teach-log-cal-month">{MONTHS[viewDate.getMonth()]} {viewDate.getFullYear()}</span>
-              <button aria-label="Next month" onClick={() => shiftMonth(1)}><IconChevronRight /></button>
+              <button aria-label="Next month" onClick={() => shiftMonth(1)} disabled={isCurrentMonth}><IconChevronRight /></button>
             </div>
 
             <FilterDropdown
@@ -338,10 +343,12 @@ export default function TeachLogCalendar() {
                 const taught = dayEvents.length > 0
                 const shown = dayEvents.slice(0, 3)
                 const overflow = dayEvents.length - shown.length
+                const isClickable = onEmptyDayClick && cell.inMonth && !taught && cell.date <= today
                 return (
                   <div
                     key={cell.key}
-                    className={`teach-log-cal-day ${taught ? 'teach-log-cal-day--taught' : ''} ${!cell.inMonth ? 'teach-log-cal-day--outside' : ''} ${isSameDay(cell.date, today) ? 'teach-log-cal-day--today' : ''}`}
+                    className={`teach-log-cal-day ${taught ? 'teach-log-cal-day--taught' : ''} ${!cell.inMonth ? 'teach-log-cal-day--outside' : ''} ${isSameDay(cell.date, today) ? 'teach-log-cal-day--today' : ''} ${isClickable ? 'teach-log-cal-day--clickable' : ''}`}
+                    onClick={isClickable ? () => onEmptyDayClick(cell.date) : undefined}
                   >
                     <span className="teach-log-cal-day-num">{cell.date.getDate()}</span>
                     {shown.map(ev => (

@@ -17,6 +17,7 @@ See conversation history for the full design rationale. Summary:
 """
 import asyncio
 import traceback
+from datetime import date, datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -62,6 +63,7 @@ async def get_or_generate_qa(
     user_id: int,
     customer_id: int,
     section: str | None = None,
+    log_date: date | None = None,
 ) -> dict:
     customer = db.get(Customer, customer_id)
     if customer is None:
@@ -84,7 +86,7 @@ async def get_or_generate_qa(
 
     if subject and subject_area and topic:
         return await _finalize(
-            db, subject, topic, subject_area, grade_row, grade, user_id, customer_id, section
+            db, subject, topic, subject_area, grade_row, grade, user_id, customer_id, section, log_date
         )
 
     # Something unresolved (subject, area, and/or topic) — validate via LLM, then create.
@@ -149,7 +151,7 @@ async def get_or_generate_qa(
         db.add(topic)
         db.flush()
 
-    return await _finalize(db, subject, topic, subject_area, grade_row, grade, user_id, customer_id, section)
+    return await _finalize(db, subject, topic, subject_area, grade_row, grade, user_id, customer_id, section, log_date)
 
 
 def _get_customer_grade_ids(db: Session, customer_id: int) -> set[int]:
@@ -175,6 +177,7 @@ async def _finalize(
     user_id: int,
     customer_id: int,
     section: str | None,
+    log_date: date | None = None,
 ) -> dict:
     """Subject+topic+grade are all confirmed valid at this point — log the
     lesson unconditionally (point 4 of the spec: log even if QA fetch/
@@ -182,14 +185,21 @@ async def _finalize(
     committed in its own transaction first so a failure partway through QA
     generation/insertion (which leaves the session needing a rollback) can
     never take the already-valid log write down with it."""
-    db.add(TeachLog(
+    teach_log = TeachLog(
         user_id=user_id,
         customer_id=customer_id,
         subject_id=subject.subject_id,
         topic_id=topic.topic_id,
         grade_id=grade_row.grade_id,
         section=section,
-    ))
+    )
+    if log_date is not None:
+        # date_created doubles as "the date this lesson was taught" (see
+        # teach_log_service.list_subjects_taught) — set explicitly to
+        # backdate a lesson logged after the fact via the calendar, instead
+        # of the server_default of now().
+        teach_log.date_created = datetime.combine(log_date, datetime.now().time())
+    db.add(teach_log)
     db.commit()
 
     warning = None
