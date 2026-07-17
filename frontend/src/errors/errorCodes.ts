@@ -2,7 +2,11 @@
 
 export const ErrorCode = {
   VALIDATION_ERROR: "VALIDATION_ERROR",
-  SUBJECT_TOPIC_INVALID: "SUBJECT_TOPIC_INVALID",
+  SUBJECT_INVALID: "SUBJECT_INVALID",
+  TOPIC_NOT_IN_SUBJECT: "TOPIC_NOT_IN_SUBJECT",
+  TEACH_LOG_NOT_FOUND: "TEACH_LOG_NOT_FOUND",
+  QA_GENERATION_FAILED: "QA_GENERATION_FAILED",
+  QA_NONE_VERIFIED: "QA_NONE_VERIFIED",
   GRADE_INVALID: "GRADE_INVALID",
   GRADE_NOT_OFFERED: "GRADE_NOT_OFFERED",
   LLM_TIMEOUT: "LLM_TIMEOUT",
@@ -45,7 +49,11 @@ export interface ErrorDefault {
 
 export const ERROR_DEFAULTS: Record<ErrorCodeValue, ErrorDefault> = {
   VALIDATION_ERROR: { message: "The submitted data failed validation.", httpStatus: 400 },
-  SUBJECT_TOPIC_INVALID: { message: "{reason}", httpStatus: 422 },
+  SUBJECT_INVALID: { message: "\"{subject}\" does not look like a valid subject. Please check what you entered.", httpStatus: 422 },
+  TOPIC_NOT_IN_SUBJECT: { message: "\"{topic}\" does not appear to be part of \"{subject}\" for Grade {grade}. Please check the topic you entered.", httpStatus: 422 },
+  TEACH_LOG_NOT_FOUND: { message: "No teaching log found for this topic and grade.", httpStatus: 404 },
+  QA_GENERATION_FAILED: { message: "The lesson was logged, but question generation failed. Please try again.", httpStatus: 502 },
+  QA_NONE_VERIFIED: { message: "No verified questions are available for this topic yet. Please try again.", httpStatus: 200 },
   GRADE_INVALID: { message: "The grade provided is not valid.", httpStatus: 400 },
   GRADE_NOT_OFFERED: { message: "No grade {grade} students in {acronym}", httpStatus: 400 },
   LLM_TIMEOUT: { message: "The AI service did not respond in time. Please try again.", httpStatus: 504 },

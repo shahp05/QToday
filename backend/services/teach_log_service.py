@@ -51,6 +51,41 @@ def _scope_clause(db: Session, *, customer_id, user_id, is_school_admin, is_syst
     return "tl.customer_id = :cid AND tl.user_id = :uid", {"cid": customer_id, "uid": user_id}
 
 
+def get_topic_catalog(db: Session, *, customer_id: int, user_id: int) -> list[dict]:
+    """Every distinct (subject, topic) this WHOLE school has ever logged —
+    not just the caller's own history — so the subject/topic combobox can
+    suggest reuse across teachers (e.g. avoid two teachers independently
+    creating near-duplicate topic spellings). Deliberately customer-scoped,
+    not global: Topic rows themselves carry no school/teacher ownership
+    (only teach_logs does), so without this filter "all topics of the
+    subject" would mean every school in the country, not just this one.
+    Identity only (ids + names) — no QA content, so this stays a small
+    payload regardless of question-generation volume."""
+    rows = db.execute(
+        text("""
+            SELECT tl.subject_id, s.subject_name, tl.topic_id, t.topic_name,
+                   BOOL_OR(tl.user_id = :uid) AS taught_by_me
+            FROM teach_logs tl
+            JOIN subjects s ON s.subject_id = tl.subject_id
+            JOIN topics t ON t.topic_id = tl.topic_id
+            WHERE tl.customer_id = :cid AND tl.is_active = TRUE
+            GROUP BY tl.subject_id, s.subject_name, tl.topic_id, t.topic_name
+            ORDER BY s.subject_name, t.topic_name
+        """),
+        {"cid": customer_id, "uid": user_id},
+    ).fetchall()
+    return [
+        {
+            "subject_id": r.subject_id,
+            "subject_name": r.subject_name,
+            "topic_id": r.topic_id,
+            "topic_name": r.topic_name,
+            "taught_by_me": r.taught_by_me,
+        }
+        for r in rows
+    ]
+
+
 def _qa_row_to_dict(row) -> dict:
     r = dict(row._mapping)
     return {

@@ -4,7 +4,11 @@ from enum import Enum
 
 class ErrorCode(str, Enum):
     VALIDATION_ERROR = "VALIDATION_ERROR"
-    SUBJECT_TOPIC_INVALID = "SUBJECT_TOPIC_INVALID"
+    SUBJECT_INVALID = "SUBJECT_INVALID"
+    TOPIC_NOT_IN_SUBJECT = "TOPIC_NOT_IN_SUBJECT"
+    TEACH_LOG_NOT_FOUND = "TEACH_LOG_NOT_FOUND"
+    QA_GENERATION_FAILED = "QA_GENERATION_FAILED"
+    QA_NONE_VERIFIED = "QA_NONE_VERIFIED"
     GRADE_INVALID = "GRADE_INVALID"
     GRADE_NOT_OFFERED = "GRADE_NOT_OFFERED"
     LLM_TIMEOUT = "LLM_TIMEOUT"
@@ -40,7 +44,11 @@ class ErrorCode(str, Enum):
 
 ERROR_DEFAULTS = {
     ErrorCode.VALIDATION_ERROR: {"message": "The submitted data failed validation.", "http_status": 400},
-    ErrorCode.SUBJECT_TOPIC_INVALID: {"message": "{reason}", "http_status": 422},
+    ErrorCode.SUBJECT_INVALID: {"message": "\"{subject}\" does not look like a valid subject. Please check what you entered.", "http_status": 422},
+    ErrorCode.TOPIC_NOT_IN_SUBJECT: {"message": "\"{topic}\" does not appear to be part of \"{subject}\" for Grade {grade}. Please check the topic you entered.", "http_status": 422},
+    ErrorCode.TEACH_LOG_NOT_FOUND: {"message": "No teaching log found for this topic and grade.", "http_status": 404},
+    ErrorCode.QA_GENERATION_FAILED: {"message": "The lesson was logged, but question generation failed. Please try again.", "http_status": 502},
+    ErrorCode.QA_NONE_VERIFIED: {"message": "No verified questions are available for this topic yet. Please try again.", "http_status": 200},
     ErrorCode.GRADE_INVALID: {"message": "The grade provided is not valid.", "http_status": 400},
     ErrorCode.GRADE_NOT_OFFERED: {"message": "No grade {grade} students in {acronym}", "http_status": 400},
     ErrorCode.LLM_TIMEOUT: {"message": "The AI service did not respond in time. Please try again.", "http_status": 504},

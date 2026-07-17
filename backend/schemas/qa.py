@@ -28,12 +28,18 @@ class QAItem(BaseModel):
 
 class QAResponse(BaseModel):
     items: list[QAItem]
-    warning: Optional[str] = None
+    # Code only, never display text — the frontend resolves it via
+    # errorCodes.ts (same registry as hard errors) so wording never requires
+    # touching the backend.
+    warning_code: Optional[str] = None
     # Lets the frontend jump straight to this subject/topic/grade in the
     # Subjects Taught list after generating, instead of rendering a separate
-    # inline QA display.
+    # inline QA display. Names are canonical (post fuzzy-match/LLM
+    # resolution), not the teacher's raw typed text.
     subject_id: int
+    subject_name: str
     topic_id: int
+    topic_name: str
     grade_id: int
 
 

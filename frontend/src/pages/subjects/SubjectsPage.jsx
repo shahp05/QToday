@@ -1,8 +1,11 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useStudentGradesStore } from '../../store/studentGradesStore'
 import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
+import { useTopicCatalogStore } from '../../store/topicCatalogStore'
 import { useProfileStore } from '../../store/profileStore'
 import { fetchOrGenerateQA } from '../../services/qaService'
+import { resolveApiError } from '../../lib/api'
+import Combobox from '../../components/Combobox'
 import './SubjectsPage.css'
 
 const MIN_GENERATE_MS = 3000
@@ -106,6 +109,9 @@ export default function SubjectsPage({ onShowList, onGenerated, logDate }) {
   const setQaItems = useSubjectsTaughtStore(s => s.setQaItems)
   const topicsCoveredCount = subjectsTaught.reduce((acc, subject) => acc + subject.topics.length, 0)
 
+  const topicCatalog = useTopicCatalogStore(s => s.topics)
+  const addCatalogTopic = useTopicCatalogStore(s => s.addTopic)
+
   const [subjectShaking, shakeSubject] = useShake()
   const [topicShaking, shakeTopic] = useShake()
   const [gradeShaking, shakeGrade] = useShake()
@@ -144,6 +150,34 @@ export default function SubjectsPage({ onShowList, onGenerated, logDate }) {
     (parsed.section !== null &&
       gradeSections.some(s => s.toLowerCase() === parsed.section.toLowerCase()))
 
+  // Combobox suggestion sources — pure typing-reduction convenience, never
+  // authoritative: whatever ends up in these fields still goes through the
+  // same validation/backend matching regardless of whether it was typed or
+  // picked from a suggestion.
+  const subjectOptions = useMemo(() => {
+    const seen = new Map()
+    topicCatalog.forEach(t => { if (!seen.has(t.subject_id)) seen.set(t.subject_id, t.subject_name) })
+    return [...seen.entries()].map(([id, name]) => ({ key: id, label: name }))
+  }, [topicCatalog])
+
+  const topicOptions = useMemo(() => {
+    const norm = committedSubject.trim().toLowerCase()
+    if (!norm) return []
+    return topicCatalog
+      .filter(t => t.subject_name.toLowerCase() === norm)
+      .map(t => ({ key: t.topic_id, label: t.topic_name }))
+  }, [topicCatalog, committedSubject])
+
+  const gradeOptions = useMemo(() => {
+    const seen = new Set()
+    const opts = []
+    studentGrades.filter(g => g.is_active).forEach(g => {
+      const label = `${g.grade_name}${g.section || ''}`
+      if (!seen.has(label)) { seen.add(label); opts.push({ key: label, label }) }
+    })
+    return opts.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))
+  }, [studentGrades])
+
   const dateLabel = logDate
     ? `on ${logDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
     : 'today'
@@ -180,8 +214,8 @@ export default function SubjectsPage({ onShowList, onGenerated, logDate }) {
     }
   }
 
-  function handleGradeChange(e) {
-    setGradeInput(e.target.value)
+  function handleGradeChange(value) {
+    setGradeInput(value)
     setGradeError(false)
     setGradeErrorMsg('')
   }
@@ -223,6 +257,15 @@ export default function SubjectsPage({ onShowList, onGenerated, logDate }) {
         logDate,
       })
       await refetchSubjectsTaught()
+      // The teach_log itself is always written even if QA generation later
+      // fails (see qa_service._finalize) — so this subject/topic identity
+      // exists regardless of the items.length branch below.
+      addCatalogTopic({
+        subject_id: data.subject_id,
+        subject_name: data.subject_name,
+        topic_id: data.topic_id,
+        topic_name: data.topic_name,
+      })
       if (data.items.length > 0) {
         // Seed the store with what we already have so the subject-list page
         // opens straight onto this topic's questions instead of re-fetching
@@ -235,7 +278,7 @@ export default function SubjectsPage({ onShowList, onGenerated, logDate }) {
         }
         onGenerated?.({ subjectId: data.subject_id, topicId: data.topic_id, gradeId: data.grade_id })
       } else {
-        setWarning(data.warning || '')
+        setWarning(data.warning_code ? resolveApiError({ error_code: data.warning_code }) : '')
       }
     } catch (err) {
       setSubmitError(err.message)
@@ -267,72 +310,57 @@ export default function SubjectsPage({ onShowList, onGenerated, logDate }) {
               </button>
             )}
           </div>
-          <input
-            ref={subjectRef}
+          <Combobox
+            inputRef={subjectRef}
             className={`teach-today-input${subjectError ? ' teach-today-input--error' : ''}`}
-            type="text"
             value={subject}
-            onChange={e => { setSubject(e.target.value); setSubjectError(false) }}
+            onChange={val => { setSubject(val); setSubjectError(false) }}
+            onPick={item => { setSubject(item.label); setSubjectError(false) }}
             onKeyDown={e => { if (e.key === 'Enter') handleNext() }}
+            options={subjectOptions}
             placeholder="e.g. Mathematics"
           />
         </div>
 
         {showDetails && (
-          <>
             <div className="teach-today-row teach-today-row--inline">
               <div className={`teach-today-field${topicShaking ? ' ui-shake' : ''}`}>
                 <label className="teach-today-label">Which topic in {committedSubject}?</label>
-                <input
+                <Combobox
                   className={`teach-today-input${topicError ? ' teach-today-input--error' : ''}`}
-                  type="text"
                   value={topic}
-                  onChange={e => { setTopic(e.target.value); setTopicError(false) }}
+                  onChange={val => { setTopic(val); setTopicError(false) }}
+                  onPick={item => { setTopic(item.label); setTopicError(false) }}
                   onKeyDown={e => { if (e.key === 'Enter') handleGenerate() }}
+                  options={topicOptions}
                   placeholder="e.g. Quadratic Equations"
                 />
               </div>
               <div className={`teach-today-field teach-today-field--grade${gradeShaking ? ' ui-shake' : ''}`}>
                 <label className="teach-today-label">Grade</label>
-                <input
+                <Combobox
                   className={`teach-today-input${gradeError ? ' teach-today-input--error' : ''}`}
-                  type="text"
                   value={gradeInput}
                   onChange={handleGradeChange}
+                  onPick={item => handleGradeChange(item.label)}
                   onBlur={handleGradeBlur}
+                  options={gradeOptions}
                   onKeyDown={e => { if (e.key === 'Enter') handleGenerate() }}
                   placeholder={gradePlaceholder}
                 />
               </div>
             </div>
-
-            {gradeError && gradeErrorMsg && (
-              <div className="teach-today-row">
-                <p className="teach-today-error">{gradeErrorMsg}</p>
-              </div>
-            )}
-
-            {submitError && (
-              <div className="teach-today-row">
-                <p className="teach-today-error">{submitError}</p>
-              </div>
-            )}
-
-            {warning && (
-              <div className="teach-today-row">
-                <p className="teach-today-warning">{warning}</p>
-              </div>
-            )}
-
-          </>
         )}
 
       </div>
 
       <div className="teach-today-arrow-row">
-        {submitting && (
-          <p className="teach-today-fetching-msg">Fetching questions for students to practice</p>
-        )}
+        <div className="teach-today-status-msg">
+          {gradeError && gradeErrorMsg && <p className="teach-today-error">{gradeErrorMsg}</p>}
+          {submitError && <p className="teach-today-error">{submitError}</p>}
+          {warning && <p className="teach-today-warning">{warning}</p>}
+          {submitting && <p className="teach-today-fetching-msg">Fetching questions for students to practice</p>}
+        </div>
         <button
           className="teach-today-arrow-btn"
           onClick={handleArrowClick}

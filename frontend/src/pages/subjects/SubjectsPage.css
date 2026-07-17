@@ -100,9 +100,14 @@
   max-width: 560px;
 }
 
+.teach-today-status-msg {
+  display: flex;
+  flex-direction: column;
+  margin-right: auto;
+}
+
 .teach-today-fetching-msg {
   margin: 0;
-  margin-right: auto;
   font-size: var(--font-size-sm, 13px);
   color: var(--color-green-light, #8EEB65);
 }

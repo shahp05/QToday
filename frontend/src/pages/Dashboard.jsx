@@ -10,6 +10,7 @@ import { useUI } from '../context/UIContext'
 import { useStudentsStore } from '../store/studentsStore'
 import { useTeachersStore } from '../store/teachersStore'
 import { useSubjectsTaughtStore } from '../store/subjectsTaughtStore'
+import { useTopicCatalogStore } from '../store/topicCatalogStore'
 import './Dashboard.css'
 
 function IconDemo() {
@@ -49,6 +50,7 @@ export default function Dashboard() {
   const fetchStudents                 = useStudentsStore(s => s.fetchStudents)
   const fetchTeachers                 = useTeachersStore(s => s.fetchTeachers)
   const fetchSubjectsTaught           = useSubjectsTaughtStore(s => s.fetchSubjectsTaught)
+  const fetchTopicCatalog             = useTopicCatalogStore(s => s.fetchTopicCatalog)
   const studentsStatus                = useStudentsStore(s => s.status)
   const teachersStatus                = useTeachersStore(s => s.status)
   const [displayedPage, setDisplayedPage] = useState(null)
@@ -63,6 +65,7 @@ export default function Dashboard() {
     fetchStudents()
     fetchTeachers()
     fetchSubjectsTaught()
+    fetchTopicCatalog()
   }, [])
 
   // Students/teachers data loads async on a left-nav button press — keep

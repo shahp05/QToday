@@ -21,7 +21,7 @@ export async function fetchOrGenerateQA({ subjectName, topicName, grade, section
     }),
   })
   if (!res.ok) throw new Error(await apiErrorMessage(res))
-  return res.json() // { items, warning, subject_id, topic_id, grade_id }
+  return res.json() // { items, warning_code, subject_id, topic_id, grade_id }
 }
 
 export async function fetchSubjectsTaught() {
@@ -34,6 +34,12 @@ export async function fetchTopicGradeQA(topicId, gradeId) {
   const res = await apiFetch(`/teach-logs/qa?topic_id=${topicId}&grade_id=${gradeId}`)
   if (!res.ok) throw new Error(await apiErrorMessage(res))
   return res.json() // { qa_items }
+}
+
+export async function fetchTopicCatalog() {
+  const res = await apiFetch('/teach-logs/topic-catalog')
+  if (!res.ok) throw new Error(await apiErrorMessage(res))
+  return res.json() // { topics: [{subject_id, subject_name, topic_id, topic_name, taught_by_me}] }
 }
 
 export async function updateQA(qaId, payload) {

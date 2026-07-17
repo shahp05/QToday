@@ -1,6 +1,10 @@
 {
   "VALIDATION_ERROR":          { "message": "The submitted data failed validation.",                         "http_status": 400 },
-  "SUBJECT_TOPIC_INVALID":     { "message": "{reason}",                                                        "http_status": 422 },
+  "SUBJECT_INVALID":           { "message": "\"{subject}\" does not look like a valid subject. Please check what you entered.", "http_status": 422 },
+  "TOPIC_NOT_IN_SUBJECT":      { "message": "\"{topic}\" does not appear to be part of \"{subject}\" for Grade {grade}. Please check the topic you entered.", "http_status": 422 },
+  "TEACH_LOG_NOT_FOUND":       { "message": "No teaching log found for this topic and grade.",                "http_status": 404 },
+  "QA_GENERATION_FAILED":      { "message": "The lesson was logged, but question generation failed. Please try again.", "http_status": 502 },
+  "QA_NONE_VERIFIED":          { "message": "No verified questions are available for this topic yet. Please try again.", "http_status": 200 },
   "GRADE_INVALID":             { "message": "The grade provided is not valid.",                               "http_status": 400 },
   "GRADE_NOT_OFFERED":         { "message": "No grade {grade} students in {acronym}",                          "http_status": 400 },
   "LLM_TIMEOUT":                { "message": "The AI service did not respond in time. Please try again.",     "http_status": 504 },

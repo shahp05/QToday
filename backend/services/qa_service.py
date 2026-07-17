@@ -92,14 +92,12 @@ async def get_or_generate_qa(
     # Something unresolved (subject, area, and/or topic) — validate via LLM, then create.
     validation = await _validate_subject_topic(subject_name, topic_name, grade, user_country_id, db)
     if not validation.get("valid"):
-        # Surface a fixed, generic message rather than the LLM's free-text
-        # reason — the LLM's raw wording isn't something to show a teacher
-        # verbatim, and it isn't specific about subject vs. topic either.
+        # Never the LLM's own free-text reason — only a code + the raw
+        # values the teacher typed. Display wording lives entirely in
+        # errorCodes.ts; changing it never requires a backend deploy.
         if not validation.get("subject_valid", True):
-            reason = "Check the subject you have entered"
-        else:
-            reason = "Check the topic you have entered"
-        raise AppError(ErrorCode.SUBJECT_TOPIC_INVALID, {"reason": reason})
+            raise AppError(ErrorCode.SUBJECT_INVALID, {"subject": subject_name})
+        raise AppError(ErrorCode.TOPIC_NOT_IN_SUBJECT, {"topic": topic_name, "subject": subject_name, "grade": grade})
 
     canonical_subject_name = title_case(validation["canonical_subject_name"])
     canonical_area_name = (
@@ -202,14 +200,14 @@ async def _finalize(
     db.add(teach_log)
     db.commit()
 
-    warning = None
+    warning_code = None
     try:
         qa_rows = await _get_verified_qa(db, subject, topic, subject_area, grade_row, grade)
         db.commit()
     except Exception as exc:
         db.rollback()
         qa_rows = []
-        warning = "The lesson was logged, but question generation failed. Please try again."
+        warning_code = ErrorCode.QA_GENERATION_FAILED
         log_error(
             db,
             type="api",
@@ -224,13 +222,21 @@ async def _finalize(
     result = {
         "items": _serialize(qa_rows),
         "subject_id": subject.subject_id,
+        # Canonical names, not the teacher's raw typed text — lets the
+        # frontend cache this subject/topic locally (e.g. for the combobox
+        # catalog) without drifting from what a fuzzy-match/LLM-canonicalize
+        # pass may have resolved it to (e.g. "Math" -> "Mathematics").
+        "subject_name": subject.subject_name,
         "topic_id": topic.topic_id,
+        "topic_name": topic.topic_name,
         "grade_id": grade_row.grade_id,
     }
-    if not qa_rows and not warning:
-        warning = "No verified questions are available for this topic yet. Please try again."
-    if warning:
-        result["warning"] = warning
+    if not qa_rows and not warning_code:
+        warning_code = ErrorCode.QA_NONE_VERIFIED
+    if warning_code:
+        # Code only, same as every other user-facing message — the frontend
+        # resolves it via errorCodes.ts, never a hardcoded string from here.
+        result["warning_code"] = warning_code.value
     return result
 
 
