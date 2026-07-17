@@ -11,6 +11,7 @@ export const useSubjectsTaughtStore = create((set, get) => ({
   status: 'idle', // idle | loading | loaded | error
   error: null,
   loadingQaKeys: new Set(), // `${topicId}:${gradeId}` currently being fetched
+  qaLoadFailedKeys: new Set(), // `${topicId}:${gradeId}` whose last fetch attempt failed
 
   fetchSubjectsTaught: async () => {
     set({ status: 'loading', error: null })
@@ -31,7 +32,14 @@ export const useSubjectsTaughtStore = create((set, get) => ({
     const grade = topic?.grades.find(g => g.grade_id === gradeId)
     if (!grade || grade.qa_items != null || get().loadingQaKeys.has(key)) return
 
-    set(state => ({ loadingQaKeys: new Set(state.loadingQaKeys).add(key) }))
+    set(state => ({
+      loadingQaKeys: new Set(state.loadingQaKeys).add(key),
+      qaLoadFailedKeys: (() => {
+        const next = new Set(state.qaLoadFailedKeys)
+        next.delete(key)
+        return next
+      })(),
+    }))
     try {
       const data = await fetchTopicGradeQA(topicId, gradeId)
       set(state => ({
@@ -43,6 +51,10 @@ export const useSubjectsTaughtStore = create((set, get) => ({
           }),
         })),
       }))
+    } catch {
+      // Leave qa_items as-is (null) — the caller falls back to whatever
+      // topic/grade was displayed before this fetch was kicked off.
+      set(state => ({ qaLoadFailedKeys: new Set(state.qaLoadFailedKeys).add(key) }))
     } finally {
       set(state => {
         const next = new Set(state.loadingQaKeys)
@@ -98,5 +110,5 @@ export const useSubjectsTaughtStore = create((set, get) => ({
     get().mutateQaItems(qaId, items => items.filter(item => item.qa_id !== qaId))
   },
 
-  clearSubjectsTaught: () => set({ subjects: [], mostRecent: null, status: 'idle', error: null, loadingQaKeys: new Set() }),
+  clearSubjectsTaught: () => set({ subjects: [], mostRecent: null, status: 'idle', error: null, loadingQaKeys: new Set(), qaLoadFailedKeys: new Set() }),
 }))

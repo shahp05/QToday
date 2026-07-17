@@ -59,6 +59,7 @@ export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayCli
   const handleQaFlagged = useSubjectsTaughtStore(s => s.handleQaFlagged)
   const ensureQaLoaded = useSubjectsTaughtStore(s => s.ensureQaLoaded)
   const loadingQaKeys = useSubjectsTaughtStore(s => s.loadingQaKeys)
+  const qaLoadFailedKeys = useSubjectsTaughtStore(s => s.qaLoadFailedKeys)
   const [expandedSubjectId, setExpandedSubjectId] = useState(initialSelection?.subjectId ?? null)
   const [selectedTopicId, setSelectedTopicId] = useState(initialSelection?.topicId ?? null)
   const [selectedGradeId, setSelectedGradeId] = useState(initialSelection?.gradeId ?? null)
@@ -77,10 +78,26 @@ export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayCli
       setDisplayedGradeId(selectedGradeId)
       return
     }
-    if (loadingQaKeys.has(`${selectedTopicId}:${selectedGradeId}`)) return
+    const key = `${selectedTopicId}:${selectedGradeId}`
+    if (loadingQaKeys.has(key)) return
+
+    if (qaLoadFailedKeys.has(key)) {
+      // The fetch for the newly-selected topic/grade failed — fall back to
+      // whatever was displayed before, including the sidebar selection, so
+      // the UI ends up exactly where it was rather than pointed at a topic
+      // with no data.
+      if (displayedTopicId != null && displayedGradeId != null) {
+        setSelectedTopicId(displayedTopicId)
+        setSelectedGradeId(displayedGradeId)
+        const displayedSubj = subjects.find(s => s.topics.some(t => t.topic_id === displayedTopicId))
+        if (displayedSubj) setExpandedSubjectId(displayedSubj.subject_id)
+      }
+      return
+    }
+
     setDisplayedTopicId(selectedTopicId)
     setDisplayedGradeId(selectedGradeId)
-  }, [selectedTopicId, selectedGradeId, loadingQaKeys])
+  }, [selectedTopicId, selectedGradeId, loadingQaKeys, qaLoadFailedKeys, displayedTopicId, displayedGradeId, subjects])
 
   // Switching to a topic/grade whose QA is actually displayed shows an
   // entirely different QA list — don't leave it scrolled to wherever the
@@ -159,7 +176,6 @@ export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayCli
   const displayedSubject = subjects.find(s => s.topics.some(t => t.topic_id === displayedTopicId)) ?? currentSubject
   const currentTopic = displayedSubject?.topics.find(t => t.topic_id === displayedTopicId)
   const currentGrade = currentTopic?.grades.find(g => g.grade_id === displayedGradeId)
-  const isSwitchingQa = selectedTopicId !== displayedTopicId || selectedGradeId !== displayedGradeId
 
   return (
     <div className="teach-log-list">
@@ -248,22 +264,14 @@ export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayCli
                   ))}
                 </div>
 
-                <div className="teach-log-qa-scroll-wrap">
-                  <div className="teach-log-qa-scroll" ref={qaScrollRef}>
-                    {currentGrade?.qa_items?.length === 0 && (
-                      <p className="teach-log-list-empty">No questions generated for this grade yet.</p>
-                    )}
-
-                    {currentGrade?.qa_items?.map(qa => (
-                      <QaCard key={qa.qa_id} qa={qa} onUpdated={handleQaUpdated} onFlagged={handleQaFlagged} />
-                    ))}
-                  </div>
-
-                  {isSwitchingQa && (
-                    <div className="teach-log-qa-overlay">
-                      <IconSpinner />
-                    </div>
+                <div className="teach-log-qa-scroll" ref={qaScrollRef}>
+                  {currentGrade?.qa_items?.length === 0 && (
+                    <p className="teach-log-list-empty">No questions generated for this grade yet.</p>
                   )}
+
+                  {currentGrade?.qa_items?.map(qa => (
+                    <QaCard key={qa.qa_id} qa={qa} onUpdated={handleQaUpdated} onFlagged={handleQaFlagged} />
+                  ))}
                 </div>
               </>
             )}

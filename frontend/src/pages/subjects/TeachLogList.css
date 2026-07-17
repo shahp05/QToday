@@ -225,38 +225,15 @@
 }
 
 /* ─── Only the QA list scrolls — subjects/topics/grades above stay put ───── */
-.teach-log-qa-scroll-wrap {
-  position: relative;
+.teach-log-qa-scroll {
   flex: 1;
   min-height: 0;
-}
-
-.teach-log-qa-scroll {
-  height: 100%;
   overflow-y: auto;
   scrollbar-gutter: stable;
   scrollbar-color: rgba(255,255,255,0.6) transparent;
 }
 
 .teach-log-qa-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.6); border-radius: 2px; }
-
-/* Shown over the still-visible previous QA list while the next topic/grade
-   loads, so switching never leaves the pane blank or shifts its layout. */
-.teach-log-qa-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(52,52,52,0.55);
-  backdrop-filter: blur(1px);
-}
-
-.teach-log-qa-overlay .teach-log-spinner {
-  width: 28px;
-  height: 28px;
-  color: rgba(255,255,255,0.75);
-}
 
 .teach-log-grade-pill {
   display: flex;
