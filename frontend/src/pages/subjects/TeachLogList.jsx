@@ -62,16 +62,33 @@ export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayCli
   const [expandedSubjectId, setExpandedSubjectId] = useState(initialSelection?.subjectId ?? null)
   const [selectedTopicId, setSelectedTopicId] = useState(initialSelection?.topicId ?? null)
   const [selectedGradeId, setSelectedGradeId] = useState(initialSelection?.gradeId ?? null)
+  // The QA pane keeps rendering whatever topic/grade it last had loaded data
+  // for, even after the user clicks a different topic — these only catch up
+  // to selectedTopicId/selectedGradeId once that topic's qa_items are ready,
+  // so the list never goes blank while a fetch is in flight.
+  const [displayedTopicId, setDisplayedTopicId] = useState(initialSelection?.topicId ?? null)
+  const [displayedGradeId, setDisplayedGradeId] = useState(initialSelection?.gradeId ?? null)
   const [showCalendar, setShowCalendar] = useState(false)
   const qaScrollRef = useRef(null)
 
-  // Switching subject/topic/grade shows an entirely different QA list —
-  // don't leave it scrolled to wherever the previous list happened to be.
-  // Both selectedTopicId and selectedGradeId are needed: two different
-  // topics can share the same first grade_id, so grade alone can miss it.
+  useEffect(() => {
+    if (selectedTopicId == null || selectedGradeId == null) {
+      setDisplayedTopicId(selectedTopicId)
+      setDisplayedGradeId(selectedGradeId)
+      return
+    }
+    if (loadingQaKeys.has(`${selectedTopicId}:${selectedGradeId}`)) return
+    setDisplayedTopicId(selectedTopicId)
+    setDisplayedGradeId(selectedGradeId)
+  }, [selectedTopicId, selectedGradeId, loadingQaKeys])
+
+  // Switching to a topic/grade whose QA is actually displayed shows an
+  // entirely different QA list — don't leave it scrolled to wherever the
+  // previous list happened to be. Both ids are needed: two different topics
+  // can share the same first grade_id, so grade alone can miss it.
   useEffect(() => {
     if (qaScrollRef.current) qaScrollRef.current.scrollTop = 0
-  }, [selectedTopicId, selectedGradeId])
+  }, [displayedTopicId, displayedGradeId])
 
   // initialSelection (arriving right after generating QA) isn't guaranteed
   // to be the eagerly-loaded "most recent" grade — e.g. ties on the same
@@ -136,8 +153,13 @@ export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayCli
   }
 
   const currentSubject = subjects.find(s => s.subject_id === expandedSubjectId)
-  const currentTopic = currentSubject?.topics.find(t => t.topic_id === selectedTopicId)
-  const currentGrade = currentTopic?.grades.find(g => g.grade_id === selectedGradeId)
+  // Look up the displayed topic across all subjects (not just currentSubject)
+  // so its stale data keeps rendering even if the sidebar has since expanded
+  // a different subject while the new topic's QA is still loading.
+  const displayedSubject = subjects.find(s => s.topics.some(t => t.topic_id === displayedTopicId)) ?? currentSubject
+  const currentTopic = displayedSubject?.topics.find(t => t.topic_id === displayedTopicId)
+  const currentGrade = currentTopic?.grades.find(g => g.grade_id === displayedGradeId)
+  const isSwitchingQa = selectedTopicId !== displayedTopicId || selectedGradeId !== displayedGradeId
 
   return (
     <div className="teach-log-list">
@@ -218,7 +240,7 @@ export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayCli
                   {currentTopic.grades.map(g => (
                     <button
                       key={g.grade_id}
-                      className={`teach-log-grade-pill ${g.grade_id === selectedGradeId ? 'teach-log-grade-pill--active' : ''}`}
+                      className={`teach-log-grade-pill ${g.grade_id === displayedGradeId ? 'teach-log-grade-pill--active' : ''}`}
                       onClick={() => selectGrade(currentTopic.topic_id, g.grade_id)}
                     >
                       {g.grade_name}
@@ -226,14 +248,22 @@ export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayCli
                   ))}
                 </div>
 
-                <div className="teach-log-qa-scroll" ref={qaScrollRef}>
-                  {currentGrade?.qa_items?.length === 0 && (
-                    <p className="teach-log-list-empty">No questions generated for this grade yet.</p>
-                  )}
+                <div className="teach-log-qa-scroll-wrap">
+                  <div className="teach-log-qa-scroll" ref={qaScrollRef}>
+                    {currentGrade?.qa_items?.length === 0 && (
+                      <p className="teach-log-list-empty">No questions generated for this grade yet.</p>
+                    )}
 
-                  {currentGrade?.qa_items?.map(qa => (
-                    <QaCard key={qa.qa_id} qa={qa} onUpdated={handleQaUpdated} onFlagged={handleQaFlagged} />
-                  ))}
+                    {currentGrade?.qa_items?.map(qa => (
+                      <QaCard key={qa.qa_id} qa={qa} onUpdated={handleQaUpdated} onFlagged={handleQaFlagged} />
+                    ))}
+                  </div>
+
+                  {isSwitchingQa && (
+                    <div className="teach-log-qa-overlay">
+                      <IconSpinner />
+                    </div>
+                  )}
                 </div>
               </>
             )}
