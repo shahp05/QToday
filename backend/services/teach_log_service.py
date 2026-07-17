@@ -145,7 +145,17 @@ def list_subjects_taught(
             "subject_name": log["subject_name"],
             "icon_key": log["icon_key"],
             "topics": [],
+            # Most-recently-taught (topic, grade) within this subject, so the
+            # frontend can auto-select it when the subject is expanded —
+            # mirrors the top-level "most_recent" but scoped per subject.
+            "most_recent_topic_id": None,
+            "most_recent_grade_id": None,
+            "_most_recent_log_date": None,
         })
+        if subject_entry["_most_recent_log_date"] is None or log["log_date"] > subject_entry["_most_recent_log_date"]:
+            subject_entry["_most_recent_log_date"] = log["log_date"]
+            subject_entry["most_recent_topic_id"] = log["topic_id"]
+            subject_entry["most_recent_grade_id"] = log["grade_id"]
         topic_key = (log["subject_id"], log["topic_id"])
         topic_entry = topics_by_id.get(topic_key)
         if topic_entry is None:
@@ -177,6 +187,7 @@ def list_subjects_taught(
         grade_entry["logs"].append({"date": log["log_date"].isoformat(), "section": log["section"]})
 
     for subject_entry in subjects.values():
+        del subject_entry["_most_recent_log_date"]
         subject_entry["topics"].sort(key=lambda t: t["topic_name"])
         for topic_entry in subject_entry["topics"]:
             topic_entry["grades"].sort(key=lambda g: g["grade_name"])

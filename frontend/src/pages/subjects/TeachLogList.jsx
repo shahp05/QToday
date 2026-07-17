@@ -111,6 +111,14 @@ export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayCli
       setSelectedGradeId(null)
     } else {
       setExpandedSubjectId(subjectId)
+      const subject = subjects.find(s => s.subject_id === subjectId)
+      const topicId = subject?.most_recent_topic_id
+      const gradeId = subject?.most_recent_grade_id
+      if (topicId != null && gradeId != null) {
+        setSelectedTopicId(topicId)
+        setSelectedGradeId(gradeId)
+        ensureQaLoaded(topicId, gradeId)
+      }
     }
   }
 
