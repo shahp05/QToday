@@ -55,17 +55,21 @@ export default function Dashboard() {
   const teachersStatus                = useTeachersStore(s => s.status)
   const [displayedPage, setDisplayedPage] = useState(null)
 
+  // Runs once, on arrival, not on every location.state change.
   useEffect(() => {
     if (location.state?.firstVisit) {
       setActivePage('students')
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Initial data load — intentionally mount-only.
   useEffect(() => {
     fetchStudents()
     fetchTeachers()
     fetchSubjectsTaught()
     fetchTopicCatalog()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Students/teachers data loads async on a left-nav button press — keep

@@ -84,6 +84,8 @@ function SignupForm({ onCodeSent }) {
   const firstRef                  = useRef(null)
   const { errors, validate, clearError, isShaking } = useValidation(SIGNUP_RULES)
 
+  // Mount-only; `set` is a plain function redefined every render, so
+  // listing it as a dep would re-run this fetch on every render instead.
   useEffect(() => {
     firstRef.current?.focus()
     fetch(`${API}/countries`)
@@ -93,6 +95,7 @@ function SignupForm({ onCodeSent }) {
         if (data.length > 0) set('country_code', data[0].code)
       })
       .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function set(field, value) {
@@ -249,6 +252,10 @@ function VerifyForm({ formData, onSuccess }) {
 
   useEffect(() => {
     inputRef.current?.focus()
+    // startTimer()'s setState calls are no-ops here (mount already matches
+    // the useState initial values) — it's shared with handleResend(),
+    // where it does the actual work of resetting the visible countdown.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     startTimer()
     return () => clearInterval(timerRef.current)
   }, [])

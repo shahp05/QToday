@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useUI, ROLE_LABELS } from '../context/UIContext'
+import { useUI } from '../context/UIContext'
+import { ROLE_LABELS } from '../context/roles'
 import './RoleSwitcher.css'
 
 export default function RoleSwitcher() {

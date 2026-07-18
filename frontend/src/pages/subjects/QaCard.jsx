@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { updateQA } from '../../services/qaService'
-import MathText, { containsMath } from '../../components/MathText'
+import MathText from '../../components/MathText'
+import { containsMath } from '../../lib/mathText'
 import './QaCard.css'
 
 function IconX() {

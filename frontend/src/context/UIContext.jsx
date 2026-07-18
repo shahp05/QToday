@@ -1,16 +1,5 @@
 import { createContext, useContext, useState } from 'react'
-
-export const ROLES = {
-  SUPER_ADMIN:    'school_super_admin',
-  TEACHER_ADMIN:  'school_teacher_admin',
-  STUDENT:        'school_student',
-}
-
-export const ROLE_LABELS = {
-  [ROLES.SUPER_ADMIN]:   'Super Admin',
-  [ROLES.TEACHER_ADMIN]: 'Teacher Admin',
-  [ROLES.STUDENT]:       'Student',
-}
+import { ROLES } from './roles'
 
 const UIContext = createContext(null)
 
@@ -30,6 +19,10 @@ export function UIProvider({ children }) {
   )
 }
 
+// Paired with UIProvider above by design (the standard React context+hook
+// pattern) — always used together, so splitting this into its own file
+// just to satisfy Fast Refresh would add indirection for no real benefit.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useUI() {
   const ctx = useContext(UIContext)
   if (!ctx) throw new Error('useUI must be used inside UIProvider')

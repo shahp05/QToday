@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
 import QaCard from './QaCard'
-import { getSubjectIcon } from './subjectIcons'
+import { getSubjectIcon } from './subjectIconMatch'
 import TeachLogCalendar from './TeachLogCalendar'
 import './TeachLogList.css'
 
