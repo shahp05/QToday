@@ -249,7 +249,6 @@
   align-items: center;
   justify-content: center;
   background: rgba(52,52,52,0.55);
-  backdrop-filter: blur(1px);
 }
 
 .teach-log-qa-overlay .teach-log-spinner {
