@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import './Combobox.css'
 
-// Non-destructive autocomplete: a plain text input the caller can always
-// type freely into (nothing here ever overwrites what they're typing),
+// Autocomplete: a plain text input the caller can always type freely into,
 // with a live substring-filtered suggestion list layered on top. Picking a
-// suggestion — click, or Enter/Tab while one is keyboard-highlighted —
-// fills the input via onPick; every other interaction behaves exactly like
-// a normal <input>, so this is an add-on to existing forms, not a
-// replacement widget.
+// suggestion — click, Enter while one is keyboard-highlighted, or blurring
+// with exactly one unambiguous match — fills the input via onPick; every
+// other interaction (including blurring with zero or multiple matches,
+// which leaves the typed text untouched) behaves exactly like a normal
+// <input>, so this is an add-on to existing forms, not a replacement
+// widget.
 export default function Combobox({
   value,
   onChange,
@@ -31,6 +32,12 @@ export default function Combobox({
   const matches = query
     ? options.filter(o => o.label.toLowerCase().includes(query)).slice(0, maxSuggestions)
     : []
+  // Once what's typed exactly matches an option, there's nothing left to
+  // suggest — collapse the list on its own rather than waiting for a blur
+  // that may never come (e.g. the next action is clicking a button, not
+  // moving to another field), which would otherwise leave the list
+  // covering the rest of the page indefinitely.
+  const isExactMatch = matches.length === 1 && matches[0].label.toLowerCase() === query
 
   // Reset the keyboard highlight whenever the typed value changes — done
   // directly during render (not in an effect), per React's documented
@@ -57,7 +64,7 @@ export default function Combobox({
   }
 
   function handleKeyDown(e) {
-    if (open && matches.length > 0) {
+    if (open && matches.length > 0 && !isExactMatch) {
       if (e.key === 'ArrowDown') {
         e.preventDefault()
         setHighlighted(h => (h + 1) % matches.length)
@@ -92,11 +99,23 @@ export default function Combobox({
         value={value}
         onChange={e => { onChange(e.target.value); setOpen(true) }}
         onFocus={() => setOpen(true)}
-        onBlur={onBlur}
+        onBlur={e => {
+          // Auto-commit an unambiguous single match on blur — standard
+          // combobox behavior — rather than leaving the field on typed
+          // text that's one keystroke short of a known option. Multiple
+          // matches are ambiguous (no single right answer to silently
+          // pick), and no matches means there's nothing to commit, so
+          // both just close the dropdown and leave the typed text as-is.
+          // Picking a suggestion via mouse (onMouseDown + preventDefault,
+          // below) never triggers this blur, so it's always safe to run.
+          if (matches.length === 1) pick(matches[0])
+          else setOpen(false)
+          onBlur?.(e)
+        }}
         onKeyDown={handleKeyDown}
         autoComplete="off"
       />
-      {open && matches.length > 0 && (
+      {open && matches.length > 0 && !isExactMatch && (
         <ul className="combobox-list" role="listbox">
           {matches.map((item, i) => (
             <li
