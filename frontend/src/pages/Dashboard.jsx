@@ -71,12 +71,17 @@ export default function Dashboard() {
   // Students/teachers data loads async on a left-nav button press — keep
   // whatever panel3 is currently showing until that fetch settles (loaded
   // or errored) instead of swapping to a blank/loading page mid-fetch. The
-  // left-nav button itself shows the spinner for this wait.
-  useEffect(() => {
-    if (activePage === 'students' && (studentsStatus === 'idle' || studentsStatus === 'loading')) return
-    if (activePage === 'teachers' && (teachersStatus === 'idle' || teachersStatus === 'loading')) return
+  // left-nav button itself shows the spinner for this wait. Done directly
+  // during render (not in an effect) since the guard clauses above already
+  // make repeated calls a no-op — a state adjustment, not a sync with an
+  // external system.
+  if (
+    !(activePage === 'students' && (studentsStatus === 'idle' || studentsStatus === 'loading')) &&
+    !(activePage === 'teachers' && (teachersStatus === 'idle' || teachersStatus === 'loading')) &&
+    displayedPage !== activePage
+  ) {
     setDisplayedPage(activePage)
-  }, [activePage, studentsStatus, teachersStatus])
+  }
 
   return (
     <div className="dashboard">

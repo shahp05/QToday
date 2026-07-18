@@ -3,22 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { useValidation } from '../../hooks/useValidation'
 import { Toast }         from '../../components/ui/Toast'
 import logo512      from '../../assets/logo_512.webp'
-import imgEnglish   from '../../assets/english.webp'
-import imgMaths5    from '../../assets/maths-5.webp'
-import imgEVS       from '../../assets/EVS.webp'
-import imgSocial    from '../../assets/social-studies.webp'
-import imgPhysics   from '../../assets/physics.webp'
-import imgMaths12   from '../../assets/maths-12.webp'
-import imgChem      from '../../assets/chemistry.webp'
-import imgBio       from '../../assets/biology.webp'
-import imgHistory   from '../../assets/history.webp'
-import imgGeo       from '../../assets/geography.webp'
-import imgCivics    from '../../assets/civics.webp'
-import imgEcon      from '../../assets/economics.webp'
-import imgCommerce  from '../../assets/commerce.webp'
-import imgPsych     from '../../assets/psychology.webp'
-import imgSociology from '../../assets/sociology.webp'
-import imgPolSci    from '../../assets/political-science.webp'
 import { API_BASE as API, resolveApiError } from '../../lib/api'
 import { ErrorCode } from '../../errors/errorCodes'
 import './SignupPage.css'
@@ -98,7 +82,7 @@ function SignupForm({ onCodeSent }) {
   const [busy, setBusy]           = useState(false)
   const [toast, setToast]         = useState('')
   const firstRef                  = useRef(null)
-  const { errors, validate, clearError, isShaking, hasErrors } = useValidation(SIGNUP_RULES)
+  const { errors, validate, clearError, isShaking } = useValidation(SIGNUP_RULES)
 
   useEffect(() => {
     firstRef.current?.focus()

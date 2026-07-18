@@ -178,13 +178,14 @@ export default function TeachLogCalendar({ onEmptyDayClick }) {
   const [selectedSection, setSelectedSection] = useState(null)
 
   // Default to the first grade/section once data is available, and re-pick
-  // if the previously selected grade disappears.
-  useEffect(() => {
-    if (grades.length === 0) return
-    if (selectedGradeId != null && grades.some(g => g.grade_id === selectedGradeId)) return
+  // if the previously selected grade disappears. Done directly during
+  // render (not in an effect) since the guard clauses above already make
+  // repeated calls a no-op — a state adjustment, not a sync with an
+  // external system.
+  if (grades.length > 0 && !(selectedGradeId != null && grades.some(g => g.grade_id === selectedGradeId))) {
     setSelectedGradeId(grades[0].grade_id)
     setSelectedSection(grades[0].sections[0] ?? null)
-  }, [grades, selectedGradeId])
+  }
 
   function selectGrade(gradeId) {
     setSelectedGradeId(gradeId)

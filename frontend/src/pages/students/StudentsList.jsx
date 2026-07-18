@@ -37,16 +37,6 @@ function IconContact() {
   )
 }
 
-function IconEmail() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 6l9 6 9-6" />
-      <rect x="3" y="5" width="18" height="14" rx="2" />
-    </svg>
-  )
-}
-
 // Only rendered when parent emails exist — hidden entirely otherwise rather
 // than shown disabled, since there's nothing useful to click into.
 function IconInfo() {
@@ -200,12 +190,13 @@ export default function StudentsList({ onUploadNew }) {
 
   // Default to the first grade/section once data is available, and re-pick
   // if the previously selected grade disappears (e.g. after a re-upload).
-  useEffect(() => {
-    if (grades.length === 0) return
-    if (selectedGrade != null && grades.some(g => g.gradeName === selectedGrade)) return
+  // Done directly during render (not in an effect) since the guard clauses
+  // above already make repeated calls a no-op — a state adjustment, not a
+  // sync with an external system.
+  if (grades.length > 0 && !(selectedGrade != null && grades.some(g => g.gradeName === selectedGrade))) {
     setSelectedGrade(grades[0].gradeName)
     setSelectedSection(grades[0].sections[0]?.section ?? null)
-  }, [grades, selectedGrade])
+  }
 
   const hasSections = grades.some(g => g.sections.some(s => s.section !== NO_SECTION))
   const currentGrade = grades.find(g => g.gradeName === selectedGrade)

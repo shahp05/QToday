@@ -22,8 +22,10 @@ function renderMath(expr, displayMode) {
 // rendered preview for — no point rendering a preview under plain text.
 export function containsMath(text) {
   if (!text) return false
-  MATH_PATTERN.lastIndex = 0
-  return MATH_PATTERN.test(text)
+  // A fresh RegExp per call, not MATH_PATTERN.test() with a reset
+  // lastIndex — the module-level regex is shared across every call site,
+  // and mutating its lastIndex is unsafe if two calls interleave.
+  return new RegExp(MATH_PATTERN.source, MATH_PATTERN.flags).test(text)
 }
 
 // Renders a string that may contain inline/block LaTeX math, leaving the
@@ -35,15 +37,18 @@ export default function MathText({ text, className }) {
   let html = ''
   let lastIndex = 0
   let match
-  MATH_PATTERN.lastIndex = 0
-  while ((match = MATH_PATTERN.exec(text)) !== null) {
+  // A fresh RegExp per render, not the shared module-level MATH_PATTERN —
+  // mutating its lastIndex would be unsafe if two MathText instances (or a
+  // containsMath call) matched interleaved during the same render pass.
+  const pattern = new RegExp(MATH_PATTERN.source, MATH_PATTERN.flags)
+  while ((match = pattern.exec(text)) !== null) {
     const [, block$, blockBracket, inline$, inlineParen] = match
     html += escapeHtml(text.slice(lastIndex, match.index))
     if (block$ !== undefined) html += renderMath(block$, true)
     else if (blockBracket !== undefined) html += renderMath(blockBracket, true)
     else if (inline$ !== undefined) html += renderMath(inline$, false)
     else if (inlineParen !== undefined) html += renderMath(inlineParen, false)
-    lastIndex = MATH_PATTERN.lastIndex
+    lastIndex = pattern.lastIndex
   }
   html += escapeHtml(text.slice(lastIndex))
 

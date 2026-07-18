@@ -32,9 +32,14 @@ export default function Combobox({
     ? options.filter(o => o.label.toLowerCase().includes(query)).slice(0, maxSuggestions)
     : []
 
-  useEffect(() => {
+  // Reset the keyboard highlight whenever the typed value changes — done
+  // directly during render (not in an effect), per React's documented
+  // pattern for adjusting state in response to a prop/state change.
+  const [prevValue, setPrevValue] = useState(value)
+  if (prevValue !== value) {
+    setPrevValue(value)
     setHighlighted(-1)
-  }, [value])
+  }
 
   useEffect(() => {
     if (!open) return

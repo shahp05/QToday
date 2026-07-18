@@ -6,7 +6,7 @@ import { fetchTopicCatalog } from '../services/qaService'
 // subject did you teach" form. Separate from subjectsTaughtStore, which is
 // about *this teacher's own* logged history + QA content — different
 // purpose, different shape, so kept apart rather than merged in.
-export const useTopicCatalogStore = create((set, get) => ({
+export const useTopicCatalogStore = create((set) => ({
   topics: [], // [{subject_id, subject_name, topic_id, topic_name, taught_by_me}]
   status: 'idle', // idle | loading | loaded | error
   error: null,

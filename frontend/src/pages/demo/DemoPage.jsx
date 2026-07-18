@@ -41,8 +41,6 @@ const SUBJECTS = [
 
 const GRADES = Array.from({ length: 12 }, (_, i) => i + 1)
 
-const DIFFICULTY = ['easy', 'medium', 'hard']
-
 // Mock questions — replaced by real API response
 const MOCK_QUESTIONS = [
   { id: 1, text: 'What is the process by which plants make their own food using sunlight?', difficulty: 'easy'   },
