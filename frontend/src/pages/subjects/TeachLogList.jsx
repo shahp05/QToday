@@ -176,6 +176,7 @@ export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayCli
   const displayedSubject = subjects.find(s => s.topics.some(t => t.topic_id === displayedTopicId)) ?? currentSubject
   const currentTopic = displayedSubject?.topics.find(t => t.topic_id === displayedTopicId)
   const currentGrade = currentTopic?.grades.find(g => g.grade_id === displayedGradeId)
+  const isSwitchingQa = selectedTopicId !== displayedTopicId || selectedGradeId !== displayedGradeId
 
   return (
     <div className="teach-log-list">
@@ -264,14 +265,22 @@ export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayCli
                   ))}
                 </div>
 
-                <div className="teach-log-qa-scroll" ref={qaScrollRef}>
-                  {currentGrade?.qa_items?.length === 0 && (
-                    <p className="teach-log-list-empty">No questions generated for this grade yet.</p>
-                  )}
+                <div className="teach-log-qa-scroll-wrap">
+                  <div className="teach-log-qa-scroll" ref={qaScrollRef}>
+                    {currentGrade?.qa_items?.length === 0 && (
+                      <p className="teach-log-list-empty">No questions generated for this grade yet.</p>
+                    )}
 
-                  {currentGrade?.qa_items?.map(qa => (
-                    <QaCard key={qa.qa_id} qa={qa} onUpdated={handleQaUpdated} onFlagged={handleQaFlagged} />
-                  ))}
+                    {currentGrade?.qa_items?.map(qa => (
+                      <QaCard key={qa.qa_id} qa={qa} onUpdated={handleQaUpdated} onFlagged={handleQaFlagged} />
+                    ))}
+                  </div>
+
+                  {isSwitchingQa && (
+                    <div className="teach-log-qa-overlay">
+                      <IconSpinner />
+                    </div>
+                  )}
                 </div>
               </>
             )}
