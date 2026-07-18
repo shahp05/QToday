@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { fetchSubjectsTaught, fetchTopicGradeQA } from '../services/qaService'
+import { resolveApiError } from '../lib/api'
+import { ErrorCode } from '../errors/errorCodes'
 
 // subjects-taught only ships qa_count + eagerly-loads the most-recently-
 // taught (topic, grade)'s qa_items — everything else is fetched on demand
@@ -11,7 +13,7 @@ export const useSubjectsTaughtStore = create((set, get) => ({
   status: 'idle', // idle | loading | loaded | error
   error: null,
   loadingQaKeys: new Set(), // `${topicId}:${gradeId}` currently being fetched
-  qaLoadFailedKeys: new Set(), // `${topicId}:${gradeId}` whose last fetch attempt failed
+  qaLoadErrors: {}, // `${topicId}:${gradeId}` -> resolved message, for the last failed fetch attempt
 
   fetchSubjectsTaught: async () => {
     set({ status: 'loading', error: null })
@@ -34,9 +36,9 @@ export const useSubjectsTaughtStore = create((set, get) => ({
 
     set(state => ({
       loadingQaKeys: new Set(state.loadingQaKeys).add(key),
-      qaLoadFailedKeys: (() => {
-        const next = new Set(state.qaLoadFailedKeys)
-        next.delete(key)
+      qaLoadErrors: (() => {
+        const next = { ...state.qaLoadErrors }
+        delete next[key]
         return next
       })(),
     }))
@@ -51,10 +53,16 @@ export const useSubjectsTaughtStore = create((set, get) => ({
           }),
         })),
       }))
-    } catch {
+    } catch (err) {
       // Leave qa_items as-is (null) — the caller falls back to whatever
-      // topic/grade was displayed before this fetch was kicked off.
-      set(state => ({ qaLoadFailedKeys: new Set(state.qaLoadFailedKeys).add(key) }))
+      // topic/grade was displayed before this fetch was kicked off. A
+      // TypeError means fetch() itself never got a response (offline, DNS,
+      // backend unreachable); anything else is a resolved backend error_code
+      // message already produced by qaService's apiErrorMessage().
+      const message = err instanceof TypeError
+        ? resolveApiError({ error_code: ErrorCode.FRONTEND_NETWORK_ERROR })
+        : err.message
+      set(state => ({ qaLoadErrors: { ...state.qaLoadErrors, [key]: message } }))
     } finally {
       set(state => {
         const next = new Set(state.loadingQaKeys)
@@ -110,5 +118,5 @@ export const useSubjectsTaughtStore = create((set, get) => ({
     get().mutateQaItems(qaId, items => items.filter(item => item.qa_id !== qaId))
   },
 
-  clearSubjectsTaught: () => set({ subjects: [], mostRecent: null, status: 'idle', error: null, loadingQaKeys: new Set(), qaLoadFailedKeys: new Set() }),
+  clearSubjectsTaught: () => set({ subjects: [], mostRecent: null, status: 'idle', error: null, loadingQaKeys: new Set(), qaLoadErrors: {} }),
 }))

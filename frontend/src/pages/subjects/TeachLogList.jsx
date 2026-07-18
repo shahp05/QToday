@@ -50,6 +50,26 @@ function IconSpinner() {
   )
 }
 
+function IconAlert() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 9v4" />
+      <path d="M10.4 3.9 2.5 17.5a1.8 1.8 0 0 0 1.6 2.7h15.8a1.8 1.8 0 0 0 1.6-2.7L13.6 3.9a1.8 1.8 0 0 0-3.2 0Z" />
+      <path d="M12 16.5h.01" />
+    </svg>
+  )
+}
+
+function IconClose() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
+  )
+}
+
 export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayClick }) {
   const subjects = useSubjectsTaughtStore(s => s.subjects)
   const mostRecent = useSubjectsTaughtStore(s => s.mostRecent)
@@ -59,7 +79,7 @@ export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayCli
   const handleQaFlagged = useSubjectsTaughtStore(s => s.handleQaFlagged)
   const ensureQaLoaded = useSubjectsTaughtStore(s => s.ensureQaLoaded)
   const loadingQaKeys = useSubjectsTaughtStore(s => s.loadingQaKeys)
-  const qaLoadFailedKeys = useSubjectsTaughtStore(s => s.qaLoadFailedKeys)
+  const qaLoadErrors = useSubjectsTaughtStore(s => s.qaLoadErrors)
   const [expandedSubjectId, setExpandedSubjectId] = useState(initialSelection?.subjectId ?? null)
   const [selectedTopicId, setSelectedTopicId] = useState(initialSelection?.topicId ?? null)
   const [selectedGradeId, setSelectedGradeId] = useState(initialSelection?.gradeId ?? null)
@@ -70,34 +90,68 @@ export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayCli
   const [displayedTopicId, setDisplayedTopicId] = useState(initialSelection?.topicId ?? null)
   const [displayedGradeId, setDisplayedGradeId] = useState(initialSelection?.gradeId ?? null)
   const [showCalendar, setShowCalendar] = useState(false)
+  // { key, topicId, gradeId, topicName, message } | null — set once when a
+  // fetch fails, cleared on dismiss/retry/auto-timeout.
+  const [toast, setToast] = useState(null)
   const qaScrollRef = useRef(null)
 
-  useEffect(() => {
-    if (selectedTopicId == null || selectedGradeId == null) {
+  // Keeping displayedTopicId/GradeId in sync with the selection (once its
+  // fetch is no longer in flight) is an adjustment of derived state, not a
+  // sync with an external system — done directly during render (React's
+  // documented pattern for this) rather than in an effect, so it settles in
+  // the same render pass instead of an extra effect-triggered one.
+  const selKey = selectedTopicId != null && selectedGradeId != null ? `${selectedTopicId}:${selectedGradeId}` : null
+  const selKeyLoading = selKey != null && loadingQaKeys.has(selKey)
+  const selKeyError = selKey != null ? qaLoadErrors[selKey] : undefined
+  const qaSyncSignal = `${selKey ?? 'none'}|${selKeyLoading}|${selKeyError ?? ''}`
+  const [prevQaSyncSignal, setPrevQaSyncSignal] = useState(null)
+  if (prevQaSyncSignal !== qaSyncSignal) {
+    setPrevQaSyncSignal(qaSyncSignal)
+    if (selKey == null) {
       setDisplayedTopicId(selectedTopicId)
       setDisplayedGradeId(selectedGradeId)
-      return
-    }
-    const key = `${selectedTopicId}:${selectedGradeId}`
-    if (loadingQaKeys.has(key)) return
-
-    if (qaLoadFailedKeys.has(key)) {
-      // The fetch for the newly-selected topic/grade failed — fall back to
-      // whatever was displayed before, including the sidebar selection, so
-      // the UI ends up exactly where it was rather than pointed at a topic
-      // with no data.
-      if (displayedTopicId != null && displayedGradeId != null) {
-        setSelectedTopicId(displayedTopicId)
-        setSelectedGradeId(displayedGradeId)
-        const displayedSubj = subjects.find(s => s.topics.some(t => t.topic_id === displayedTopicId))
-        if (displayedSubj) setExpandedSubjectId(displayedSubj.subject_id)
+    } else if (!selKeyLoading) {
+      if (selKeyError) {
+        // The fetch for the newly-selected topic/grade failed — fall back
+        // to whatever was displayed before, including the sidebar
+        // selection, so the UI ends up exactly where it was rather than
+        // pointed at a topic with no data. Surface the failure as a toast
+        // rather than silently.
+        const failedTopicName = subjects
+          .flatMap(s => s.topics)
+          .find(t => t.topic_id === selectedTopicId)?.topic_name
+        if (displayedTopicId != null && displayedGradeId != null) {
+          setSelectedTopicId(displayedTopicId)
+          setSelectedGradeId(displayedGradeId)
+          const displayedSubj = subjects.find(s => s.topics.some(t => t.topic_id === displayedTopicId))
+          if (displayedSubj) setExpandedSubjectId(displayedSubj.subject_id)
+        }
+        setToast({ key: selKey, topicId: selectedTopicId, gradeId: selectedGradeId, topicName: failedTopicName, message: selKeyError })
+      } else {
+        setDisplayedTopicId(selectedTopicId)
+        setDisplayedGradeId(selectedGradeId)
       }
-      return
     }
+  }
 
-    setDisplayedTopicId(selectedTopicId)
-    setDisplayedGradeId(selectedGradeId)
-  }, [selectedTopicId, selectedGradeId, loadingQaKeys, qaLoadFailedKeys, displayedTopicId, displayedGradeId, subjects])
+  // Auto-dismiss the toast so a failure notice doesn't linger indefinitely
+  // if the user ignores it.
+  useEffect(() => {
+    if (!toast) return
+    const timer = setTimeout(() => setToast(null), 6000)
+    return () => clearTimeout(timer)
+  }, [toast])
+
+  function retryToast() {
+    if (!toast) return
+    const { topicId, gradeId } = toast
+    setToast(null)
+    setSelectedTopicId(topicId)
+    setSelectedGradeId(gradeId)
+    const subj = subjects.find(s => s.topics.some(t => t.topic_id === topicId))
+    if (subj) setExpandedSubjectId(subj.subject_id)
+    ensureQaLoaded(topicId, gradeId)
+  }
 
   // Switching to a topic/grade whose QA is actually displayed shows an
   // entirely different QA list — don't leave it scrolled to wherever the
@@ -125,18 +179,20 @@ export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayCli
   // Its qa_items are eagerly attached by the subjects-taught response, so
   // this never needs an on-demand fetch. The store is usually already
   // loaded (fetched at login), so this typically fires on the very first
-  // render; the ref just guards against re-running it later if the store
-  // data changes while the user has already navigated around.
-  const didAutoExpand = useRef(Boolean(initialSelection))
-  useEffect(() => {
-    if (didAutoExpand.current || status !== 'loaded') return
-    didAutoExpand.current = true
+  // render; the flag just guards against re-running it later if the store
+  // data changes while the user has already navigated around. Done directly
+  // during render (not in an effect) for the same reason as the QA sync
+  // above — it's a one-time state adjustment, not a sync with an external
+  // system.
+  const [didAutoExpand, setDidAutoExpand] = useState(Boolean(initialSelection))
+  if (!didAutoExpand && status === 'loaded') {
+    setDidAutoExpand(true)
     if (mostRecent) {
       setExpandedSubjectId(mostRecent.subject_id)
       setSelectedTopicId(mostRecent.topic_id)
       setSelectedGradeId(mostRecent.grade_id)
     }
-  }, [status, mostRecent])
+  }
 
   function toggleSubject(subjectId) {
     if (expandedSubjectId === subjectId) {
@@ -285,6 +341,19 @@ export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayCli
               </>
             )}
           </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className="teach-log-toast" role="alert">
+          <IconAlert />
+          <span className="teach-log-toast-message">
+            Couldn't load questions{toast.topicName ? ` for "${toast.topicName}"` : ''}. {toast.message}
+          </span>
+          <button className="teach-log-toast-retry" onClick={retryToast}>Retry</button>
+          <button className="teach-log-toast-close" onClick={() => setToast(null)} aria-label="Dismiss">
+            <IconClose />
+          </button>
         </div>
       )}
     </div>

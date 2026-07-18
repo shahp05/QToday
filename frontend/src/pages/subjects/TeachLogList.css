@@ -286,3 +286,52 @@
   border-color: var(--color-green-light, #8EEB65);
   color: var(--color-dark, #343434);
 }
+
+/* ─── Toast shown when an on-demand QA fetch fails ───────────────────────── */
+.teach-log-toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 380px;
+  padding: 10px 12px;
+  background: #1f1f1f;
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: var(--radius-sm, 6px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+  color: rgba(255,255,255,0.5);
+}
+
+.teach-log-toast-message {
+  flex: 1;
+  font-size: var(--font-size-sm, 13px);
+  color: rgba(255,255,255,0.85);
+}
+
+.teach-log-toast-retry {
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  padding: 4px 6px;
+  font-size: var(--font-size-sm, 13px);
+  font-weight: 500;
+  color: var(--color-green-light, #8EEB65);
+  cursor: pointer;
+}
+
+.teach-log-toast-close {
+  flex-shrink: 0;
+  display: flex;
+  border: none;
+  background: none;
+  padding: 2px;
+  color: rgba(255,255,255,0.4);
+  cursor: pointer;
+}
+
+.teach-log-toast-close:hover {
+  color: var(--color-white);
+}
