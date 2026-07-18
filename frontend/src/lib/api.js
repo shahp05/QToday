@@ -3,14 +3,32 @@ import { ErrorCode, ERROR_DEFAULTS } from '../errors/errorCodes'
 
 export const API_BASE = 'http://localhost:8001/api'
 
-/** fetch wrapper that attaches the JWT (when present) and clears the
- * profile store on a 401 so stale/expired sessions don't linger client-side. */
+/** fetch wrapper that attaches the JWT (when present), aborts a request that
+ * hangs longer than timeoutMs (default 20s — bump this per-call for routes
+ * expected to run long, e.g. LLM generation), and clears the profile store
+ * on a 401 so stale/expired sessions don't linger client-side. */
 export async function apiFetch(path, options = {}) {
+  const { timeoutMs = 20000, ...fetchOptions } = options
   const token = useProfileStore.getState().token
-  const headers = { ...options.headers }
+  const headers = { ...fetchOptions.headers }
   if (token) headers.Authorization = `Bearer ${token}`
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  let res
+  try {
+    res = await fetch(`${API_BASE}${path}`, { ...fetchOptions, headers, signal: controller.signal })
+  } catch (err) {
+    // A client-side timeout rejects with a DOMException named "AbortError",
+    // not a TypeError — normalize it to a TypeError so every call site's
+    // existing `err instanceof TypeError` check (network failure) handles a
+    // hung request the same way, without each one needing its own
+    // AbortError case.
+    if (err.name === 'AbortError') throw new TypeError('Request timed out', { cause: err })
+    throw err
+  } finally {
+    clearTimeout(timer)
+  }
 
   if (res.status === 401) {
     useProfileStore.getState().clearProfile()

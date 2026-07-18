@@ -5,6 +5,7 @@ import { useTopicCatalogStore } from '../../store/topicCatalogStore'
 import { useProfileStore } from '../../store/profileStore'
 import { fetchOrGenerateQA } from '../../services/qaService'
 import { resolveApiError } from '../../lib/api'
+import { ErrorCode } from '../../errors/errorCodes'
 import Combobox from '../../components/Combobox'
 import './SubjectsPage.css'
 
@@ -281,7 +282,7 @@ export default function SubjectsPage({ onShowList, onGenerated, logDate }) {
         setWarning(data.warning_code ? resolveApiError({ error_code: data.warning_code }) : '')
       }
     } catch (err) {
-      setSubmitError(err.message)
+      setSubmitError(err instanceof TypeError ? resolveApiError({ error_code: ErrorCode.FRONTEND_NETWORK_ERROR }) : err.message)
     } finally {
       setSubmitting(false)
     }

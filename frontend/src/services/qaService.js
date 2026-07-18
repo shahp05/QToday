@@ -19,6 +19,9 @@ export async function fetchOrGenerateQA({ subjectName, topicName, grade, section
         ? `${logDate.getFullYear()}-${String(logDate.getMonth() + 1).padStart(2, '0')}-${String(logDate.getDate()).padStart(2, '0')}`
         : null,
     }),
+    // This round-trip runs an LLM generation on the backend — well past the
+    // default timeout for a plain DB-backed request.
+    timeoutMs: 90000,
   })
   if (!res.ok) throw new Error(await apiErrorMessage(res))
   return res.json() // { items, warning_code, subject_id, topic_id, grade_id }
