@@ -23,6 +23,7 @@ class ErrorCode(str, Enum):
     SCHOOL_NOT_ASSOCIATED = "SCHOOL_NOT_ASSOCIATED"
     LAST_SUPER_ADMIN = "LAST_SUPER_ADMIN"
     TEACHER_NOT_FOUND = "TEACHER_NOT_FOUND"
+    STUDENT_NOT_FOUND = "STUDENT_NOT_FOUND"
     NO_PENDING_VERIFICATION = "NO_PENDING_VERIFICATION"
     VERIFICATION_CODE_EXPIRED = "VERIFICATION_CODE_EXPIRED"
     TOO_MANY_ATTEMPTS = "TOO_MANY_ATTEMPTS"
@@ -63,6 +64,7 @@ ERROR_DEFAULTS = {
     ErrorCode.SCHOOL_NOT_ASSOCIATED: {"message": "No school is associated with this account.", "http_status": 400},
     ErrorCode.LAST_SUPER_ADMIN: {"message": "At least one super admin must remain for this school.", "http_status": 400},
     ErrorCode.TEACHER_NOT_FOUND: {"message": "This teacher could not be found.", "http_status": 404},
+    ErrorCode.STUDENT_NOT_FOUND: {"message": "This student could not be found.", "http_status": 404},
     ErrorCode.NO_PENDING_VERIFICATION: {"message": "No pending verification found for this email.", "http_status": 400},
     ErrorCode.VERIFICATION_CODE_EXPIRED: {"message": "Your code has expired. Request a new one.", "http_status": 410},
     ErrorCode.TOO_MANY_ATTEMPTS: {"message": "Too many incorrect attempts. Please request a new code.", "http_status": 400},

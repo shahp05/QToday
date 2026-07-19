@@ -1,0 +1,214 @@
+.student-subjects {
+  /* Single source of truth for "how wide is one topic card" — the dropdown
+     and the card grid both key off this so they can never drift apart. */
+  --topic-card-min: 260px;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  flex: 1;
+}
+
+.student-subjects-header {
+  position: sticky;
+  top: 0;
+  z-index: 7;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 24px 0;
+  margin-bottom: 10px;
+  background: var(--color-dark);
+}
+
+.student-subjects-title {
+  margin: 0;
+  font-family: var(--font-family);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-normal);
+  color: rgba(255,255,255,0.65);
+}
+
+.student-subjects-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.student-subjects-bar {
+  position: sticky;
+  top: 56px;
+  z-index: 6;
+  flex-shrink: 0;
+  /* Same track sizing as .student-topic-grid below — not just the same
+     min-width — so the dropdown's cell is exactly one card's width at
+     every breakpoint, including when cards stretch past --topic-card-min
+     to fill a row (1fr). Only the first column is ever populated. */
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--topic-card-min), 1fr));
+  gap: 16px;
+  padding: 10px 24px;
+  background: var(--color-dark);
+}
+
+.student-subjects-dropdown {
+  width: 100%;
+}
+
+.student-subjects-body {
+  padding: 8px 24px 24px;
+}
+
+.student-topic-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--topic-card-min), 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 1024px) {
+  .student-subjects {
+    --topic-card-min: 220px;
+  }
+}
+
+@media (max-width: 640px) {
+  .student-subjects {
+    --topic-card-min: 100%;
+  }
+
+  .student-subjects-header {
+    padding: 20px 16px 0;
+  }
+
+  .student-subjects-bar {
+    padding: 10px 16px;
+  }
+
+  .student-subjects-body {
+    padding: 8px 16px 16px;
+  }
+
+  .student-topic-grid,
+  .student-subjects-bar {
+    gap: 12px;
+  }
+}
+
+.student-topic-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.student-topic-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.student-topic-seq {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  background: var(--color-red);
+  color: var(--color-white);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.student-topic-card-name {
+  margin: 0;
+  font-family: var(--font-family);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-topic-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.student-topic-progress-row {
+  display: grid;
+  grid-template-columns: 74px 1fr 34px;
+  align-items: center;
+  gap: 8px;
+}
+
+.student-topic-progress-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-light);
+}
+
+.student-topic-progress-track {
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-grey-light);
+  overflow: hidden;
+}
+
+.student-topic-progress-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width var(--transition-normal);
+}
+
+.student-topic-progress-fill--self {
+  background: var(--color-green-dark);
+}
+
+.student-topic-progress-fill--max {
+  background: var(--color-yellow);
+}
+
+.student-topic-progress-value {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-light);
+  text-align: right;
+}
+
+.student-topic-last-played {
+  margin: 2px 0 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.student-topic-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.student-topic-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex: 1;
+  height: 32px;
+  border: 1px solid var(--color-grey);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text-light);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.student-topic-btn--play {
+  border-color: var(--color-green-light);
+  color: var(--color-green-dark);
+}

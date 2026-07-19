@@ -1,0 +1,141 @@
+import { useEffect, useState } from 'react'
+import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
+import { useQuizProgressStore } from '../../store/quizProgressStore'
+import { getSubjectIcon } from './subjectIconMatch'
+import Dropdown from '../../components/Dropdown'
+import './StudentSubjectsHome.css'
+
+function IconPlay() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M8 5v14l11-7z" />
+    </svg>
+  )
+}
+
+function IconHistory() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M12 7v5l3 3" />
+    </svg>
+  )
+}
+
+function IconProgress() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 3v18h18" />
+      <path d="M7 15l4-4 3 3 5-6" />
+    </svg>
+  )
+}
+
+const NOT_ATTEMPTED = { student_avg_pct: 0, max_score_pct: 0, last_played: null, attempts: 0 }
+
+function formatLastPlayed(isoDate) {
+  if (!isoDate) return 'Not attempted yet'
+  const date = new Date(`${isoDate}T00:00:00`)
+  return `Last played ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+}
+
+export default function StudentSubjectsHome() {
+  // subjects (and each subject's topics) already arrive alphabetically
+  // sorted from the backend — see teach_log_service.list_subjects_taught.
+  const subjects = useSubjectsTaughtStore(s => s.subjects)
+  const topicStatsById = useQuizProgressStore(s => s.topicStatsById)
+  const fetchQuizProgress = useQuizProgressStore(s => s.fetchQuizProgress)
+  const [selectedSubjectId, setSelectedSubjectId] = useState(null)
+
+  useEffect(() => { fetchQuizProgress() }, [fetchQuizProgress])
+
+  if (subjects.length === 0) {
+    return (
+      <div className="student-subjects content-card">
+        <h2 className="content-card-title">Subjects</h2>
+        <p className="content-card-placeholder">No subjects available for your grade yet.</p>
+      </div>
+    )
+  }
+
+  const activeSubjectId = subjects.some(s => s.subject_id === selectedSubjectId)
+    ? selectedSubjectId
+    : subjects[0].subject_id
+  const activeSubject = subjects.find(s => s.subject_id === activeSubjectId)
+
+  const subjectOptions = subjects.map(s => {
+    const Icon = getSubjectIcon(s.subject_name, s.icon_key)
+    return { key: s.subject_id, label: s.subject_name, icon: <Icon /> }
+  })
+
+  return (
+    <div className="student-subjects">
+      <div className="student-subjects-header">
+        <h2 className="student-subjects-title">Play</h2>
+        <div className="student-subjects-header-actions">
+          {/* Right-aligned action buttons land here later. */}
+        </div>
+      </div>
+
+      <div className="student-subjects-bar">
+        <Dropdown
+          className="student-subjects-dropdown"
+          value={activeSubjectId}
+          options={subjectOptions}
+          onChange={key => setSelectedSubjectId(key)}
+        />
+      </div>
+
+      <div className="student-subjects-body">
+        <div className="student-topic-grid">
+          {activeSubject.topics.map((topic, index) => {
+            const stats = topicStatsById[topic.topic_id] ?? NOT_ATTEMPTED
+            return (
+              <div key={topic.topic_id} className="student-topic-card">
+                <div className="student-topic-card-header">
+                  {/* Static red for now — later this fills based on the
+                      student's quiz performance on this topic. */}
+                  <span className="student-topic-seq">{index + 1}</span>
+                  <h3 className="student-topic-card-name">{topic.topic_name}</h3>
+                </div>
+
+                <div className="student-topic-progress">
+                  <div className="student-topic-progress-row">
+                    <span className="student-topic-progress-label">Your average</span>
+                    <div className="student-topic-progress-track">
+                      <div className="student-topic-progress-fill student-topic-progress-fill--self" style={{ width: `${stats.student_avg_pct}%` }} />
+                    </div>
+                    <span className="student-topic-progress-value">{stats.student_avg_pct}%</span>
+                  </div>
+                  <div className="student-topic-progress-row">
+                    <span className="student-topic-progress-label">Class best</span>
+                    <div className="student-topic-progress-track">
+                      <div className="student-topic-progress-fill student-topic-progress-fill--max" style={{ width: `${stats.max_score_pct}%` }} />
+                    </div>
+                    <span className="student-topic-progress-value">{stats.max_score_pct}%</span>
+                  </div>
+                  <p className="student-topic-last-played">{formatLastPlayed(stats.last_played)}</p>
+                </div>
+
+                <div className="student-topic-actions">
+                  <button className="student-topic-btn student-topic-btn--play" disabled title="Coming soon">
+                    <IconPlay /> Play
+                  </button>
+                  <button className="student-topic-btn" disabled title="Coming soon">
+                    <IconHistory /> History
+                  </button>
+                  <button className="student-topic-btn" disabled title="Coming soon">
+                    <IconProgress /> Progress
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}

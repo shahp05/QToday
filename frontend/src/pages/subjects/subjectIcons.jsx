@@ -1,10 +1,15 @@
 // Curated per-subject icons, matched by keyword against the subject name.
 // This is a client-side stand-in for the eventual DB-persisted icon_key —
 // once that lands, the backend value replaces this name-matching lookup.
+//
+// Each icon's viewBox is cropped to its actual drawn bounds (not the full
+// 0 0 24 24 canvas most stroke-icon sets use) so the glyph fills its box
+// edge-to-edge — otherwise the icon's own built-in margin makes it look
+// indented relative to plain text sitting next to it at the same font size.
 
 export function IconBook() {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <svg width="17" height="17" viewBox="3 1 18 22" fill="none" stroke="currentColor"
       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
       <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
@@ -14,7 +19,7 @@ export function IconBook() {
 
 export function IconCalculator() {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <svg width="17" height="17" viewBox="3 1 18 22" fill="none" stroke="currentColor"
       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect x="4" y="2" width="16" height="20" rx="2" />
       <line x1="8" y1="6" x2="16" y2="6" />
@@ -33,7 +38,7 @@ export function IconCalculator() {
 
 export function IconFlask() {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <svg width="17" height="17" viewBox="3.5 1 17 21" fill="none" stroke="currentColor"
       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M9 2v6.5L4.5 18a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L15 8.5V2" />
       <path d="M8 2h8" />
@@ -44,7 +49,7 @@ export function IconFlask() {
 
 export function IconAtom() {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <svg width="17" height="17" viewBox="1 2 22 20" fill="none" stroke="currentColor"
       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="12" cy="12" r="1" />
       <ellipse cx="12" cy="12" rx="10" ry="4.5" />
@@ -56,7 +61,7 @@ export function IconAtom() {
 
 export function IconDna() {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <svg width="17" height="17" viewBox="5 2 14 20" fill="none" stroke="currentColor"
       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M6 3c0 6 12 12 12 18" />
       <path d="M18 3c0 6-12 12-12 18" />
@@ -82,7 +87,7 @@ export function IconGlobe() {
 
 export function IconLandmark() {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <svg width="17" height="17" viewBox="2 1 20 22" fill="none" stroke="currentColor"
       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <line x1="3" y1="22" x2="21" y2="22" />
       <line x1="6" y1="18" x2="6" y2="11" />
@@ -96,7 +101,7 @@ export function IconLandmark() {
 
 export function IconMonitor() {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <svg width="17" height="17" viewBox="2 3 20 18" fill="none" stroke="currentColor"
       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect x="3" y="4" width="18" height="12" rx="1.5" />
       <line x1="8" y1="20" x2="16" y2="20" />
@@ -107,7 +112,7 @@ export function IconMonitor() {
 
 export function IconPalette() {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <svg width="17" height="17" viewBox="1 1 21 22" fill="none" stroke="currentColor"
       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M12 2a10 10 0 1 0 0 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.4-.3-.4-.5-.9-.5-1.4 0-1.1.9-2 2-2h2.3c1.9 0 3.5-1.6 3.5-3.5C21 6.4 17.2 2 12 2z" />
       <circle cx="7.5" cy="10.5" r="1.2" />
@@ -119,7 +124,7 @@ export function IconPalette() {
 
 export function IconMusic() {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <svg width="17" height="17" viewBox="2 2 20 20" fill="none" stroke="currentColor"
       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M9 18V5l12-2v13" />
       <circle cx="6" cy="18" r="3" />
@@ -143,7 +148,7 @@ export function IconDumbbell() {
 
 export function IconLeaf() {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <svg width="17" height="17" viewBox="3 1 13 20" fill="none" stroke="currentColor"
       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M11 20A7 7 0 0 1 4 13c0-5 4-11 11-11 0 7-3 11-4 11" />
       <path d="M4 13c4 0 7 3 7 7" />
@@ -153,7 +158,7 @@ export function IconLeaf() {
 
 export function IconCoins() {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <svg width="17" height="17" viewBox="2 2 20 20" fill="none" stroke="currentColor"
       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="9" cy="9" r="6" />
       <path d="M14.5 8.5A6 6 0 1 1 8.5 14.5" />
@@ -165,7 +170,7 @@ export function IconCoins() {
 
 export function IconBriefcase() {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <svg width="17" height="17" viewBox="1 2 22 20" fill="none" stroke="currentColor"
       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect x="2" y="7" width="20" height="14" rx="2" />
       <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
@@ -175,7 +180,7 @@ export function IconBriefcase() {
 
 export function IconUsers() {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <svg width="17" height="17" viewBox="0 2 24 20" fill="none" stroke="currentColor"
       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
       <circle cx="9" cy="7" r="4" />
@@ -187,7 +192,7 @@ export function IconUsers() {
 
 export function IconBrain() {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <svg width="17" height="17" viewBox="5 1 14 20" fill="none" stroke="currentColor"
       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M12 2c-2.2 0-4 1.8-4 4 0 .3 0 .6.1.9C6.8 7.5 6 8.9 6 10.5c0 1 .3 1.9.9 2.6-.6.7-.9 1.6-.9 2.6 0 2.2 1.8 4 4 4h1" />
       <path d="M12 2c2.2 0 4 1.8 4 4 0 .3 0 .6-.1.9 1.3.6 2.1 2 2.1 3.6 0 1-.3 1.9-.9 2.6.6.7.9 1.6.9 2.6 0 2.2-1.8 4-4 4h-1" />
@@ -198,7 +203,7 @@ export function IconBrain() {
 
 export function IconLanguage() {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <svg width="17" height="17" viewBox="3 2 18 19" fill="none" stroke="currentColor"
       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M4 4.5A1.5 1.5 0 0 1 5.5 3h13A1.5 1.5 0 0 1 20 4.5v10a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 4v-4H5.5A1.5 1.5 0 0 1 4 14.5z" />
       <path d="M8 8h8" />

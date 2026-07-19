@@ -6,7 +6,9 @@ import IntroMessage from '../components/IntroMessage'
 import StudentsPage from './students/StudentsPage'
 import TeachersPage from './teachers/TeachersPage'
 import SubjectsHome from './subjects/SubjectsHome'
+import StudentSubjectsHome from './subjects/StudentSubjectsHome'
 import { useUI } from '../context/UIContext'
+import { useProfileStore } from '../store/profileStore'
 import { useStudentsStore } from '../store/studentsStore'
 import { useTeachersStore } from '../store/teachersStore'
 import { useSubjectsTaughtStore } from '../store/subjectsTaughtStore'
@@ -28,9 +30,9 @@ const PAGE_TITLES = {
   account:   'Account',
 }
 
-function PageContent({ activePage }) {
+function PageContent({ activePage, isStudent }) {
   switch (activePage) {
-    case 'subjects':  return <SubjectsHome />
+    case 'subjects':  return isStudent ? <StudentSubjectsHome /> : <SubjectsHome />
     default:
       return (
         <div className="content-card">
@@ -45,6 +47,7 @@ function PageContent({ activePage }) {
 
 export default function Dashboard() {
   const { activePage, setActivePage } = useUI()
+  const isStudent                     = useProfileStore(s => s.is_student)
   const navigate                      = useNavigate()
   const location                      = useLocation()
   const fetchStudents                 = useStudentsStore(s => s.fetchStudents)
@@ -100,7 +103,7 @@ export default function Dashboard() {
           : displayedPage === 'teachers'
             ? <TeachersPage />
             : displayedPage
-              ? <PageContent activePage={displayedPage} />
+              ? <PageContent activePage={displayedPage} isStudent={isStudent} />
               : <IntroMessage />
         }
       </div>
