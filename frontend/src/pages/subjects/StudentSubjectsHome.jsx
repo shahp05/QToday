@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
 import { useQuizProgressStore } from '../../store/quizProgressStore'
+import { startQuiz as fetchQuizQuestions } from '../../services/quizService'
 import { getSubjectIcon } from './subjectIconMatch'
 import Dropdown from '../../components/Dropdown'
+import QuizPage from './QuizPage'
 import './StudentSubjectsHome.css'
 
 function IconPlay() {
@@ -24,16 +26,6 @@ function IconHistory() {
   )
 }
 
-function IconProgress() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 3v18h18" />
-      <path d="M7 15l4-4 3 3 5-6" />
-    </svg>
-  )
-}
-
 const NOT_ATTEMPTED = { student_avg_pct: 0, max_score_pct: 0, last_played: null, attempts: 0 }
 
 function formatLastPlayed(isoDate) {
@@ -49,8 +41,23 @@ export default function StudentSubjectsHome() {
   const topicStatsById = useQuizProgressStore(s => s.topicStatsById)
   const fetchQuizProgress = useQuizProgressStore(s => s.fetchQuizProgress)
   const [selectedSubjectId, setSelectedSubjectId] = useState(null)
+  const [activeQuiz, setActiveQuiz] = useState(null) // { topicId, gradeId, subjectName, topicName, questions, totalMarks } | null
+  const [loadingQuiz, setLoadingQuiz] = useState(null) // { topicId, source: 'play' | 'card' } | null
+  const [quizError, setQuizError] = useState('')
 
   useEffect(() => { fetchQuizProgress() }, [fetchQuizProgress])
+
+  if (activeQuiz) {
+    return (
+      <QuizPage
+        subjectName={activeQuiz.subjectName}
+        topicName={activeQuiz.topicName}
+        questions={activeQuiz.questions}
+        totalMarks={activeQuiz.totalMarks}
+        onExit={() => setActiveQuiz(null)}
+      />
+    )
+  }
 
   if (subjects.length === 0) {
     return (
@@ -71,14 +78,41 @@ export default function StudentSubjectsHome() {
     return { key: s.subject_id, label: s.subject_name, icon: <Icon /> }
   })
 
+  async function startQuiz(topic, source) {
+    if (loadingQuiz) return
+    const gradeId = topic.grades[0]?.grade_id
+    if (gradeId == null) return
+    setQuizError('')
+    setLoadingQuiz({ topicId: topic.topic_id, source })
+    try {
+      const data = await fetchQuizQuestions(topic.topic_id, gradeId)
+      setActiveQuiz({
+        topicId: topic.topic_id,
+        gradeId,
+        subjectName: activeSubject.subject_name,
+        topicName: topic.topic_name,
+        questions: data.questions,
+        totalMarks: data.total_marks,
+      })
+    } catch (err) {
+      setQuizError(err.message)
+    } finally {
+      setLoadingQuiz(null)
+    }
+  }
+
   return (
     <div className="student-subjects">
       <div className="student-subjects-header">
         <h2 className="student-subjects-title">Play</h2>
         <div className="student-subjects-header-actions">
-          {/* Right-aligned action buttons land here later. */}
+          <button className="student-subjects-history-btn" disabled title="Coming soon">
+            <IconHistory /> History
+          </button>
         </div>
       </div>
+
+      {quizError && <p className="student-subjects-error">{quizError}</p>}
 
       <div className="student-subjects-bar">
         <Dropdown
@@ -93,8 +127,16 @@ export default function StudentSubjectsHome() {
         <div className="student-topic-grid">
           {activeSubject.topics.map((topic, index) => {
             const stats = topicStatsById[topic.topic_id] ?? NOT_ATTEMPTED
+            const isLoadingThis = loadingQuiz?.topicId === topic.topic_id
             return (
-              <div key={topic.topic_id} className="student-topic-card">
+              <div
+                key={topic.topic_id}
+                className="student-topic-card"
+                role="button"
+                tabIndex={0}
+                onClick={() => startQuiz(topic, 'card')}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startQuiz(topic, 'card') } }}
+              >
                 <div className="student-topic-card-header">
                   {/* Static red for now — later this fills based on the
                       student's quiz performance on this topic. */}
@@ -121,16 +163,21 @@ export default function StudentSubjectsHome() {
                 </div>
 
                 <div className="student-topic-actions">
-                  <button className="student-topic-btn student-topic-btn--play" disabled title="Coming soon">
-                    <IconPlay /> Play
-                  </button>
-                  <button className="student-topic-btn" disabled title="Coming soon">
-                    <IconHistory /> History
-                  </button>
-                  <button className="student-topic-btn" disabled title="Coming soon">
-                    <IconProgress /> Progress
+                  <button
+                    className="student-topic-play-btn"
+                    onClick={e => { e.stopPropagation(); startQuiz(topic, 'play') }}
+                    aria-label={`Play ${topic.topic_name} quiz`}
+                    disabled={!!loadingQuiz}
+                  >
+                    {isLoadingThis && loadingQuiz.source === 'play' ? <span className="student-topic-spinner" /> : <IconPlay />}
                   </button>
                 </div>
+
+                {isLoadingThis && loadingQuiz.source === 'card' && (
+                  <div className="student-topic-card-overlay">
+                    <span className="student-topic-spinner student-topic-spinner--lg" />
+                  </div>
+                )}
               </div>
             )
           })}

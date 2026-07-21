@@ -1,0 +1,341 @@
+.quiz-page {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+/* ─── Intro / message / summary screens — centered, page-level scroll ───── */
+.quiz-center {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+@media (max-width: 640px) {
+  .quiz-center {
+    padding: 16px;
+  }
+}
+
+.quiz-page-message {
+  width: 100%;
+  max-width: 560px;
+}
+
+.quiz-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  width: 100%;
+  max-width: 560px;
+  text-align: left;
+}
+
+.quiz-intro-subject {
+  margin: 0;
+  font-family: var(--font-family);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-normal);
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.quiz-intro-accent {
+  color: var(--color-green-light, #8EEB65);
+  font-weight: var(--font-weight-semibold);
+}
+
+.quiz-intro-message {
+  margin: 0;
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  line-height: 1.6;
+  color: #aaaaaa;
+}
+
+.quiz-intro-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+/* ─── Shared button base — same padding-driven sizing as the rest of the
+   app's action buttons (students-list-upload-btn, qa-card-pill, etc.),
+   not a fixed height. ─────────────────────────────────────────────────── */
+.quiz-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+/* Muted-panel treatment — same interaction language as .leftnav-item. */
+.quiz-intro-back-btn,
+.quiz-nav-btn {
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.70);
+}
+
+.quiz-intro-back-btn:hover,
+.quiz-intro-back-btn:focus-visible,
+.quiz-nav-btn:hover:not(:disabled),
+.quiz-nav-btn:focus-visible:not(:disabled) {
+  background: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.90);
+}
+
+.quiz-nav-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.quiz-intro-start-btn,
+.quiz-submit-btn {
+  padding: 8px 20px;
+  border: 1px solid var(--color-green-light, #8EEB65);
+  background: var(--color-green-light, #8EEB65);
+  color: var(--color-dark, #343434);
+}
+
+.quiz-intro-start-btn:hover,
+.quiz-intro-start-btn:focus-visible,
+.quiz-submit-btn:hover,
+.quiz-submit-btn:focus-visible {
+  background: none;
+  color: var(--color-white, #ffffff);
+}
+
+.quiz-exit-btn {
+  align-self: flex-start;
+  border: 1px solid var(--color-green-light, #8EEB65);
+  border-radius: var(--radius-sm);
+  background: var(--color-green-light, #8EEB65);
+  color: var(--color-dark, #343434);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+.quiz-exit-btn:hover,
+.quiz-exit-btn:focus-visible {
+  background: none;
+  color: var(--color-white);
+}
+
+.quiz-summary-line {
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+  margin: 0 0 6px;
+}
+
+.quiz-summary-note {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-light);
+  margin: 0 0 16px;
+}
+
+/* ─── Question-taking screen: fixed header/footer, scrollable answer card ─
+   .quiz-page fills the panel's full height (see above); header and footer
+   are flex-shrink:0 so they never move, and only .quiz-answer-card (flex:1,
+   min-height:0, overflow-y:auto) scrolls when its content doesn't fit. ──── */
+.quiz-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  box-sizing: border-box;
+}
+
+.quiz-header-title {
+  margin: 0;
+  font-family: var(--font-family);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-normal);
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.quiz-close-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.70);
+}
+
+.quiz-close-btn:hover,
+.quiz-close-btn:focus-visible {
+  background: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.90);
+}
+
+.quiz-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px 24px 0;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.quiz-question-label {
+  flex-shrink: 0;
+  margin: 0;
+  font-family: var(--font-family);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.5;
+  color: var(--color-green-light, #8EEB65);
+}
+
+.quiz-answer-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.quiz-options {
+  margin: 0;
+  padding: 16px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: var(--font-size-md);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  box-sizing: border-box;
+}
+
+.quiz-options li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.quiz-option-key {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  line-height: 1;
+  border: 1px solid var(--color-grey, #cccccc);
+  border-radius: var(--radius-sm);
+  background: none;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--color-text-light, #666666);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+.quiz-option-key:hover {
+  border-color: var(--color-green-light, #8EEB65);
+}
+
+.quiz-option-key--selected {
+  border-color: var(--color-green-light, #8EEB65);
+  background: var(--color-green-light, #8EEB65);
+  color: var(--color-dark, #343434);
+}
+
+.quiz-descriptive-input {
+  width: 100%;
+  height: 100%;
+  min-height: 160px;
+  resize: none;
+  border: none;
+  outline: none;
+  border-radius: var(--radius-md);
+  padding: 16px;
+  font-family: var(--font-family);
+  font-size: var(--font-size-md);
+  color: var(--color-text);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  box-sizing: border-box;
+  transition: box-shadow 0.2s;
+}
+
+.quiz-descriptive-input:focus {
+  box-shadow: var(--shadow-md), 0 0 0 2px var(--color-green-light, #8EEB65);
+}
+
+.quiz-footer {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px 24px 24px;
+  box-sizing: border-box;
+}
+
+.quiz-nav-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.quiz-timer {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-red, #D32F2F);
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .quiz-header {
+    padding: 16px 16px;
+  }
+
+  .quiz-body {
+    padding: 16px 16px 0;
+  }
+
+  .quiz-footer {
+    padding: 16px 16px;
+  }
+}

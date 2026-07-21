@@ -9,3 +9,9 @@ export async function fetchQuizProgress(studentId) {
   if (!res.ok) throw new Error(await apiErrorMessage(res))
   return res.json() // { topics: [{topic_id, subject_id, student_avg_pct, max_score_pct, last_played, attempts}] }
 }
+
+export async function startQuiz(topicId, gradeId) {
+  const res = await apiFetch(`/quizzes/start?topic_id=${topicId}&grade_id=${gradeId}`)
+  if (!res.ok) throw new Error(await apiErrorMessage(res))
+  return res.json() // { questions: [{qa_id, question_type, question, options, difficulty_level}], total_marks }
+}

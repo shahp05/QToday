@@ -1,6 +1,9 @@
+import random
+
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from config.app_config import get_setting
 from errors.app_error import AppError
 from errors.error_codes import ErrorCode
 
@@ -106,3 +109,65 @@ def get_student_quiz_progress(db: Session, *, student_id: int) -> dict:
     ]
 
     return {"topics": topics}
+
+
+def get_quiz_questions(db: Session, *, claims: dict, topic_id: int, grade_id: int) -> dict:
+    """A random sample of verified questions for a (topic, grade) a student
+    is quizzing on. Deliberately re-scoped here rather than reusing
+    teach_log_service.get_topic_grade_qa: that function is teacher-facing and
+    doesn't filter is_verified, and it also returns 'answer' — neither of
+    which should ever reach a student before they submit. Visibility is
+    proven the same way as elsewhere: a teach_logs row showing this topic was
+    actually taught to the student's own grade."""
+    if not claims.get("is_student"):
+        raise AppError(ErrorCode.AUTH_FORBIDDEN)
+
+    own = db.execute(
+        text("SELECT student_id FROM students WHERE user_id = :uid AND is_active = TRUE"),
+        {"uid": claims["user_id"]},
+    ).first()
+    if own is None:
+        raise AppError(ErrorCode.STUDENT_NOT_FOUND)
+
+    visible = db.execute(
+        text("""
+            SELECT 1
+            FROM teach_logs tl
+            JOIN student_grades sg ON sg.grade_id = tl.grade_id AND sg.is_active = TRUE
+            WHERE sg.student_id = :sid AND tl.is_active = TRUE
+              AND tl.topic_id = :topic_id AND tl.grade_id = :grade_id
+            LIMIT 1
+        """),
+        {"sid": own.student_id, "topic_id": topic_id, "grade_id": grade_id},
+    ).first()
+    if not visible:
+        raise AppError(ErrorCode.TEACH_LOG_NOT_FOUND)
+
+    qa_rows = db.execute(
+        text("""
+            SELECT qa_id, question_type, question, options, difficulty_level
+            FROM qa
+            WHERE topic_id = :topic_id AND grade_id = :grade_id
+              AND is_active = TRUE AND is_verified = TRUE
+        """),
+        {"topic_id": topic_id, "grade_id": grade_id},
+    ).fetchall()
+
+    # Same (count, marks-per-question) settings quizzes.total_marks is
+    # documented as being snapshotted from — see schema.sql's QUIZZES
+    # comment — so the number shown here always matches what a submitted
+    # quiz would actually be scored out of.
+    count = get_setting("default_questions_per_quiz", 20)
+    marks_per_qa = get_setting("default_marks_per_qa", 5)
+    selected = random.sample(qa_rows, min(count, len(qa_rows)))
+    questions = [
+        {
+            "qa_id": r.qa_id,
+            "question_type": r.question_type,
+            "question": r.question,
+            "options": r.options,
+            "difficulty_level": r.difficulty_level,
+        }
+        for r in selected
+    ]
+    return {"questions": questions, "total_marks": len(questions) * marks_per_qa}
