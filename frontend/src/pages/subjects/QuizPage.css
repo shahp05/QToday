@@ -104,8 +104,7 @@
   cursor: not-allowed;
 }
 
-.quiz-intro-start-btn,
-.quiz-submit-btn {
+.quiz-intro-start-btn {
   padding: 8px 20px;
   border: 1px solid var(--color-green-light, #8EEB65);
   background: var(--color-green-light, #8EEB65);
@@ -113,9 +112,7 @@
 }
 
 .quiz-intro-start-btn:hover,
-.quiz-intro-start-btn:focus-visible,
-.quiz-submit-btn:hover,
-.quiz-submit-btn:focus-visible {
+.quiz-intro-start-btn:focus-visible {
   background: none;
   color: var(--color-white, #ffffff);
 }
@@ -151,64 +148,181 @@
   margin: 0 0 16px;
 }
 
-/* ─── Question-taking screen: fixed header/footer, scrollable answer card ─
-   .quiz-page fills the panel's full height (see above); header and footer
-   are flex-shrink:0 so they never move, and only .quiz-answer-card (flex:1,
-   min-height:0, overflow-y:auto) scrolls when its content doesn't fit. ──── */
-.quiz-header {
-  flex-shrink: 0;
+/* ─── Question-taking screen: a card centered on the page (like .quiz-center
+   above), capped to a sane height so it never stretches edge-to-edge. Only
+   .quiz-card-body scrolls internally — header/footer stay put, the question
+   always starts at the same position, and the answer area grows to fit MCQ
+   options vs. a descriptive textarea. ───────────────────────────────────── */
+.quiz-taking-wrap {
+  flex: 1;
+  min-height: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 24px 24px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  justify-content: center;
+  padding: 32px;
+  overflow-y: auto;
   box-sizing: border-box;
 }
 
-.quiz-header-title {
+/* Fixed height (not max-height) — the card must be the same size on every
+   question, otherwise its shorter/taller content shifts the whole thing up
+   or down within .quiz-taking-wrap and the header/question/footer end up
+   at a different screen position each time. Only .quiz-answer-zone inside
+   scrolls when content doesn't fit this fixed box. */
+.quiz-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 640px;
+  height: min(640px, 100%);
+  box-sizing: border-box;
+}
+
+.quiz-card-header {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: 20px;
+}
+
+.quiz-card-header-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.quiz-taking-header-info {
+  min-width: 0;
+}
+
+.quiz-taking-subject {
   margin: 0;
   font-family: var(--font-family);
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-normal);
-  color: rgba(255, 255, 255, 0.65);
+  font-size: var(--font-size-sm);
+  color: rgba(255, 255, 255, 0.55);
 }
 
-.quiz-close-btn {
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 1px solid transparent;
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.70);
-}
-
-.quiz-close-btn:hover,
-.quiz-close-btn:focus-visible {
-  background: rgba(255, 255, 255, 0.15);
+.quiz-taking-topic {
+  margin: 2px 0 0;
+  font-family: var(--font-family);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
   color: rgba(255, 255, 255, 0.90);
 }
 
-.quiz-body {
+.quiz-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.quiz-progress-dots {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.quiz-progress-dot {
+  width: 16px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.quiz-progress-dot--done {
+  background: var(--color-green-light, #8EEB65);
+}
+
+.quiz-status-meta {
+  flex-shrink: 0;
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  color: rgba(255, 255, 255, 0.55);
+  white-space: nowrap;
+}
+
+.quiz-quit-wrap {
+  position: relative;
+  display: flex;
+}
+
+.quiz-quit-icon-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+}
+
+.quiz-quit-icon-btn:hover,
+.quiz-quit-icon-btn:focus-visible {
+  background: rgba(255, 255, 255, 0.10);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.quiz-quit-confirm {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--color-red, #D32F2F);
+  color: #ffffff;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.quiz-card-body {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  width: 100%;
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 16px 24px 0;
   box-sizing: border-box;
   overflow: hidden;
 }
 
-.quiz-question-label {
+/* Distinct bordered section for the question + answer — visually separate
+   from the header (topic/progress) and footer (nav) above/below it. ────── */
+.quiz-qa-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 20px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* Sized to its own content, not reserved proportional space — a fixed
+   1/3 (or any) share left dead air below short questions. The header
+   staying fixed and the question always starting at the panel's top edge
+   is what keeps things feeling stable across questions, not equalizing
+   the gap beneath it. */
+.quiz-question-zone {
   flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  padding-bottom: 16px;
+}
+
+.quiz-question-label {
   margin: 0;
   font-family: var(--font-family);
   font-size: var(--font-size-md);
@@ -217,7 +331,7 @@
   color: var(--color-green-light, #8EEB65);
 }
 
-.quiz-answer-card {
+.quiz-answer-zone {
   flex: 1;
   min-height: 0;
   display: flex;
@@ -227,23 +341,34 @@
 
 .quiz-options {
   margin: 0;
-  padding: 16px;
+  padding: 0;
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 2px;
   font-size: var(--font-size-md);
   color: var(--color-text);
+}
+
+.quiz-option-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
   background: var(--color-surface);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
   box-sizing: border-box;
+  cursor: pointer;
+  transition: box-shadow 0.2s;
 }
 
-.quiz-options li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.quiz-option-item:hover {
+  box-shadow: var(--shadow-md), 0 0 0 1px var(--color-green-light, #8EEB65);
+}
+
+.quiz-option-item--selected {
+  box-shadow: var(--shadow-md), 0 0 0 2px var(--color-green-light, #8EEB65);
 }
 
 .quiz-option-key {
@@ -298,16 +423,14 @@
   box-shadow: var(--shadow-md), 0 0 0 2px var(--color-green-light, #8EEB65);
 }
 
-.quiz-footer {
+.quiz-card-footer {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: 10px;
   width: 100%;
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 16px 24px 24px;
+  padding-top: 20px;
   box-sizing: border-box;
 }
 
@@ -315,27 +438,43 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 12px;
   width: 100%;
 }
 
-.quiz-timer {
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-  color: var(--color-red, #D32F2F);
-  text-align: center;
+/* Prev/Next are icon-only, safe to compress to a square — pure navigation.
+   Submit ends the quiz, a one-way action, so it keeps a text label rather
+   than relying on an icon whose meaning ("done"? "correct answer"?) isn't
+   obvious in a quiz context; it's the odd one out in shape as well as the
+   color change once every question has an answer. ───────────────────────── */
+.quiz-nav-row .quiz-nav-btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+}
+
+.quiz-nav-row .quiz-nav-btn--submit {
+  width: auto;
+  height: 44px;
+  padding: 0 20px;
+  gap: 8px;
+}
+
+.quiz-nav-btn--submit.quiz-nav-btn--submit-ready {
+  border-color: var(--color-green-light, #8EEB65);
+  background: var(--color-green-light, #8EEB65);
+  color: var(--color-dark, #343434);
+}
+
+.quiz-nav-btn--submit.quiz-nav-btn--submit-ready:hover,
+.quiz-nav-btn--submit.quiz-nav-btn--submit-ready:focus-visible {
+  background: none;
+  color: var(--color-green-light, #8EEB65);
 }
 
 @media (max-width: 640px) {
-  .quiz-header {
-    padding: 16px 16px;
-  }
-
-  .quiz-body {
-    padding: 16px 16px 0;
-  }
-
-  .quiz-footer {
-    padding: 16px 16px;
+  .quiz-taking-wrap {
+    padding: 16px;
   }
 }
+

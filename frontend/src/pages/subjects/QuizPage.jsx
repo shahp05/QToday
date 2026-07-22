@@ -12,6 +12,33 @@ function IconClose() {
   )
 }
 
+function IconChevronLeft() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  )
+}
+
+function IconChevronRight() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
+  )
+}
+
+function IconCheck() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  )
+}
+
 // MCQ items carry an options object; true/false doesn't, so synthesize one
 // here to render both the same way — same pattern as QaCard.getRenderOptions.
 function getRenderOptions(qa) {
@@ -37,6 +64,7 @@ export default function QuizPage({ subjectName, topicName, questions, totalMarks
   const [submitted, setSubmitted] = useState(false)
   const [totalSeconds, setTotalSeconds] = useState(0)
   const [finalTotalSeconds, setFinalTotalSeconds] = useState(0)
+  const [confirmQuit, setConfirmQuit] = useState(false)
 
   const quizStartRef = useRef(null)
   const questionStartRef = useRef(null)
@@ -77,6 +105,7 @@ export default function QuizPage({ subjectName, topicName, questions, totalMarks
   function goTo(newIndex) {
     commitQuestionTime(questions[index].qa_id)
     setIndex(newIndex)
+    setConfirmQuit(false)
   }
 
   function handleAnswer(qaId, value) {
@@ -87,6 +116,14 @@ export default function QuizPage({ subjectName, topicName, questions, totalMarks
     commitQuestionTime(questions[index].qa_id)
     setFinalTotalSeconds(Math.round((Date.now() - quizStartRef.current) / 1000))
     setSubmitted(true)
+  }
+
+  function handleQuitClick() {
+    if (confirmQuit) {
+      onExit()
+    } else {
+      setConfirmQuit(true)
+    }
   }
 
   if (questions.length === 0) {
@@ -146,58 +183,95 @@ export default function QuizPage({ subjectName, topicName, questions, totalMarks
   const q = questions[index]
   const renderOptions = getRenderOptions(q)
   const answeredCount = Object.keys(answers).length
+  const isLast = index === questions.length - 1
 
   return (
     <div className="quiz-page">
-      <div className="quiz-header">
-        <h2 className="quiz-header-title">Question {index + 1} of {questions.length}</h2>
-        <button className="quiz-btn quiz-close-btn" onClick={onExit} aria-label="Stop quiz">
-          <IconClose />
-        </button>
-      </div>
+      <div className="quiz-taking-wrap">
+        <div className="quiz-card">
+          <div className="quiz-card-header">
+            <div className="quiz-card-header-top">
+              <div className="quiz-taking-header-info">
+                <p className="quiz-taking-subject">{subjectName}</p>
+                <p className="quiz-taking-topic">{topicName}</p>
+              </div>
+              <div className="quiz-quit-wrap">
+                {confirmQuit && <div className="quiz-quit-confirm">Sure you want to quit?</div>}
+                <button className="quiz-quit-icon-btn" onClick={handleQuitClick} aria-label="Quit quiz">
+                  <IconClose />
+                </button>
+              </div>
+            </div>
 
-      <div className="quiz-body">
-        <MathText className="quiz-question-label" text={q.question} />
+            <div className="quiz-status-row">
+              <div className="quiz-progress-dots">
+                {questions.map((_, i) => (
+                  <span key={i} className={`quiz-progress-dot${i <= index ? ' quiz-progress-dot--done' : ''}`} />
+                ))}
+              </div>
+              <div className="quiz-status-meta">
+                Answered {answeredCount} of {questions.length} &middot; {formatDuration(totalSeconds)}
+              </div>
+            </div>
+          </div>
 
-        <div className="quiz-answer-card">
-          {renderOptions ? (
-            <ul className="quiz-options">
-              {Object.entries(renderOptions).map(([key, text]) => (
-                <li key={key}>
-                  <button
-                    type="button"
-                    className={`quiz-option-key${answers[q.qa_id] === key ? ' quiz-option-key--selected' : ''}`}
-                    onClick={() => handleAnswer(q.qa_id, key)}
-                    aria-label={`Select option ${key.toUpperCase()}`}
-                  >
-                    {key.toUpperCase()}
-                  </button>
-                  <MathText text={text} />
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <textarea
-              className="quiz-descriptive-input"
-              value={answers[q.qa_id] || ''}
-              onChange={e => handleAnswer(q.qa_id, e.target.value)}
-              placeholder="Type your answer…"
-            />
-          )}
+          <div className="quiz-card-body">
+            <div className="quiz-qa-panel">
+              <div className="quiz-question-zone">
+                <MathText className="quiz-question-label" text={q.question} />
+              </div>
+
+              <div className="quiz-answer-zone">
+                {renderOptions ? (
+                  <ul className="quiz-options">
+                    {Object.entries(renderOptions).map(([key, text]) => (
+                      <li
+                        key={key}
+                        className={`quiz-option-item${answers[q.qa_id] === key ? ' quiz-option-item--selected' : ''}`}
+                        onClick={() => handleAnswer(q.qa_id, key)}
+                      >
+                        <button
+                          type="button"
+                          className={`quiz-option-key${answers[q.qa_id] === key ? ' quiz-option-key--selected' : ''}`}
+                          onClick={() => handleAnswer(q.qa_id, key)}
+                          aria-label={`Select option ${key.toUpperCase()}`}
+                        >
+                          {key.toUpperCase()}
+                        </button>
+                        <MathText text={text} />
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <textarea
+                    className="quiz-descriptive-input"
+                    value={answers[q.qa_id] || ''}
+                    onChange={e => handleAnswer(q.qa_id, e.target.value)}
+                    placeholder="Type your answer…"
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="quiz-card-footer">
+            <div className="quiz-nav-row">
+              <button className="quiz-btn quiz-nav-btn" onClick={() => goTo(index - 1)} disabled={index === 0} aria-label="Previous question">
+                <IconChevronLeft />
+              </button>
+              <button
+                className={`quiz-btn quiz-nav-btn quiz-nav-btn--submit${answeredCount === questions.length ? ' quiz-nav-btn--submit-ready' : ''}`}
+                onClick={handleSubmit}
+              >
+                <IconCheck />
+                Done
+              </button>
+              <button className="quiz-btn quiz-nav-btn" onClick={() => goTo(index + 1)} disabled={isLast} aria-label="Next question">
+                <IconChevronRight />
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
-
-      <div className="quiz-footer">
-        <div className="quiz-nav-row">
-          <button className="quiz-btn quiz-nav-btn" onClick={() => goTo(index - 1)} disabled={index === 0}>
-            Prev
-          </button>
-          <button className="quiz-btn quiz-submit-btn" onClick={handleSubmit}>Submit</button>
-          <button className="quiz-btn quiz-nav-btn" onClick={() => goTo(index + 1)} disabled={index === questions.length - 1}>
-            Next
-          </button>
-        </div>
-        <div className="quiz-timer">Answered {answeredCount} questions in {formatDuration(totalSeconds)} time</div>
       </div>
     </div>
   )
