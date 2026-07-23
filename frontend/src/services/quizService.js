@@ -15,3 +15,25 @@ export async function startQuiz(topicId, gradeId) {
   if (!res.ok) throw new Error(await apiErrorMessage(res))
   return res.json() // { questions: [{qa_id, question_type, question, options, difficulty_level}], total_marks }
 }
+
+// answers: [{qa_id, student_response, time_taken_seconds}]
+export async function submitQuiz(topicId, gradeId, answers, totalTimeTakenSeconds) {
+  const res = await apiFetch('/quizzes/submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      topic_id: topicId,
+      grade_id: gradeId,
+      answers,
+      total_time_taken_seconds: totalTimeTakenSeconds,
+    }),
+  })
+  if (!res.ok) throw new Error(await apiErrorMessage(res))
+  return res.json() // { quiz_id, total_marks, total_score, is_scored, pending_count }
+}
+
+export async function fetchQuizStatus(quizId) {
+  const res = await apiFetch(`/quizzes/${quizId}/status`)
+  if (!res.ok) throw new Error(await apiErrorMessage(res))
+  return res.json() // { quiz_id, topic_id, total_marks, total_score, is_scored, pending_count }
+}

@@ -2,6 +2,7 @@ import jobs.app  # noqa: F401 — sets the Windows-compatible asyncio event loop
                  # policy (SelectorEventLoop) before uvicorn creates its loop;
                  # psycopg3 async mode can't use Windows' default ProactorEventLoop.
 import traceback
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,10 +13,22 @@ from sqlalchemy import text
 from db.database import SessionLocal, get_db
 from errors.app_error import AppError
 from errors.error_codes import ErrorCode, ERROR_DEFAULTS
+from jobs.app import app as procrastinate_app
 from routers import auth, countries, error_logs, qa, quizzes, signup, students, teach_logs, teachers
 from services.error_log_service import log_error
 
-app = FastAPI(title="QToday API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Deferring a task (e.g. routers/quizzes.py's .defer_async() calls)
+    # requires the Procrastinate App's connection pool to be open in THIS
+    # process too, not just in worker.py — without this, every defer_async()
+    # call raises "App was not open" and the request 500s.
+    async with procrastinate_app.open_async():
+        yield
+
+
+app = FastAPI(title="QToday API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

@@ -19,7 +19,7 @@ import asyncio
 import traceback
 from datetime import date, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from config.app_config import get_setting
@@ -754,6 +754,36 @@ def update_qa(db: Session, *, qa_id: int, user_id: int, customer_id: int, payloa
 
     db.commit()
     return _serialize([qa])[0]
+
+
+async def top_up_qa(db: Session, *, subject_id: int, topic_id: int, grade_id: int) -> int:
+    """Best-effort background replenishment of the QA pool for a
+    (subject, topic, grade), triggered after a quiz submission (see
+    jobs/tasks.py:top_up_qa_task) so the bank keeps growing instead of a
+    student cycling through the same fixed set of verified questions.
+    Returns 0 (without calling the LLM) if the pool is already large enough."""
+    subject = db.get(Subject, subject_id)
+    topic = db.get(Topic, topic_id)
+    grade_row = db.get(Grade, grade_id)
+    if subject is None or topic is None or grade_row is None:
+        return 0
+
+    threshold = get_setting("qa_top_up_threshold", 40)
+    existing_count = db.execute(
+        select(func.count()).select_from(QA).where(
+            QA.subject_id == subject_id, QA.topic_id == topic_id, QA.grade_id == grade_id,
+            QA.is_active == True, QA.is_verified == True,  # noqa: E712
+        )
+    ).scalar_one()
+    if existing_count >= threshold:
+        return 0
+
+    subject_area = db.get(SubjectArea, topic.subject_area_id)
+    new_rows = await _generate_and_save_qa(db, subject, topic, subject_area, grade_row, grade_row.grade_name)
+    db.commit()
+    verified = await _verify_qa_batch(new_rows)
+    db.commit()
+    return len(verified)
 
 
 def _serialize(qa_rows: list[QA]) -> list[dict]:

@@ -303,3 +303,12 @@
   border-radius: var(--radius-md);
 }
 
+.student-topic-scoring-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+

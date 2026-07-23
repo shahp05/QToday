@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import MathText from '../../components/MathText'
+import { Toast } from '../../components/ui/Toast'
+import { submitQuiz } from '../../services/quizService'
 import './QuizPage.css'
 
 function IconClose() {
@@ -53,12 +55,14 @@ function formatDuration(totalSeconds) {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-// Question-taking flow only — real scoring is deferred, so finalizeQuiz
-// simulates an evaluation delay and a placeholder score, then hands a
-// result object back to onExit for the caller to display. Questions (and
-// total_marks) are fetched by the caller (StudentSubjectsHome), which owns
-// the loading spinner shown while this component isn't mounted yet.
-export default function QuizPage({ subjectName, topicName, questions, totalMarks, onExit }) {
+// Question-taking flow. Questions (and total_marks) are fetched by the
+// caller (StudentSubjectsHome), which owns the loading spinner shown while
+// this component isn't mounted yet. On submit, finalizeQuiz posts every
+// question's answer + time-taken to the backend and hands the result
+// (quiz_id, score-so-far, whether LLM grading is still pending) back to
+// onExit — the caller shows a "scoring in progress" state and polls until
+// the LLM pass (if any) completes.
+export default function QuizPage({ subjectName, topicName, topicId, gradeId, questions, totalMarks, onExit }) {
   const [started, setStarted] = useState(false)
   const [index, setIndex] = useState(0)
   const [answers, setAnswers] = useState({})
@@ -66,6 +70,7 @@ export default function QuizPage({ subjectName, topicName, questions, totalMarks
   const [confirmQuit, setConfirmQuit] = useState(false)
   const [reviewing, setReviewing] = useState(false)
   const [evaluating, setEvaluating] = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
   const quizStartRef = useRef(null)
   const questionStartRef = useRef(null)
@@ -113,38 +118,50 @@ export default function QuizPage({ subjectName, topicName, questions, totalMarks
     setAnswers(prev => ({ ...prev, [qaId]: value }))
   }
 
-  // Scans the other n-1 questions (never fromIndex itself) in the given
-  // direction, wrapping around the ends, and returns the first one without
-  // an answer — or -1 if every other question is already answered.
-  function findUnansweredFrom(fromIndex, direction) {
-    const n = questions.length
-    for (let step = 1; step < n; step++) {
-      const i = ((fromIndex + direction * step) % n + n) % n
+  // Scans strictly forward from fromIndex (never wraps back past the start)
+  // and returns the first later question without an answer — or -1 if
+  // everything ahead is already answered.
+  function findUnansweredForwardFrom(fromIndex) {
+    for (let i = fromIndex + 1; i < questions.length; i++) {
       if (answers[questions[i].qa_id] === undefined) return i
     }
     return -1
   }
 
   // MCQ/true-false only — picking an option is a single decisive action, so
-  // it advances automatically to the next unanswered question. Descriptive
-  // answers stay put since typing is ongoing and there's no equivalent
-  // "done" moment to trigger on; those rely on Prev/Next instead.
+  // it advances automatically to the next unanswered question ahead of it.
+  // Never wraps back to an earlier question — reaching the end with
+  // questions still unanswered just stops advancing, same as manual Next.
+  // Descriptive answers stay put since typing is ongoing and there's no
+  // equivalent "done" moment to trigger on; those rely on Prev/Next instead.
   function handleSelectOption(qaId, value) {
     handleAnswer(qaId, value)
-    const nextIndex = findUnansweredFrom(index, 1)
+    const nextIndex = findUnansweredForwardFrom(index)
     if (nextIndex !== -1) {
       goTo(nextIndex)
     }
   }
 
-  // Ends the quiz: shows a spinner on whichever button triggered it, waits
-  // out a placeholder "evaluating" delay, then returns to the topic-cards
-  // page. No backend to grade against yet, so nothing is scored or shown
-  // here — the score display gets built once evaluation is wired up.
-  function finalizeQuiz() {
+  // Ends the quiz: shows a spinner on whichever button triggered it, submits
+  // every question's answer + time-taken to the backend, then returns to the
+  // topic-cards page with the result (auto-scored total plus whether an LLM
+  // pass is still pending) for the caller to display/poll.
+  async function finalizeQuiz() {
     commitQuestionTime(questions[index].qa_id)
     setEvaluating(true)
-    setTimeout(onExit, 1400)
+    setSubmitError('')
+    const payloadAnswers = questions.map(q => ({
+      qa_id: q.qa_id,
+      student_response: answers[q.qa_id] ?? null,
+      time_taken_seconds: perQuestionSecondsRef.current[q.qa_id] ?? 0,
+    }))
+    try {
+      const result = await submitQuiz(topicId, gradeId, payloadAnswers, totalSeconds)
+      onExit(result)
+    } catch (err) {
+      setEvaluating(false)
+      setSubmitError(err.message)
+    }
   }
 
   // Done only finalizes outright when every question already has an answer;
@@ -237,8 +254,11 @@ export default function QuizPage({ subjectName, topicName, questions, totalMarks
 
               <div className="quiz-status-row">
                 <div className="quiz-progress-dots">
-                  {questions.map((_, i) => (
-                    <span key={i} className={`quiz-progress-dot${i <= index ? ' quiz-progress-dot--done' : ''}`} />
+                  {questions.map((qq, i) => (
+                    <span
+                      key={i}
+                      className={`quiz-progress-dot${answers[qq.qa_id] !== undefined || i === index ? ' quiz-progress-dot--done' : ''}`}
+                    />
                   ))}
                 </div>
                 <div className="quiz-status-meta">
@@ -260,6 +280,7 @@ export default function QuizPage({ subjectName, topicName, questions, totalMarks
             </div>
 
             <div className="quiz-card-footer">
+              <Toast message={submitError} onDismiss={() => setSubmitError('')} />
               <div className="quiz-intro-actions">
                 {noneAnswered ? (
                   <>
@@ -357,6 +378,7 @@ export default function QuizPage({ subjectName, topicName, questions, totalMarks
           </div>
 
           <div className="quiz-card-footer">
+            <Toast message={submitError} onDismiss={() => setSubmitError('')} />
             <div className="quiz-nav-row">
               <button className="quiz-btn quiz-nav-btn" onClick={() => goTo(index - 1)} disabled={index === 0 || evaluating} aria-label="Previous question">
                 <IconChevronLeft />

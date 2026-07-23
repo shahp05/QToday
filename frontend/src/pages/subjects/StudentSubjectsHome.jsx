@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
 import { useQuizProgressStore } from '../../store/quizProgressStore'
-import { startQuiz as fetchQuizQuestions } from '../../services/quizService'
+import { fetchQuizStatus, startQuiz as fetchQuizQuestions } from '../../services/quizService'
 import { getSubjectIcon } from './subjectIconMatch'
 import Dropdown from '../../components/Dropdown'
 import QuizPage from './QuizPage'
@@ -44,17 +44,58 @@ export default function StudentSubjectsHome() {
   const [activeQuiz, setActiveQuiz] = useState(null) // { topicId, gradeId, subjectName, topicName, questions, totalMarks } | null
   const [loadingQuiz, setLoadingQuiz] = useState(null) // { topicId, source: 'play' | 'card' } | null
   const [quizError, setQuizError] = useState('')
+  // topic_id -> quiz_id, for topics whose LLM scoring pass hasn't finished yet
+  const [scoringTopics, setScoringTopics] = useState({})
 
   useEffect(() => { fetchQuizProgress() }, [fetchQuizProgress])
+
+  // Polls every scoring-in-progress quiz until the background LLM pass
+  // (jobs/tasks.py:score_quiz_task) finishes — see conversation history for
+  // why polling was chosen over a push transport (no websocket infra yet).
+  // Keeps running even if the student navigates away from this page's quiz
+  // and back, since the job itself is server-side and independent of this
+  // component's lifetime; only the polling loop is client-local.
+  useEffect(() => {
+    const topicIds = Object.keys(scoringTopics)
+    if (topicIds.length === 0) return
+    const interval = setInterval(async () => {
+      for (const topicId of topicIds) {
+        try {
+          const status = await fetchQuizStatus(scoringTopics[topicId])
+          if (status.is_scored) {
+            setScoringTopics(prev => {
+              const next = { ...prev }
+              delete next[topicId]
+              return next
+            })
+            fetchQuizProgress()
+          }
+        } catch {
+          // transient network/poll failure — try again next tick
+        }
+      }
+    }, 4000)
+    return () => clearInterval(interval)
+  }, [scoringTopics, fetchQuizProgress])
 
   if (activeQuiz) {
     return (
       <QuizPage
         subjectName={activeQuiz.subjectName}
         topicName={activeQuiz.topicName}
+        topicId={activeQuiz.topicId}
+        gradeId={activeQuiz.gradeId}
         questions={activeQuiz.questions}
         totalMarks={activeQuiz.totalMarks}
-        onExit={() => setActiveQuiz(null)}
+        onExit={result => {
+          setActiveQuiz(null)
+          if (!result) return // quit without submitting
+          if (result.pending_count > 0) {
+            setScoringTopics(prev => ({ ...prev, [activeQuiz.topicId]: result.quiz_id }))
+          } else {
+            fetchQuizProgress()
+          }
+        }}
       />
     )
   }
@@ -79,7 +120,7 @@ export default function StudentSubjectsHome() {
   })
 
   async function startQuiz(topic, source) {
-    if (loadingQuiz) return
+    if (loadingQuiz || scoringTopics[topic.topic_id]) return
     const gradeId = topic.grades[0]?.grade_id
     if (gradeId == null) return
     setQuizError('')
@@ -128,6 +169,7 @@ export default function StudentSubjectsHome() {
           {activeSubject.topics.map((topic, index) => {
             const stats = topicStatsById[topic.topic_id] ?? NOT_ATTEMPTED
             const isLoadingThis = loadingQuiz?.topicId === topic.topic_id
+            const isScoringThis = !!scoringTopics[topic.topic_id]
             return (
               <div
                 key={topic.topic_id}
@@ -167,7 +209,7 @@ export default function StudentSubjectsHome() {
                     className="student-topic-play-btn"
                     onClick={e => { e.stopPropagation(); startQuiz(topic, 'play') }}
                     aria-label={`Play ${topic.topic_name} quiz`}
-                    disabled={!!loadingQuiz}
+                    disabled={!!loadingQuiz || isScoringThis}
                   >
                     {isLoadingThis && loadingQuiz.source === 'play' ? <span className="student-topic-spinner" /> : <IconPlay />}
                   </button>
@@ -176,6 +218,14 @@ export default function StudentSubjectsHome() {
                 {isLoadingThis && loadingQuiz.source === 'card' && (
                   <div className="student-topic-card-overlay">
                     <span className="student-topic-spinner student-topic-spinner--lg" />
+                  </div>
+                )}
+
+                {isScoringThis && (
+                  <div className="student-topic-card-overlay">
+                    <span className="student-topic-scoring-label">
+                      <span className="student-topic-spinner" /> Scoring…
+                    </span>
                   </div>
                 )}
               </div>
