@@ -53,18 +53,19 @@ function formatDuration(totalSeconds) {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-// Question-taking flow only — submission/scoring is deferred, so Submit just
-// ends the local session and shows a summary instead of posting anywhere.
-// Questions (and total_marks) are fetched by the caller (StudentSubjectsHome),
-// which owns the loading spinner shown while this component isn't mounted yet.
+// Question-taking flow only — real scoring is deferred, so finalizeQuiz
+// simulates an evaluation delay and a placeholder score, then hands a
+// result object back to onExit for the caller to display. Questions (and
+// total_marks) are fetched by the caller (StudentSubjectsHome), which owns
+// the loading spinner shown while this component isn't mounted yet.
 export default function QuizPage({ subjectName, topicName, questions, totalMarks, onExit }) {
   const [started, setStarted] = useState(false)
   const [index, setIndex] = useState(0)
   const [answers, setAnswers] = useState({})
-  const [submitted, setSubmitted] = useState(false)
   const [totalSeconds, setTotalSeconds] = useState(0)
-  const [finalTotalSeconds, setFinalTotalSeconds] = useState(0)
   const [confirmQuit, setConfirmQuit] = useState(false)
+  const [reviewing, setReviewing] = useState(false)
+  const [evaluating, setEvaluating] = useState(false)
 
   const quizStartRef = useRef(null)
   const questionStartRef = useRef(null)
@@ -86,14 +87,14 @@ export default function QuizPage({ subjectName, topicName, questions, totalMarks
   // Ticks the total-time display once a second — reads refs from an effect
   // (not render), which is the only place that's safe to do so.
   useEffect(() => {
-    if (!started || questions.length === 0 || submitted) return
+    if (!started || questions.length === 0 || reviewing || evaluating) return
     function tick() {
       setTotalSeconds(Math.round((Date.now() - quizStartRef.current) / 1000))
     }
     tick()
     const id = setInterval(tick, 1000)
     return () => clearInterval(id)
-  }, [started, questions, submitted])
+  }, [started, questions, reviewing, evaluating])
 
   function commitQuestionTime(qaId) {
     if (questionStartRef.current == null) return
@@ -112,10 +113,61 @@ export default function QuizPage({ subjectName, topicName, questions, totalMarks
     setAnswers(prev => ({ ...prev, [qaId]: value }))
   }
 
-  function handleSubmit() {
+  // Scans the other n-1 questions (never fromIndex itself) in the given
+  // direction, wrapping around the ends, and returns the first one without
+  // an answer — or -1 if every other question is already answered.
+  function findUnansweredFrom(fromIndex, direction) {
+    const n = questions.length
+    for (let step = 1; step < n; step++) {
+      const i = ((fromIndex + direction * step) % n + n) % n
+      if (answers[questions[i].qa_id] === undefined) return i
+    }
+    return -1
+  }
+
+  // MCQ/true-false only — picking an option is a single decisive action, so
+  // it advances automatically to the next unanswered question. Descriptive
+  // answers stay put since typing is ongoing and there's no equivalent
+  // "done" moment to trigger on; those rely on Prev/Next instead.
+  function handleSelectOption(qaId, value) {
+    handleAnswer(qaId, value)
+    const nextIndex = findUnansweredFrom(index, 1)
+    if (nextIndex !== -1) {
+      goTo(nextIndex)
+    }
+  }
+
+  // Ends the quiz: shows a spinner on whichever button triggered it, waits
+  // out a placeholder "evaluating" delay, then returns to the topic-cards
+  // page. No backend to grade against yet, so nothing is scored or shown
+  // here — the score display gets built once evaluation is wired up.
+  function finalizeQuiz() {
     commitQuestionTime(questions[index].qa_id)
-    setFinalTotalSeconds(Math.round((Date.now() - quizStartRef.current) / 1000))
-    setSubmitted(true)
+    setEvaluating(true)
+    setTimeout(onExit, 1400)
+  }
+
+  // Done only finalizes outright when every question already has an answer;
+  // otherwise it opens the review screen so the student can see how much is
+  // left before deciding whether to go back or submit as-is.
+  function handleDoneClick() {
+    if (Object.keys(answers).length === questions.length) {
+      finalizeQuiz()
+    } else {
+      commitQuestionTime(questions[index].qa_id)
+      setReviewing(true)
+    }
+  }
+
+  function handleStartOver() {
+    setIndex(0)
+    setReviewing(false)
+  }
+
+  function handleContinueUnanswered() {
+    const nextIndex = questions.findIndex(qq => answers[qq.qa_id] === undefined)
+    setIndex(nextIndex === -1 ? 0 : nextIndex)
+    setReviewing(false)
   }
 
   function handleQuitClick() {
@@ -162,18 +214,68 @@ export default function QuizPage({ subjectName, topicName, questions, totalMarks
     )
   }
 
-  if (submitted) {
+  if (reviewing) {
     const answeredCount = Object.keys(answers).length
+    const noneAnswered = answeredCount === 0
     return (
       <div className="quiz-page">
-        <div className="quiz-center">
-          <div className="quiz-page-message content-card">
-            <h2 className="content-card-title">Quiz complete</h2>
-            <p className="quiz-summary-line">
-              You answered {answeredCount} of {questions.length} questions in {formatDuration(finalTotalSeconds)}.
-            </p>
-            <p className="quiz-summary-note">Scoring isn't wired up yet — your answers weren't submitted anywhere.</p>
-            <button className="quiz-exit-btn" onClick={onExit}>Back to topics</button>
+        <div className="quiz-taking-wrap">
+          <div className="quiz-card quiz-card--auto">
+            <div className="quiz-card-header">
+              <div className="quiz-card-header-top">
+                <div className="quiz-taking-header-info">
+                  <p className="quiz-taking-subject">{subjectName}</p>
+                  <p className="quiz-taking-topic">{topicName}</p>
+                </div>
+                <div className="quiz-quit-wrap">
+                  {confirmQuit && <div className="quiz-quit-confirm">Sure you want to quit?</div>}
+                  <button className="quiz-quit-icon-btn" onClick={handleQuitClick} aria-label="Quit quiz">
+                    <IconClose />
+                  </button>
+                </div>
+              </div>
+
+              <div className="quiz-status-row">
+                <div className="quiz-progress-dots">
+                  {questions.map((_, i) => (
+                    <span key={i} className={`quiz-progress-dot${i <= index ? ' quiz-progress-dot--done' : ''}`} />
+                  ))}
+                </div>
+                <div className="quiz-status-meta">
+                  Answered {answeredCount} of {questions.length} &middot; {formatDuration(totalSeconds)}
+                </div>
+              </div>
+            </div>
+
+            <div className="quiz-card-body">
+              <div className="quiz-qa-panel quiz-qa-panel--alert">
+                <div className="quiz-question-zone">
+                  <p className="quiz-question-label quiz-question-label--alert">
+                    {noneAnswered
+                      ? "You haven't answered any questions on this topic. Start from the first question now, or revise the topic and play another time."
+                      : `You have answered ${answeredCount} out of ${questions.length} questions. You can retry the remaining questions, or submit incomplete quiz as-is.`}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="quiz-card-footer">
+              <div className="quiz-intro-actions">
+                {noneAnswered ? (
+                  <>
+                    <button className="quiz-btn quiz-intro-back-btn" onClick={onExit} disabled={evaluating}>Play Later</button>
+                    <button className="quiz-btn quiz-intro-start-btn" onClick={handleStartOver} disabled={evaluating}>Start Over</button>
+                  </>
+                ) : (
+                  <>
+                    <button className="quiz-btn quiz-intro-back-btn" onClick={handleContinueUnanswered} disabled={evaluating}>Retry {questions.length - answeredCount}</button>
+                    <button className="quiz-btn quiz-intro-start-btn" onClick={finalizeQuiz} disabled={evaluating}>
+                      {evaluating ? <span className="quiz-btn-spinner" /> : <IconCheck />} Submit As-is
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -228,12 +330,12 @@ export default function QuizPage({ subjectName, topicName, questions, totalMarks
                       <li
                         key={key}
                         className={`quiz-option-item${answers[q.qa_id] === key ? ' quiz-option-item--selected' : ''}`}
-                        onClick={() => handleAnswer(q.qa_id, key)}
+                        onClick={() => handleSelectOption(q.qa_id, key)}
                       >
                         <button
                           type="button"
                           className={`quiz-option-key${answers[q.qa_id] === key ? ' quiz-option-key--selected' : ''}`}
-                          onClick={() => handleAnswer(q.qa_id, key)}
+                          onClick={() => handleSelectOption(q.qa_id, key)}
                           aria-label={`Select option ${key.toUpperCase()}`}
                         >
                           {key.toUpperCase()}
@@ -256,17 +358,17 @@ export default function QuizPage({ subjectName, topicName, questions, totalMarks
 
           <div className="quiz-card-footer">
             <div className="quiz-nav-row">
-              <button className="quiz-btn quiz-nav-btn" onClick={() => goTo(index - 1)} disabled={index === 0} aria-label="Previous question">
+              <button className="quiz-btn quiz-nav-btn" onClick={() => goTo(index - 1)} disabled={index === 0 || evaluating} aria-label="Previous question">
                 <IconChevronLeft />
               </button>
               <button
                 className={`quiz-btn quiz-nav-btn quiz-nav-btn--submit${answeredCount === questions.length ? ' quiz-nav-btn--submit-ready' : ''}`}
-                onClick={handleSubmit}
+                onClick={handleDoneClick}
+                disabled={evaluating}
               >
-                <IconCheck />
-                Done
+                {evaluating ? <span className="quiz-btn-spinner" /> : <IconCheck />} Done
               </button>
-              <button className="quiz-btn quiz-nav-btn" onClick={() => goTo(index + 1)} disabled={isLast} aria-label="Next question">
+              <button className="quiz-btn quiz-nav-btn" onClick={() => goTo(index + 1)} disabled={isLast || evaluating} aria-label="Next question">
                 <IconChevronRight />
               </button>
             </div>
