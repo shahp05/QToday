@@ -70,11 +70,13 @@ export default function LeftNav() {
   const clearQuizProgress = useQuizProgressStore(s => s.clearQuizProgress)
   const studentsStatus = useStudentsStore(s => s.status)
   const teachersStatus = useTeachersStore(s => s.status)
+  const subjectsStatus = useSubjectsTaughtStore(s => s.status)
   const navigate = useNavigate()
 
   const isLoadingById = {
     students: studentsStatus === 'idle' || studentsStatus === 'loading',
     teachers: teachersStatus === 'idle' || teachersStatus === 'loading',
+    subjects: subjectsStatus === 'idle' || subjectsStatus === 'loading',
   }
 
   const infoItems = [

@@ -35,7 +35,7 @@
   gap: 8px;
 }
 
-.student-subjects-history-btn {
+.student-subjects-progress-btn {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -51,13 +51,13 @@
   transition: border-color 0.2s, background 0.2s, color 0.2s;
 }
 
-.student-subjects-history-btn:hover,
-.student-subjects-history-btn:focus-visible {
+.student-subjects-progress-btn:hover,
+.student-subjects-progress-btn:focus-visible {
   background: none;
   color: var(--color-white);
 }
 
-.student-subjects-history-btn:disabled {
+.student-subjects-progress-btn:disabled {
   cursor: not-allowed;
   background: var(--color-green-light, #8EEB65);
   color: var(--color-dark, #343434);
@@ -171,7 +171,6 @@
   width: 22px;
   height: 22px;
   border-radius: var(--radius-full);
-  background: var(--color-red);
   color: var(--color-white);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
@@ -219,14 +218,6 @@
   height: 100%;
   border-radius: var(--radius-full);
   transition: width var(--transition-normal);
-}
-
-.student-topic-progress-fill--self {
-  background: var(--color-green-dark);
-}
-
-.student-topic-progress-fill--max {
-  background: var(--color-yellow);
 }
 
 .student-topic-progress-value {

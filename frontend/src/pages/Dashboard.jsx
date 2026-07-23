@@ -56,6 +56,7 @@ export default function Dashboard() {
   const fetchTopicCatalog             = useTopicCatalogStore(s => s.fetchTopicCatalog)
   const studentsStatus                = useStudentsStore(s => s.status)
   const teachersStatus                = useTeachersStore(s => s.status)
+  const subjectsStatus                = useSubjectsTaughtStore(s => s.status)
   const [displayedPage, setDisplayedPage] = useState(null)
 
   // Runs once, on arrival, not on every location.state change.
@@ -75,9 +76,10 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Students/teachers data loads async on a left-nav button press — keep
-  // whatever panel3 is currently showing until that fetch settles (loaded
-  // or errored) instead of swapping to a blank/loading page mid-fetch. The
+  // Students/teachers/subjects data loads async (subjects/students/teachers
+  // are all kicked off together on Dashboard mount, above) — keep whatever
+  // panel3 is currently showing until that fetch settles (loaded or
+  // errored) instead of swapping to a blank/loading page mid-fetch. The
   // left-nav button itself shows the spinner for this wait. Done directly
   // during render (not in an effect) since the guard clauses above already
   // make repeated calls a no-op — a state adjustment, not a sync with an
@@ -85,6 +87,7 @@ export default function Dashboard() {
   if (
     !(activePage === 'students' && (studentsStatus === 'idle' || studentsStatus === 'loading')) &&
     !(activePage === 'teachers' && (teachersStatus === 'idle' || teachersStatus === 'loading')) &&
+    !(activePage === 'subjects' && (subjectsStatus === 'idle' || subjectsStatus === 'loading')) &&
     displayedPage !== activePage
   ) {
     setDisplayedPage(activePage)
