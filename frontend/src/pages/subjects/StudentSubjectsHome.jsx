@@ -8,7 +8,7 @@ import { getSubjectIcon } from './subjectIconMatch'
 import Dropdown from '../../components/Dropdown'
 import { Toast } from '../../components/ui/Toast'
 import QuizPage from './QuizPage'
-import StudentQuizList from './StudentQuizList'
+import StudentQuizProgress from './StudentQuizProgress'
 import './StudentSubjectsHome.css'
 
 function IconPlay() {
@@ -59,11 +59,8 @@ export default function StudentSubjectsHome() {
   const topicStatsById = useQuizProgressStore(s => s.topicStatsById)
   const fetchQuizProgress = useQuizProgressStore(s => s.fetchQuizProgress)
   const quizHistory = useQuizHistoryStore(s => s.quizzes)
-  const quizHistoryStatus = useQuizHistoryStore(s => s.status)
-  const quizHistoryError = useQuizHistoryStore(s => s.error)
   const fetchQuizHistory = useQuizHistoryStore(s => s.fetchQuizHistory)
   const refreshQuizHistory = useQuizHistoryStore(s => s.refreshQuizHistory)
-  const dismissQuizHistoryError = useQuizHistoryStore(s => s.dismissQuizHistoryError)
   const [selectedSubjectId, setSelectedSubjectId] = useState(null)
   const [activeQuiz, setActiveQuiz] = useState(null) // { topicId, gradeId, subjectName, topicName, questions, totalMarks } | null
   const [loadingQuiz, setLoadingQuiz] = useState(null) // { topicId, source: 'play' | 'card' } | null
@@ -71,7 +68,6 @@ export default function StudentSubjectsHome() {
   // topic_id -> quiz_id, for topics whose LLM scoring pass hasn't finished yet
   const [scoringTopics, setScoringTopics] = useState({})
   const [view, setView] = useState('topics') // 'topics' | 'progress'
-  const [selectedTopicFilter, setSelectedTopicFilter] = useState('all') // 'all' | topic_id
 
   useEffect(() => { fetchQuizProgress() }, [fetchQuizProgress])
   // Fetched eagerly (not gated on the Progress click) so the button can show
@@ -190,22 +186,6 @@ export default function StudentSubjectsHome() {
     }
   }
 
-  const subjectQuizzesAll = quizHistory.filter(q => q.subject_id === activeSubjectId)
-
-  // Only topics this student has actually played a quiz on for the selected
-  // subject — not the full topic list, which would offer dead filter options.
-  const seenTopics = new Map()
-  for (const q of subjectQuizzesAll) {
-    if (!seenTopics.has(q.topic_id)) seenTopics.set(q.topic_id, q.topic_name)
-  }
-  const topicFilterOptions = [
-    { key: 'all', label: 'All topics' },
-    ...Array.from(seenTopics, ([key, label]) => ({ key, label })),
-  ]
-  const subjectQuizzes = selectedTopicFilter === 'all'
-    ? subjectQuizzesAll
-    : subjectQuizzesAll.filter(q => q.topic_id === selectedTopicFilter)
-
   return (
     <div className="student-subjects">
       <div className="student-subjects-header">
@@ -226,31 +206,20 @@ export default function StudentSubjectsHome() {
 
       <Toast message={quizError} onDismiss={() => setQuizError('')} />
 
-      <div className="student-subjects-bar">
-        <Dropdown
-          className="student-subjects-dropdown"
-          value={activeSubjectId}
-          options={subjectOptions}
-          onChange={key => { setSelectedSubjectId(key); setSelectedTopicFilter('all') }}
-        />
-        {view === 'progress' && (
+      {view === 'topics' && (
+        <div className="student-subjects-bar">
           <Dropdown
             className="student-subjects-dropdown"
-            value={selectedTopicFilter}
-            options={topicFilterOptions}
-            onChange={key => setSelectedTopicFilter(key)}
+            value={activeSubjectId}
+            options={subjectOptions}
+            onChange={key => setSelectedSubjectId(key)}
           />
-        )}
-      </div>
+        </div>
+      )}
 
       {view === 'progress' ? (
-        <div className="student-subjects-body">
-          <StudentQuizList
-            quizzes={subjectQuizzes}
-            status={quizHistoryStatus}
-            error={quizHistoryError}
-            onDismissError={dismissQuizHistoryError}
-          />
+        <div className="student-subjects-body student-subjects-body--progress">
+          <StudentQuizProgress />
         </div>
       ) : (
       <div className="student-subjects-body">

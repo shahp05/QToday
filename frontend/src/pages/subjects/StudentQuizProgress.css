@@ -1,0 +1,145 @@
+/* Same technique as TeachLogList.css's teach-log-columns: a height-bounded
+   flex row (parent .student-subjects-body--progress supplies the bound) so
+   the subject panel and the QA pane each own their own overflow-y:auto,
+   instead of the whole page scrolling as one. */
+.student-quiz-progress-columns {
+  display: flex;
+  align-items: stretch;
+  gap: 24px;
+  flex: 1;
+  min-height: 0;
+}
+
+.student-quiz-progress-subjects {
+  flex: 0 0 240px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: var(--radius-sm, 6px);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.student-quiz-progress-subject-block {
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.student-quiz-progress-subject-block:last-child {
+  border-bottom: none;
+}
+
+.student-quiz-progress-subject-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: #aaaaaa;
+}
+
+.student-quiz-progress-subject-name {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  font-size: var(--font-size-md, 14px);
+  color: #aaaaaa;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-quiz-progress-subject-count {
+  font-size: var(--font-size-sm, 11px);
+  color: rgba(255,255,255,0.35);
+}
+
+.student-quiz-progress-topic-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 8px 35px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.student-quiz-progress-topic-row:hover:not(:disabled) {
+  background: rgba(255,255,255,0.06);
+}
+
+.student-quiz-progress-topic-row--active {
+  background: var(--color-green-light, #8EEB65);
+}
+
+.student-quiz-progress-topic-row--active:hover {
+  background: var(--color-green-light, #8EEB65);
+}
+
+.student-quiz-progress-topic-row--active .student-quiz-progress-topic-name,
+.student-quiz-progress-topic-row--active .student-quiz-progress-topic-count {
+  color: var(--color-dark, #343434);
+  font-weight: 500;
+}
+
+.student-quiz-progress-topic-row:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.student-quiz-progress-topic-name {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-size-sm, 11px);
+  color: var(--color-white);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-quiz-progress-topic-count {
+  font-size: var(--font-size-sm, 11px);
+  color: rgba(255,255,255,0.35);
+}
+
+.student-quiz-progress-detail {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Only this pane scrolls — the subject/topic panel stays put. Explicit
+   light thumb color matches teach-log-qa-scroll — without it this inherits
+   .dashboard-panel3's near-black thumb, invisible on this dark background. */
+.student-quiz-progress-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-color: rgba(255,255,255,0.6) transparent;
+}
+
+.student-quiz-progress-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.6);
+  border-radius: 2px;
+}
+
+.student-quiz-progress-empty {
+  font-size: var(--font-size-md, 14px);
+  color: rgba(255,255,255,0.5);
+}
+
+@media (max-width: 900px) {
+  .student-quiz-progress-columns {
+    flex-direction: column;
+  }
+
+  .student-quiz-progress-subjects {
+    flex: 0 0 auto;
+    max-height: 240px;
+    width: 100%;
+  }
+}

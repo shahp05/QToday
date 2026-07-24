@@ -5,7 +5,21 @@
   display: flex;
   flex-direction: column;
   width: 100%;
+  height: 100%;
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Progress view only: bounded flex column instead of the Topics view's
+   natural-height body, so the subject/topic panel and QA pane below can
+   each own their own overflow-y:auto — same technique as TeachLogList's
+   teach-log-columns, rather than the outer page scrolling as one. */
+.student-subjects-body--progress {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .student-subjects-header {

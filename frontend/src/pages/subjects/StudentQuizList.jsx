@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { scoreColor } from '../../lib/scoreColor'
 import { Toast } from '../../components/ui/Toast'
 import { fetchQuizDetail } from '../../services/quizService'
@@ -33,7 +33,9 @@ function IconChevron({ open }) {
 // Each quiz carries its own grade_name (the grade it was actually played
 // at, snapshotted server-side on submit) — not the student's current
 // grade, since a topic can be replayed across grades over time.
-export default function StudentQuizList({ quizzes, status, error, onDismissError }) {
+// autoExpandKey: changes whenever the caller switches to a different topic —
+// triggers auto-opening the most recent (first) scored quiz in `quizzes`.
+export default function StudentQuizList({ quizzes, status, error, onDismissError, autoExpandKey }) {
   // Single-open accordion (matches TeachLogList.jsx's subject-row pattern) —
   // expanding a quiz collapses whichever one was open before it.
   const [expandedQuizId, setExpandedQuizId] = useState(null)
@@ -41,12 +43,7 @@ export default function StudentQuizList({ quizzes, status, error, onDismissError
   const [detailStatus, setDetailStatus] = useState('idle') // idle | loading | loaded | error
   const [detailError, setDetailError] = useState('')
 
-  async function toggleQuiz(quiz) {
-    if (!quiz.is_scored) return
-    if (expandedQuizId === quiz.quiz_id) {
-      setExpandedQuizId(null)
-      return
-    }
+  async function openQuiz(quiz) {
     setExpandedQuizId(quiz.quiz_id)
     setDetail(null)
     setDetailStatus('loading')
@@ -60,6 +57,26 @@ export default function StudentQuizList({ quizzes, status, error, onDismissError
       setDetailStatus('error')
     }
   }
+
+  function toggleQuiz(quiz) {
+    if (!quiz.is_scored) return
+    if (expandedQuizId === quiz.quiz_id) {
+      setExpandedQuizId(null)
+      return
+    }
+    openQuiz(quiz)
+  }
+
+  useEffect(() => {
+    if (autoExpandKey == null) return
+    const mostRecent = quizzes[0]
+    if (mostRecent?.is_scored) {
+      openQuiz(mostRecent)
+    } else {
+      setExpandedQuizId(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoExpandKey])
 
   if (status === 'loading' || status === 'idle') {
     return (
