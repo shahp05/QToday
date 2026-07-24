@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
 import { useQuizProgressStore } from '../../store/quizProgressStore'
+import { useQuizHistoryStore } from '../../store/quizHistoryStore'
 import { fetchQuizStatus, startQuiz as fetchQuizQuestions } from '../../services/quizService'
 import { scoreColor } from '../../lib/scoreColor'
 import { getSubjectIcon } from './subjectIconMatch'
 import Dropdown from '../../components/Dropdown'
+import { Toast } from '../../components/ui/Toast'
 import QuizPage from './QuizPage'
+import StudentQuizList from './StudentQuizList'
 import './StudentSubjectsHome.css'
 
 function IconPlay() {
@@ -28,6 +31,17 @@ function IconProgress() {
   )
 }
 
+function IconTopics() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="4" rx="1" />
+      <rect x="3" y="10" width="18" height="4" rx="1" />
+      <rect x="3" y="16" width="18" height="4" rx="1" />
+    </svg>
+  )
+}
+
 const NOT_ATTEMPTED = { student_avg_pct: 0, max_score_pct: 0, last_played: null, attempts: 0 }
 
 function formatLastPlayed(isoDate) {
@@ -44,14 +58,25 @@ export default function StudentSubjectsHome() {
   const subjectsError = useSubjectsTaughtStore(s => s.error)
   const topicStatsById = useQuizProgressStore(s => s.topicStatsById)
   const fetchQuizProgress = useQuizProgressStore(s => s.fetchQuizProgress)
+  const quizHistory = useQuizHistoryStore(s => s.quizzes)
+  const quizHistoryStatus = useQuizHistoryStore(s => s.status)
+  const quizHistoryError = useQuizHistoryStore(s => s.error)
+  const fetchQuizHistory = useQuizHistoryStore(s => s.fetchQuizHistory)
+  const refreshQuizHistory = useQuizHistoryStore(s => s.refreshQuizHistory)
+  const dismissQuizHistoryError = useQuizHistoryStore(s => s.dismissQuizHistoryError)
   const [selectedSubjectId, setSelectedSubjectId] = useState(null)
   const [activeQuiz, setActiveQuiz] = useState(null) // { topicId, gradeId, subjectName, topicName, questions, totalMarks } | null
   const [loadingQuiz, setLoadingQuiz] = useState(null) // { topicId, source: 'play' | 'card' } | null
   const [quizError, setQuizError] = useState('')
   // topic_id -> quiz_id, for topics whose LLM scoring pass hasn't finished yet
   const [scoringTopics, setScoringTopics] = useState({})
+  const [view, setView] = useState('topics') // 'topics' | 'progress'
+  const [selectedTopicFilter, setSelectedTopicFilter] = useState('all') // 'all' | topic_id
 
   useEffect(() => { fetchQuizProgress() }, [fetchQuizProgress])
+  // Fetched eagerly (not gated on the Progress click) so the button can show
+  // a total-quizzes-played count across every subject as soon as the page loads.
+  useEffect(() => { fetchQuizHistory() }, [fetchQuizHistory])
 
   // Polls every scoring-in-progress quiz until the background LLM pass
   // (jobs/tasks.py:score_quiz_task) finishes — see conversation history for
@@ -73,6 +98,7 @@ export default function StudentSubjectsHome() {
               return next
             })
             fetchQuizProgress()
+            refreshQuizHistory()
           }
         } catch {
           // transient network/poll failure — try again next tick
@@ -80,7 +106,7 @@ export default function StudentSubjectsHome() {
       }
     }, 4000)
     return () => clearInterval(interval)
-  }, [scoringTopics, fetchQuizProgress])
+  }, [scoringTopics, fetchQuizProgress, refreshQuizHistory])
 
   if (activeQuiz) {
     return (
@@ -99,6 +125,7 @@ export default function StudentSubjectsHome() {
           } else {
             fetchQuizProgress()
           }
+          refreshQuizHistory()
         }}
       />
     )
@@ -163,28 +190,69 @@ export default function StudentSubjectsHome() {
     }
   }
 
+  const subjectQuizzesAll = quizHistory.filter(q => q.subject_id === activeSubjectId)
+
+  // Only topics this student has actually played a quiz on for the selected
+  // subject — not the full topic list, which would offer dead filter options.
+  const seenTopics = new Map()
+  for (const q of subjectQuizzesAll) {
+    if (!seenTopics.has(q.topic_id)) seenTopics.set(q.topic_id, q.topic_name)
+  }
+  const topicFilterOptions = [
+    { key: 'all', label: 'All topics' },
+    ...Array.from(seenTopics, ([key, label]) => ({ key, label })),
+  ]
+  const subjectQuizzes = selectedTopicFilter === 'all'
+    ? subjectQuizzesAll
+    : subjectQuizzesAll.filter(q => q.topic_id === selectedTopicFilter)
+
   return (
     <div className="student-subjects">
       <div className="student-subjects-header">
         <h2 className="student-subjects-title">Play</h2>
         <div className="student-subjects-header-actions">
-          <button className="student-subjects-progress-btn" disabled title="Coming soon">
-            <IconProgress /> Progress
-          </button>
+          {view === 'topics' ? (
+            <button className="student-subjects-progress-btn" onClick={() => setView('progress')}>
+              <IconProgress /> Progress
+              {quizHistory.length > 0 && <span className="student-subjects-progress-count">{quizHistory.length}</span>}
+            </button>
+          ) : (
+            <button className="student-subjects-progress-btn" onClick={() => setView('topics')}>
+              <IconTopics /> Topics
+            </button>
+          )}
         </div>
       </div>
 
-      {quizError && <p className="student-subjects-error">{quizError}</p>}
+      <Toast message={quizError} onDismiss={() => setQuizError('')} />
 
       <div className="student-subjects-bar">
         <Dropdown
           className="student-subjects-dropdown"
           value={activeSubjectId}
           options={subjectOptions}
-          onChange={key => setSelectedSubjectId(key)}
+          onChange={key => { setSelectedSubjectId(key); setSelectedTopicFilter('all') }}
         />
+        {view === 'progress' && (
+          <Dropdown
+            className="student-subjects-dropdown"
+            value={selectedTopicFilter}
+            options={topicFilterOptions}
+            onChange={key => setSelectedTopicFilter(key)}
+          />
+        )}
       </div>
 
+      {view === 'progress' ? (
+        <div className="student-subjects-body">
+          <StudentQuizList
+            quizzes={subjectQuizzes}
+            status={quizHistoryStatus}
+            error={quizHistoryError}
+            onDismissError={dismissQuizHistoryError}
+          />
+        </div>
+      ) : (
       <div className="student-subjects-body">
         <div className="student-topic-grid">
           {activeSubject.topics.map((topic, index) => {
@@ -252,6 +320,7 @@ export default function StudentSubjectsHome() {
           })}
         </div>
       </div>
+      )}
     </div>
   )
 }

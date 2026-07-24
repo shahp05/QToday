@@ -1,0 +1,105 @@
+.student-quiz-list-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 0;
+}
+
+.student-quiz-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 640px;
+}
+
+.student-quiz-block {
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.student-quiz-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  font-family: var(--font-family);
+  text-align: left;
+  cursor: pointer;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.student-quiz-row:hover,
+.student-quiz-row:focus-visible {
+  border-color: var(--color-green-light, #8EEB65);
+  box-shadow: var(--shadow-sm);
+  outline: none;
+}
+
+.student-quiz-row--pending,
+.student-quiz-row:disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+
+.student-quiz-score {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  color: var(--color-white);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.student-quiz-score--pending {
+  background: var(--color-grey-light);
+  color: var(--color-text-light);
+}
+
+.student-quiz-row-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.student-quiz-row-topic {
+  margin: 0;
+  font-family: var(--font-family);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-quiz-row-meta {
+  margin: 2px 0 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-light);
+}
+
+.student-quiz-row > svg {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.student-quiz-detail {
+  border-top: 1px solid var(--color-grey);
+}
+
+.student-quiz-detail-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.student-quiz-detail-list .qa-card + .qa-card {
+  border-top: 1px solid var(--color-grey);
+}

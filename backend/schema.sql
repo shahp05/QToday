@@ -334,6 +334,7 @@ CREATE TABLE IF NOT EXISTS quizzes (
     quiz_id                     SERIAL          PRIMARY KEY,
     subject_id                  INTEGER         NOT NULL REFERENCES subjects(subject_id),
     topic_id                    INTEGER         NOT NULL REFERENCES topics(topic_id),
+    grade_id                    INTEGER         NULL REFERENCES grades(grade_id),
     student_id                  INTEGER         NOT NULL REFERENCES students(student_id),
     date_created                TIMESTAMP       NOT NULL DEFAULT NOW(),
     date_scored                 TIMESTAMP       NULL,

@@ -101,10 +101,15 @@ export default function QuizPage({ subjectName, topicName, topicId, gradeId, que
     return () => clearInterval(id)
   }, [started, questions, reviewing, evaluating])
 
+  // Only ever called from click handlers (goTo, handleDoneClick,
+  // finalizeQuiz) below, never during render — the linter can't trace that
+  // through a plain helper, hence the disables.
   function commitQuestionTime(qaId) {
     if (questionStartRef.current == null) return
+    // eslint-disable-next-line react-hooks/purity
     const elapsed = Math.round((Date.now() - questionStartRef.current) / 1000)
     perQuestionSecondsRef.current[qaId] = (perQuestionSecondsRef.current[qaId] || 0) + elapsed
+    // eslint-disable-next-line react-hooks/purity
     questionStartRef.current = Date.now()
   }
 

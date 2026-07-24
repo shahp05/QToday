@@ -359,6 +359,7 @@ class Quiz(Base):
     quiz_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     subject_id: Mapped[int] = mapped_column(ForeignKey("subjects.subject_id"), nullable=False)
     topic_id: Mapped[int] = mapped_column(ForeignKey("topics.topic_id"), nullable=False)
+    grade_id: Mapped[int | None] = mapped_column(ForeignKey("grades.grade_id"), nullable=True)
     student_id: Mapped[int] = mapped_column(ForeignKey("students.student_id"), nullable=False)
     date_created: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
     date_scored: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

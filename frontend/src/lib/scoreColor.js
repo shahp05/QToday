@@ -7,3 +7,11 @@ export function scoreColor(pct) {
   if (pct >= 40) return 'var(--color-yellow)'
   return 'var(--color-red)'
 }
+
+// Text color to pair with scoreColor()'s background. --color-green-light is
+// a light lime (#8EEB65) — white text on it reads poorly, so it gets dark
+// text like every other green-light button/pill in the app; red and amber
+// are dark enough that white text stays readable.
+export function scoreTextColor(pct) {
+  return pct >= 75 ? 'var(--color-dark)' : 'var(--color-white)'
+}

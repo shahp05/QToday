@@ -1,0 +1,75 @@
+/* --font-size-xs is 10px at desktop breakpoints — too small for a
+   standalone badge, so it's floored at 12px rather than used directly. */
+.student-quiz-qa-score {
+  flex-shrink: 0;
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
+  font-size: max(12px, var(--font-size-xs));
+  font-weight: var(--font-weight-semibold);
+  background: var(--color-grey-light);
+  color: var(--color-text-light);
+}
+
+/* Padding intentionally left as QaCard.css's own 12px 14px — same as the
+   teacher's QA list uses, unmodified. */
+.student-quiz-qa-card .qa-card-question-row {
+  align-items: baseline;
+}
+
+.student-quiz-option-label--incorrect {
+  border-color: var(--color-red, #D32F2F);
+  background: var(--color-red, #D32F2F);
+  color: var(--color-white);
+}
+
+.student-quiz-option-label--pending {
+  border-color: var(--color-yellow, #F5A623);
+  background: rgba(245, 166, 35, 0.12);
+  color: var(--color-yellow, #F5A623);
+}
+
+.student-quiz-qa-descriptive {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.student-quiz-qa-answer-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--font-size-sm, 13px);
+  color: var(--color-text, #343434);
+}
+
+.student-quiz-qa-pending {
+  color: var(--color-text-light);
+}
+
+.student-quiz-qa-actions {
+  margin-top: 2px;
+}
+
+.student-quiz-qa-challenged-tag {
+  font-size: var(--font-size-sm, 13px);
+  font-style: italic;
+  color: var(--color-text-light);
+}
+
+.student-quiz-qa-challenge {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.student-quiz-qa-challenge-input {
+  width: 100%;
+  border: 1.5px solid var(--color-green-light, #8EEB65);
+  border-radius: var(--radius-sm, 6px);
+  padding: 6px 8px;
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm, 13px);
+  color: var(--color-text, #343434);
+  outline: none;
+}

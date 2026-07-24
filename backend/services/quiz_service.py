@@ -5,7 +5,7 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from config.app_config import get_setting
-from db.models import QA, Quiz, QuizScore
+from db.models import QA, Quiz, QuizChallenge, QuizScore
 from errors.app_error import AppError
 from errors.error_codes import ErrorCode
 
@@ -239,6 +239,7 @@ def submit_quiz(db: Session, *, claims: dict, payload) -> dict:
     quiz = Quiz(
         subject_id=subject_id,
         topic_id=payload.topic_id,
+        grade_id=payload.grade_id,
         student_id=student_id,
         total_marks=len(qa_ids) * marks_per_qa,
         total_time_taken_seconds=payload.total_time_taken_seconds,
@@ -304,6 +305,141 @@ def submit_quiz(db: Session, *, claims: dict, payload) -> dict:
         "subject_id": subject_id,
         "grade_id": payload.grade_id,
     }
+
+
+def get_student_quiz_history(db: Session, *, student_id: int) -> dict:
+    """One row per quiz ever played by this student, across every subject,
+    newest first — the source list for the student-facing Progress screen.
+    Unlike get_student_quiz_progress (per-topic averages), this is per-attempt
+    so the screen can show each play-through with its own date and score.
+    Grade comes from the quiz's own grade_id (snapshotted at submit time, see
+    submit_quiz), not the student's current grade — a topic can be replayed
+    across grades over time (promotion, retake at a different section, etc.),
+    and each attempt must keep showing the grade it was actually played at."""
+    rows = db.execute(
+        text("""
+            SELECT q.quiz_id, q.subject_id, s.subject_name, q.topic_id, t.topic_name,
+                   q.grade_id, g.grade_name,
+                   q.date_created, q.total_marks, q.total_score,
+                   (q.total_score IS NOT NULL) AS is_scored
+            FROM quizzes q
+            JOIN subjects s ON s.subject_id = q.subject_id
+            JOIN topics t ON t.topic_id = q.topic_id
+            LEFT JOIN grades g ON g.grade_id = q.grade_id
+            WHERE q.student_id = :sid AND q.is_active = TRUE
+            ORDER BY q.date_created DESC
+        """),
+        {"sid": student_id},
+    ).fetchall()
+
+    quizzes = [
+        {
+            "quiz_id": r.quiz_id,
+            "subject_id": r.subject_id,
+            "subject_name": r.subject_name,
+            "topic_id": r.topic_id,
+            "topic_name": r.topic_name,
+            "grade_name": r.grade_name,
+            "date_created": r.date_created.isoformat(),
+            "total_marks": float(r.total_marks),
+            "total_score": float(r.total_score) if r.total_score is not None else None,
+            "is_scored": r.is_scored,
+        }
+        for r in rows
+    ]
+    return {"quizzes": quizzes}
+
+
+def get_quiz_detail(db: Session, *, claims: dict, quiz_id: int) -> dict:
+    """Per-question breakdown of a played quiz: the frozen question/options,
+    the student's response, the correct answer, and the marks awarded — for
+    the review screen a student opens from their Progress list. Only the
+    quiz's own student may view it."""
+    student_id = _resolve_own_student_id(db, claims)
+    quiz = db.get(Quiz, quiz_id)
+    if quiz is None or not quiz.is_active or quiz.student_id != student_id:
+        raise AppError(ErrorCode.QUIZ_NOT_FOUND)
+
+    grade_name = None
+    if quiz.grade_id is not None:
+        grade_row = db.execute(
+            text("SELECT grade_name FROM grades WHERE grade_id = :gid"), {"gid": quiz.grade_id},
+        ).first()
+        grade_name = grade_row.grade_name if grade_row else None
+
+    scores = db.execute(
+        select(QuizScore)
+        .where(QuizScore.quiz_id == quiz_id, QuizScore.is_active == True)  # noqa: E712
+        .order_by(QuizScore.quiz_score_id)
+    ).scalars().all()
+
+    challenged_qa_ids = set(db.execute(
+        select(QuizChallenge.qa_id).where(
+            QuizChallenge.quiz_id == quiz_id, QuizChallenge.is_active == True,  # noqa: E712
+        ).distinct()
+    ).scalars().all())
+
+    return {
+        "quiz_id": quiz.quiz_id,
+        "subject_id": quiz.subject_id,
+        "topic_id": quiz.topic_id,
+        "grade_name": grade_name,
+        "date_created": quiz.date_created.isoformat(),
+        "total_marks": float(quiz.total_marks),
+        "total_score": float(quiz.total_score) if quiz.total_score is not None else None,
+        "questions": [
+            {
+                "qa_id": qs.qa_id,
+                "question_type": qs.question_type,
+                "question": qs.question,
+                "options": qs.options,
+                "answer": qs.answer,
+                "student_response": qs.student_response,
+                "marks": float(qs.marks),
+                "score": float(qs.score) if qs.score is not None else None,
+                "is_scored": qs.is_scored,
+                "challenged": qs.qa_id in challenged_qa_ids,
+            }
+            for qs in scores
+        ],
+    }
+
+
+def challenge_quiz_question(db: Session, *, claims: dict, quiz_id: int, qa_id: int, reason: str) -> dict:
+    """A student disputing how one of their answers was scored. Only allowed
+    on a question that's actually theirs, already scored, and not already
+    challenged — adjudication (LLM review, is_upheld) is a separate,
+    deferred piece of work; this just records the dispute."""
+    student_id = _resolve_own_student_id(db, claims)
+    quiz = db.get(Quiz, quiz_id)
+    if quiz is None or not quiz.is_active or quiz.student_id != student_id:
+        raise AppError(ErrorCode.QUIZ_NOT_FOUND)
+
+    score = db.execute(
+        select(QuizScore).where(
+            QuizScore.quiz_id == quiz_id, QuizScore.qa_id == qa_id, QuizScore.is_active == True,  # noqa: E712
+        )
+    ).scalar_one_or_none()
+    if score is None or not score.is_scored:
+        raise AppError(ErrorCode.QUIZ_NOT_FOUND)
+
+    if not reason or not reason.strip():
+        raise AppError(ErrorCode.VALIDATION_ERROR)
+
+    already_challenged = db.execute(
+        select(QuizChallenge.challenge_id).where(
+            QuizChallenge.quiz_id == quiz_id, QuizChallenge.qa_id == qa_id, QuizChallenge.is_active == True,  # noqa: E712
+        )
+    ).first()
+    if already_challenged:
+        raise AppError(ErrorCode.VALIDATION_ERROR)
+
+    challenge = QuizChallenge(quiz_id=quiz_id, qa_id=qa_id, challenge_reason=reason.strip())
+    db.add(challenge)
+    db.commit()
+    db.refresh(challenge)
+
+    return {"challenge_id": challenge.challenge_id, "date_created": challenge.date_created.isoformat()}
 
 
 def get_quiz_status(db: Session, *, claims: dict, quiz_id: int) -> dict:

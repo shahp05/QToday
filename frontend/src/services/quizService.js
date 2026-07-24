@@ -37,3 +37,26 @@ export async function fetchQuizStatus(quizId) {
   if (!res.ok) throw new Error(await apiErrorMessage(res))
   return res.json() // { quiz_id, topic_id, total_marks, total_score, is_scored, pending_count }
 }
+
+export async function fetchQuizHistory(studentId) {
+  const query = studentId != null ? `?student_id=${studentId}` : ''
+  const res = await apiFetch(`/quizzes/history${query}`)
+  if (!res.ok) throw new Error(await apiErrorMessage(res))
+  return res.json() // { quizzes: [{quiz_id, subject_id, subject_name, topic_id, topic_name, grade_name, date_created, total_marks, total_score, is_scored}] }
+}
+
+export async function fetchQuizDetail(quizId) {
+  const res = await apiFetch(`/quizzes/${quizId}/detail`)
+  if (!res.ok) throw new Error(await apiErrorMessage(res))
+  return res.json() // { quiz_id, subject_id, topic_id, grade_name, date_created, total_marks, total_score, questions: [{..., challenged}] }
+}
+
+export async function challengeQuizQuestion(quizId, qaId, reason) {
+  const res = await apiFetch(`/quizzes/${quizId}/questions/${qaId}/challenge`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  })
+  if (!res.ok) throw new Error(await apiErrorMessage(res))
+  return res.json() // { challenge_id, date_created }
+}
