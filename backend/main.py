@@ -10,7 +10,9 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
+from config.app_config import ensure_default_settings
 from db.database import SessionLocal, get_db
+from db.seed_data import ensure_default_grades
 from errors.app_error import AppError
 from errors.error_codes import ErrorCode, ERROR_DEFAULTS
 from jobs.app import app as procrastinate_app
@@ -20,6 +22,18 @@ from services.error_log_service import log_error
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Self-heals any app_settings row / grades row missing its default (see
+    # ensure_default_settings' and ensure_default_grades' docstrings) —
+    # idempotent and additive-only, safe to run on every boot rather than
+    # relying on a one-time migration INSERT that Alembic can silently skip
+    # forever once already applied.
+    db = SessionLocal()
+    try:
+        ensure_default_settings(db)
+        ensure_default_grades(db)
+    finally:
+        db.close()
+
     # Deferring a task (e.g. routers/quizzes.py's .defer_async() calls)
     # requires the Procrastinate App's connection pool to be open in THIS
     # process too, not just in worker.py — without this, every defer_async()

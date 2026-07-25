@@ -523,10 +523,15 @@ CREATE INDEX IF NOT EXISTS idx_error_logs_correlation ON error_logs(correlation_
 
 -- ------------------------------------------------------------
 -- SEED: grades master (1–12)
+--
+--   Deliberately NOT seeded here — same reasoning as APP_SETTINGS
+--   below: a one-time INSERT (here or in a migration) silently
+--   stops applying the moment a database has already passed that
+--   revision. Seeded instead by db.seed_data.ensure_default_grades()
+--   on every app startup (see main.py's lifespan) — idempotent,
+--   additive-only, never touches an existing grade_id (referenced
+--   by FK from teach_logs/qa/quizzes/student_grades).
 -- ------------------------------------------------------------
-INSERT INTO grades (grade_name)
-VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12)
-ON CONFLICT (grade_name) DO NOTHING;
 
 
 -- ------------------------------------------------------------
@@ -535,6 +540,19 @@ ON CONFLICT (grade_name) DO NOTHING;
 --   Read by config/app_config.py and cached in memory. Change a
 --   row + call reload_settings() to take effect without a deploy.
 --   Secrets (API keys, DATABASE_URL) stay in .env — never here.
+--
+--   Deliberately NOT seeded here. It used to be, via a static INSERT
+--   in this file and again in a one-time Alembic migration — but a
+--   migration INSERT only ever runs once per database (Alembic
+--   tracks "applied" by revision id, not by re-diffing the SQL
+--   inside it), so a database that had already passed that revision
+--   before the seed values were last edited silently never got them.
+--   That's what left this table completely empty in production.
+--   The single source of truth is now config/default_settings.py,
+--   applied by config.app_config.ensure_default_settings() on every
+--   app startup (see main.py's lifespan) — idempotent and additive
+--   only, so it backfills a fresh install exactly like it self-heals
+--   an existing one.
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS app_settings (
     setting_key     VARCHAR(100)    PRIMARY KEY,
@@ -542,35 +560,6 @@ CREATE TABLE IF NOT EXISTS app_settings (
     description     VARCHAR(500)    NULL,
     date_modified   TIMESTAMP       NOT NULL DEFAULT NOW()
 );
-
-INSERT INTO app_settings (setting_key, setting_value, description) VALUES
-    ('match_auto_accept_threshold', '0.98', 'Trigram similarity score above which a subject/topic match is auto-accepted without an LLM check'),
-    ('match_llm_verify_floor',      '0.90', 'Trigram similarity score above which an ambiguous match is sent to the LLM for same/different disambiguation'),
-    ('qa_count',                    '30',   'Total QA items generated per subject+topic+grade'),
-    ('descriptive_pct',             '0.20', 'Share of qa_count that should be descriptive questions'),
-    ('mcq_pct',                     '0.60', 'Share of qa_count that should be MCQ questions'),
-    ('difficulty_default',          '[0.20,0.20,0.20,0.20,0.20]', 'Difficulty level 1-5 distribution for grades below the skew threshold'),
-    ('difficulty_skewed',           '[0.10,0.10,0.10,0.30,0.40]', 'Difficulty level 1-5 distribution for grades at/above the skew threshold'),
-    ('difficulty_skew_grade_threshold', '9', 'Grade at which the skewed (harder) difficulty distribution kicks in'),
-    ('grade_relevant_to_increment', '2',    'Default +N applied to grade to compute grade_relevant_to for grades below the override bands'),
-    ('grade_relevant_to_override_grade_6', '10', 'grade_relevant_to value forced for grades 6-7'),
-    ('grade_relevant_to_override_grade_8', '12', 'grade_relevant_to value forced for grades 8 and above'),
-    ('title_case_stopwords',        '["a","an","the","of","in","on","and","or","for","to","with","at","by","is","are"]', 'Words kept lowercase in title-cased subject/topic names unless first or last word'),
-    ('llm_provider_map',            '{"validate":"groq","generate":"openai"}', 'Which provider handles each LLM purpose'),
-    ('llm_model_map',               '{"groq":"llama-3.3-70b-versatile","openai":"gpt-4o"}', 'Which model each provider uses'),
-    ('default_marks_per_qa',        '5',    'Default marks assigned to each question when a quiz is created'),
-    ('default_questions_per_quiz',  '20',   'Default number of questions per quiz (20 x 5 marks = 100 total by default)'),
-    ('default_expected_time_seconds', '60', 'Fallback expected_time_seconds for qa rows before an LLM estimate or empirical recalibration is available'),
-    ('qa_time_recalibration_min_attempts', '10', 'Minimum quiz_scores attempts for a qa_id before empirical time data overrides the LLM estimate'),
-    ('descriptive_match_auto_score_threshold', '0.85', 'Trigram similarity score above which a descriptive answer is auto-scored from a precedent match (master answer or another student''s past scored response) without an LLM call'),
-    ('qa_pool_min_size',            '30',   'Minimum qa rows per subject+topic+grade before usage-triggered replenishment is considered'),
-    ('rest_countries_api_url',      '"https://api.worldbank.org/v2/country?format=json&per_page=300"', 'External source for the country_list background job (World Bank — free, no key; REST Countries deprecated its free tier)'),
-    ('error_log_soft_delete_after_days', '90', 'Age in days after which error_logs rows are marked date_deleted by the purge-mark job'),
-    ('error_log_purge_grace_days',  '30',   'Days after date_deleted before error_logs rows are physically deleted by the purge-delete job'),
-    ('batch_request_types',         '{"country_list":{"interval_days":90},"qa_generation":{},"qa_verification":{},"qa_scoring":{},"qa_time_recalibration":{"interval_days":7},"error_log_purge_mark":{"interval_days":1},"error_log_purge_delete":{"interval_days":1}}', 'Valid batch_jobs.request_type values and their default run interval where applicable'),
-    ('signup_verification_ttl_seconds', '60',  'Seconds before a signup email verification code expires'),
-    ('signup_verification_max_attempts', '5',  'Max wrong-code attempts before the code is invalidated and a new one must be requested')
-ON CONFLICT (setting_key) DO NOTHING;
 
 
 -- ------------------------------------------------------------

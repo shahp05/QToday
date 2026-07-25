@@ -1,11 +1,12 @@
 """
-Purpose -> provider routing.
+Purpose -> model routing.
 
-Every service (qa_service today, batch/quiz services later) asks for
-a client by *purpose*, not by provider name. Which provider/model
-actually handles a purpose is configured in app_settings
-(llm_provider_map / llm_model_map) — change it there, no code change
-or redeploy needed.
+Every service (qa_service, quiz_scoring_service, etc.) asks for a client by
+*purpose*, not by model name. Which model actually handles a purpose is
+configured in app_settings (llm_model_map) — change it there, no code change
+or redeploy needed. OpenAI is the only provider; a per-purpose model is still
+useful (e.g. a cheaper/faster model for one purpose, a stronger one for
+another that needs more reliable reasoning).
 """
 import os
 from enum import Enum
@@ -13,45 +14,22 @@ from enum import Enum
 from config.app_config import get_setting
 from llm.client import LLMClient
 
+DEFAULT_MODEL = "gpt-4o"
+
 
 class LLMPurpose(str, Enum):
-    VALIDATE = "validate"   # cheap judgment calls: match disambiguation, subject/topic validity
+    VALIDATE = "validate"   # judgment calls: match disambiguation, subject/topic validity, quiz/challenge scoring
     GENERATE = "generate"   # actual QA content generation
 
 
-_PROVIDER_DEFAULTS = {
-    "groq": {
-        "base_url": "https://api.groq.com/openai/v1",
-        "env_key": "GROQ_API_KEY",
-        "default_model": "llama-3.3-70b-versatile",
-    },
-    "openai": {
-        "base_url": None,
-        "env_key": "OPENAI_API_KEY",
-        "default_model": "gpt-4o",
-    },
-}
-
-
 def get_llm_client(purpose: LLMPurpose) -> LLMClient:
-    # Both purposes default to a strong model: VALIDATE decides structural,
-    # hard-to-reverse things (subject/topic existence, canonical naming,
-    # country-specificity) that persist into the taxonomy — not a place to
-    # cut cost with a weaker model.
-    provider_map = get_setting("llm_provider_map", {"validate": "openai", "generate": "openai"})
-    provider = provider_map.get(purpose.value, "openai")
-
-    if provider not in _PROVIDER_DEFAULTS:
-        raise ValueError(f"Unknown LLM provider '{provider}' configured for purpose '{purpose.value}'")
-
-    cfg = _PROVIDER_DEFAULTS[provider]
-    api_key = os.getenv(cfg["env_key"])
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError(
-            f"{cfg['env_key']} not set in .env — required for LLM purpose '{purpose.value}' (provider: {provider})"
+            f"OPENAI_API_KEY not set in .env — required for LLM purpose '{purpose.value}'"
         )
 
     model_map = get_setting("llm_model_map", {})
-    model = model_map.get(provider, cfg["default_model"])
+    model = model_map.get(purpose.value, DEFAULT_MODEL)
 
-    return LLMClient(api_key=api_key, model=model, base_url=cfg["base_url"])
+    return LLMClient(api_key=api_key, model=model)

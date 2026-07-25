@@ -1,12 +1,9 @@
 """
-Thin, provider-agnostic LLM client.
+Thin OpenAI client wrapper.
 
-Groq exposes an OpenAI-compatible API (just a different base_url and
-API key), so one client class covers both providers — and any other
-OpenAI-compatible provider added later. Structured output is requested
-via JSON mode (response_format=json_object) rather than provider-specific
-strict JSON schema, since that support varies across providers; callers
-validate the parsed dict against a Pydantic model themselves.
+Structured output is requested via JSON mode (response_format=json_object)
+rather than strict JSON schema, since callers validate the parsed dict
+against a Pydantic model themselves.
 """
 import json
 
@@ -14,8 +11,8 @@ from openai import AsyncOpenAI
 
 
 class LLMClient:
-    def __init__(self, *, api_key: str, model: str, base_url: str | None = None):
-        self._client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+    def __init__(self, *, api_key: str, model: str):
+        self._client = AsyncOpenAI(api_key=api_key)
         self.model = model
 
     async def generate_json(
