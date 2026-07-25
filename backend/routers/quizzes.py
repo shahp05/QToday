@@ -95,11 +95,11 @@ def get_quiz_detail_route(
 
 
 @router.post("/{quiz_id}/questions/{qa_id}/challenge", response_model=ChallengeQuizQuestionResponse)
-def challenge_quiz_question_route(
+async def challenge_quiz_question_route(
     quiz_id: int,
     qa_id: int,
     payload: ChallengeQuizQuestionRequest,
     claims: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return challenge_quiz_question(db, claims=claims, quiz_id=quiz_id, qa_id=qa_id, reason=payload.reason)
+    return await challenge_quiz_question(db, claims=claims, quiz_id=quiz_id, qa_id=qa_id, reason=payload.reason)

@@ -64,10 +64,11 @@ class QuizDetailQuestion(BaseModel):
     marks: float
     score: Optional[float] = None
     is_scored: bool
-    # Whether this student already has an open/resolved challenge on this
-    # question for this quiz — lets the UI hide the challenge button/form
-    # once one exists, without needing a separate lookup.
-    challenged: bool = False
+    # Set once this question has been challenged (resolved synchronously —
+    # there's no "pending" state) — the UI shows both under the question and
+    # hides the challenge button once present, without a separate lookup.
+    challenge_reason: Optional[str] = None
+    challenge_response: Optional[str] = None
 
 
 class QuizDetailResponse(BaseModel):
@@ -89,3 +90,10 @@ class ChallengeQuizQuestionRequest(BaseModel):
 class ChallengeQuizQuestionResponse(BaseModel):
     challenge_id: int
     date_created: str
+    challenge_reason: str
+    challenge_response: str
+    score: float
+    marks: float
+    answer: str
+    total_score: float
+    total_marks: float

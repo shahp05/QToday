@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { scoreColor } from '../../lib/scoreColor'
 import { Toast } from '../../components/ui/Toast'
 import { fetchQuizDetail } from '../../services/quizService'
@@ -33,14 +33,37 @@ function IconChevron({ open }) {
 // Each quiz carries its own grade_name (the grade it was actually played
 // at, snapshotted server-side on submit) — not the student's current
 // grade, since a topic can be replayed across grades over time.
-// autoExpandKey: changes whenever the caller switches to a different topic —
-// collapses whatever was open, since it belonged to the previous topic's list.
+// autoExpandKey: changes whenever the caller switches to a different topic.
+// Passed as the accordion's key rather than watched in an effect — a fresh
+// key remounts StudentQuizAccordion with its state reset to initial values,
+// collapsing whatever was open (which belonged to the previous topic's
+// list) without a setState-in-effect render pass.
 export default function StudentQuizList({ quizzes, status, error, onDismissError, autoExpandKey }) {
-  // Single-open accordion (matches TeachLogList.jsx's subject-row pattern) —
-  // expanding a quiz collapses whichever one was open before it. The row
-  // only opens once its detail has actually loaded — loadingQuizId drives a
-  // spinner in the row header instead, so the body never expands empty and
-  // then pops content in underneath the spinner.
+  if (status === 'loading' || status === 'idle') {
+    return (
+      <div className="student-quiz-list-loading">
+        <span className="student-topic-spinner student-topic-spinner--lg" />
+      </div>
+    )
+  }
+
+  if (status === 'error') {
+    return <Toast message={error} onDismiss={onDismissError} />
+  }
+
+  if (quizzes.length === 0) {
+    return <p className="content-card-placeholder">No quizzes played for this subject yet.</p>
+  }
+
+  return <StudentQuizAccordion key={autoExpandKey} quizzes={quizzes} />
+}
+
+// Single-open accordion (matches TeachLogList.jsx's subject-row pattern) —
+// expanding a quiz collapses whichever one was open before it. The row only
+// opens once its detail has actually loaded — loadingQuizId drives a spinner
+// in the row header instead, so the body never expands empty and then pops
+// content in underneath the spinner.
+function StudentQuizAccordion({ quizzes }) {
   const [expandedQuizId, setExpandedQuizId] = useState(null)
   const [detail, setDetail] = useState(null) // fetchQuizDetail() result for expandedQuizId
   const [loadingQuizId, setLoadingQuizId] = useState(null)
@@ -67,30 +90,6 @@ export default function StudentQuizList({ quizzes, status, error, onDismissError
       return
     }
     openQuiz(quiz)
-  }
-
-  useEffect(() => {
-    if (autoExpandKey == null) return
-    setExpandedQuizId(null)
-    setDetail(null)
-    setLoadingQuizId(null)
-    setDetailError('')
-  }, [autoExpandKey])
-
-  if (status === 'loading' || status === 'idle') {
-    return (
-      <div className="student-quiz-list-loading">
-        <span className="student-topic-spinner student-topic-spinner--lg" />
-      </div>
-    )
-  }
-
-  if (status === 'error') {
-    return <Toast message={error} onDismiss={onDismissError} />
-  }
-
-  if (quizzes.length === 0) {
-    return <p className="content-card-placeholder">No quizzes played for this subject yet.</p>
   }
 
   return (
@@ -130,7 +129,28 @@ export default function StudentQuizList({ quizzes, status, error, onDismissError
             {isOpen && detail && (
               <div className="student-quiz-detail">
                 <div className="student-quiz-detail-list">
-                  {detail.questions.map(q => <StudentQuizQaItem key={q.qa_id} q={q} quizId={quiz.quiz_id} />)}
+                  {detail.questions.map(q => (
+                    <StudentQuizQaItem
+                      key={q.qa_id}
+                      q={q}
+                      quizId={quiz.quiz_id}
+                      onChallengeResolved={result => {
+                        setDetail(prev => ({
+                          ...prev,
+                          total_score: result.total_score,
+                          questions: prev.questions.map(pq => pq.qa_id === q.qa_id
+                            ? {
+                              ...pq,
+                              score: result.score,
+                              answer: result.answer,
+                              challenge_reason: result.challenge_reason,
+                              challenge_response: result.challenge_response,
+                            }
+                            : pq),
+                        }))
+                      }}
+                    />
+                  ))}
                 </div>
               </div>
             )}

@@ -50,21 +50,16 @@
   margin-top: 2px;
 }
 
-.student-quiz-qa-challenged-tag {
-  font-size: var(--font-size-sm, 13px);
-  font-style: italic;
-  color: var(--color-text-light);
-}
-
 .student-quiz-qa-challenge {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 6px;
   width: 100%;
 }
 
 .student-quiz-qa-challenge-input {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   border: 1.5px solid var(--color-green-light, #8EEB65);
   border-radius: var(--radius-sm, 6px);
   padding: 6px 8px;
@@ -72,4 +67,61 @@
   font-size: var(--font-size-sm, 13px);
   color: var(--color-text, #343434);
   outline: none;
+}
+
+.student-quiz-qa-challenge-input--error {
+  border-color: var(--color-red, #D32F2F);
+}
+
+/* Smaller version of SubjectsPage.jsx's .teach-today-arrow-btn, for this
+   inline per-question form. */
+.student-quiz-qa-challenge-submit {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--color-green-light, #8EEB65);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-green-light, #8EEB65);
+  color: var(--color-dark, #343434);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+.student-quiz-qa-challenge-submit:hover,
+.student-quiz-qa-challenge-submit:focus-visible {
+  background: none;
+  color: var(--color-text, #343434);
+}
+
+.student-quiz-qa-challenge-submit:disabled {
+  cursor: not-allowed;
+}
+
+/* .qa-card-pill--cancel is sized by its own padding elsewhere (QaCard.jsx's
+   edit flow) — pinned to match the submit button's fixed 28px box here so
+   the two sit at the same size next to each other. */
+.student-quiz-qa-challenge-cancel {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+}
+
+.student-quiz-qa-challenge-result {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--font-size-sm, 13px);
+}
+
+.student-quiz-qa-challenge-reason {
+  color: var(--color-text-light);
+  font-style: italic;
+}
+
+.student-quiz-qa-challenge-response {
+  color: var(--color-text, #343434);
 }

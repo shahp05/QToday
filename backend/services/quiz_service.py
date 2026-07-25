@@ -8,6 +8,7 @@ from config.app_config import get_setting
 from db.models import QA, Quiz, QuizChallenge, QuizScore
 from errors.app_error import AppError
 from errors.error_codes import ErrorCode
+from services.quiz_scoring_service import evaluate_challenge, resolve_grading_context
 
 
 def resolve_authorized_student_id(
@@ -373,11 +374,16 @@ def get_quiz_detail(db: Session, *, claims: dict, quiz_id: int) -> dict:
         .order_by(QuizScore.quiz_score_id)
     ).scalars().all()
 
-    challenged_qa_ids = set(db.execute(
-        select(QuizChallenge.qa_id).where(
-            QuizChallenge.quiz_id == quiz_id, QuizChallenge.is_active == True,  # noqa: E712
-        ).distinct()
-    ).scalars().all())
+    # One resolved challenge per qa_id at most (challenge_quiz_question blocks
+    # a second one) — reason/response are shown under the question whenever
+    # a challenge exists, not just while a decision is pending.
+    challenge_by_qa_id = {
+        c.qa_id: c for c in db.execute(
+            select(QuizChallenge).where(
+                QuizChallenge.quiz_id == quiz_id, QuizChallenge.is_active == True,  # noqa: E712
+            )
+        ).scalars().all()
+    }
 
     return {
         "quiz_id": quiz.quiz_id,
@@ -398,33 +404,44 @@ def get_quiz_detail(db: Session, *, claims: dict, quiz_id: int) -> dict:
                 "marks": float(qs.marks),
                 "score": float(qs.score) if qs.score is not None else None,
                 "is_scored": qs.is_scored,
-                "challenged": qs.qa_id in challenged_qa_ids,
+                "challenge_reason": challenge_by_qa_id[qs.qa_id].challenge_reason if qs.qa_id in challenge_by_qa_id else None,
+                "challenge_response": challenge_by_qa_id[qs.qa_id].challenge_response if qs.qa_id in challenge_by_qa_id else None,
             }
             for qs in scores
         ],
     }
 
 
-def challenge_quiz_question(db: Session, *, claims: dict, quiz_id: int, qa_id: int, reason: str) -> dict:
-    """A student disputing how one of their answers was scored. Only allowed
-    on a question that's actually theirs, already scored, and not already
-    challenged — adjudication (LLM review, is_upheld) is a separate,
-    deferred piece of work; this just records the dispute."""
+async def challenge_quiz_question(db: Session, *, claims: dict, quiz_id: int, qa_id: int, reason: str) -> dict:
+    """A student disputing how one of their answers was scored: re-grades the
+    question via a single synchronous LLM call (evaluate_challenge) while the
+    student waits, then applies whatever it decides — this quiz's own frozen
+    score/answer, the quiz's total, and (if the reference answer was wrong)
+    the live QA row for every future quiz on it. Only allowed on a question
+    that's actually the caller's, already scored, answered, under full marks,
+    and not already challenged. Nothing is written until the LLM call
+    succeeds, so a failure (network/LLM error) leaves no trace — the student
+    can just submit again."""
     student_id = _resolve_own_student_id(db, claims)
     quiz = db.get(Quiz, quiz_id)
     if quiz is None or not quiz.is_active or quiz.student_id != student_id:
         raise AppError(ErrorCode.QUIZ_NOT_FOUND)
 
-    score = db.execute(
+    quiz_score = db.execute(
         select(QuizScore).where(
             QuizScore.quiz_id == quiz_id, QuizScore.qa_id == qa_id, QuizScore.is_active == True,  # noqa: E712
         )
     ).scalar_one_or_none()
-    if score is None or not score.is_scored:
+    if quiz_score is None or not quiz_score.is_scored:
         raise AppError(ErrorCode.QUIZ_NOT_FOUND)
+    if not quiz_score.student_response:
+        raise AppError(ErrorCode.VALIDATION_ERROR)
+    if quiz_score.score is not None and float(quiz_score.score) >= float(quiz_score.marks):
+        raise AppError(ErrorCode.VALIDATION_ERROR)
 
     if not reason or not reason.strip():
         raise AppError(ErrorCode.VALIDATION_ERROR)
+    reason = reason.strip()
 
     already_challenged = db.execute(
         select(QuizChallenge.challenge_id).where(
@@ -434,12 +451,51 @@ def challenge_quiz_question(db: Session, *, claims: dict, quiz_id: int, qa_id: i
     if already_challenged:
         raise AppError(ErrorCode.VALIDATION_ERROR)
 
-    challenge = QuizChallenge(quiz_id=quiz_id, qa_id=qa_id, challenge_reason=reason.strip())
+    context = resolve_grading_context(db, quiz)
+    if context is None:
+        raise AppError(ErrorCode.EXTERNAL_SERVICE_FAILED)
+
+    grade_name = str(quiz_score.qa.grade.grade_name) if quiz_score.qa and quiz_score.qa.grade else "unknown"
+    try:
+        result = await evaluate_challenge(quiz_score, context=context, grade_name=grade_name, reason=reason)
+        revised_score = max(0.0, min(float(quiz_score.marks), float(result["revised_score"])))
+    except Exception:
+        raise AppError(ErrorCode.EXTERNAL_SERVICE_FAILED)
+
+    explanation = result.get("explanation") or ""
+    quiz_score.score = revised_score
+    if result.get("stored_answer_correct") is False and result.get("corrected_answer"):
+        # Unlike the batch scoring pass, a challenge is an adjudicated
+        # correction the student directly proved — so this quiz's own frozen
+        # answer is updated too (not just the live QA row for future quizzes).
+        quiz_score.answer = result["corrected_answer"]
+        qa = db.get(QA, qa_id)
+        if qa is not None:
+            qa.answer = result["corrected_answer"]
+
+    challenge = QuizChallenge(
+        quiz_id=quiz_id, qa_id=qa_id, challenge_reason=reason, challenge_response=explanation,
+        date_closed=datetime.now(timezone.utc),
+    )
     db.add(challenge)
+
+    all_scores = db.execute(select(QuizScore.score).where(QuizScore.quiz_id == quiz_id)).scalars().all()
+    quiz.total_score = sum(s or 0 for s in all_scores)
+
     db.commit()
     db.refresh(challenge)
 
-    return {"challenge_id": challenge.challenge_id, "date_created": challenge.date_created.isoformat()}
+    return {
+        "challenge_id": challenge.challenge_id,
+        "date_created": challenge.date_created.isoformat(),
+        "challenge_reason": reason,
+        "challenge_response": explanation,
+        "score": float(quiz_score.score),
+        "marks": float(quiz_score.marks),
+        "answer": quiz_score.answer,
+        "total_score": float(quiz.total_score),
+        "total_marks": float(quiz.total_marks),
+    }
 
 
 def get_quiz_status(db: Session, *, claims: dict, quiz_id: int) -> dict:

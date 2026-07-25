@@ -1,9 +1,25 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import MathText from '../../components/MathText'
 import { scoreColor, scoreTextColor } from '../../lib/scoreColor'
 import { challengeQuizQuestion } from '../../services/quizService'
+import { useQuizHistoryStore } from '../../store/quizHistoryStore'
+import { useQuizProgressStore } from '../../store/quizProgressStore'
 import './QaCard.css'
 import './StudentQuizQaItem.css'
+
+// Same shake-on-invalid-submit pattern as Login/Signup/SubjectsPage — local
+// here too since none of those export it as a shared hook either.
+function useShake() {
+  const [shaking, setShaking] = useState(false)
+  const timer = useRef(null)
+  function shake() {
+    clearTimeout(timer.current)
+    setShaking(true)
+    timer.current = setTimeout(() => setShaking(false), 450)
+  }
+  useEffect(() => () => clearTimeout(timer.current), [])
+  return [shaking, shake]
+}
 
 function IconCheck() {
   return (
@@ -28,6 +44,17 @@ function IconSpinner() {
   return <span className="qa-card-spinner" role="status" aria-label="Working" />
 }
 
+// Same right-chevron used by the teacher's subject/topic/grade arrow button
+// (SubjectsPage.jsx's .teach-today-arrow-btn), sized down for this inline form.
+function IconArrow() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 12h14M13 6l6 6-6 6" />
+    </svg>
+  )
+}
+
 // MCQ items carry an options object; true/false doesn't, so synthesize one
 // here to render both the same way — same pattern as QaCard.getRenderOptions.
 function getRenderOptions(q) {
@@ -40,28 +67,43 @@ function getRenderOptions(q) {
 // `.qa-card`/`.qa-card-options` visual language (lettered option pills,
 // green highlight on the correct one), swapping the edit/flag actions row
 // for a per-question score badge, tick/cross correctness markers, and a
-// challenge form for anything short of full marks.
-export default function StudentQuizQaItem({ q, quizId }) {
+// challenge form for anything short of full marks. onChallengeResolved lets
+// the parent (StudentQuizList) patch this question's score/answer and the
+// quiz's total into its own detail state once the LLM re-grades it.
+export default function StudentQuizQaItem({ q, quizId, onChallengeResolved }) {
   const renderOptions = getRenderOptions(q)
   const isMcq = !!q.options
   const isFullMarks = q.is_scored && q.score === q.marks
   const isAnswered = q.student_response != null && q.student_response !== ''
-  const canChallenge = q.is_scored && !isFullMarks && isAnswered
+  const alreadyChallenged = q.challenge_reason != null
+  const canChallenge = q.is_scored && !isFullMarks && isAnswered && !alreadyChallenged
 
-  const [challenged, setChallenged] = useState(q.challenged)
   const [challenging, setChallenging] = useState(false)
   const [reason, setReason] = useState('')
+  const [reasonError, setReasonError] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [isShaking, shake] = useShake()
 
   async function handleSubmitChallenge() {
-    if (!reason.trim()) return
+    if (!reason.trim()) {
+      setReasonError(true)
+      shake()
+      return
+    }
+    setReasonError(false)
     setSubmitting(true)
     setSubmitError('')
     try {
-      await challengeQuizQuestion(quizId, q.qa_id, reason.trim())
-      setChallenged(true)
+      const result = await challengeQuizQuestion(quizId, q.qa_id, reason.trim())
       setChallenging(false)
+      setReason('')
+      onChallengeResolved?.(result)
+      // Score/answer just changed — the topic-card % and the quiz-history
+      // row's % badge (both fed by these stores, outside this component)
+      // need to catch up too.
+      useQuizHistoryStore.getState().refreshQuizHistory()
+      useQuizProgressStore.getState().fetchQuizProgress()
     } catch (err) {
       setSubmitError(err.message)
     } finally {
@@ -138,37 +180,33 @@ export default function StudentQuizQaItem({ q, quizId }) {
 
       {canChallenge && (
         <div className="qa-card-actions-row student-quiz-qa-actions">
-          {challenged ? (
-            <span className="student-quiz-qa-challenged-tag">Challenge submitted</span>
-          ) : challenging ? (
-            <div className="student-quiz-qa-challenge">
+          {challenging ? (
+            <div className={`student-quiz-qa-challenge${isShaking ? ' ui-shake' : ''}`}>
               <input
                 type="text"
-                className="student-quiz-qa-challenge-input"
+                className={`student-quiz-qa-challenge-input${reasonError ? ' student-quiz-qa-challenge-input--error' : ''}`}
                 placeholder="Why do you think this is wrong?"
                 value={reason}
-                onChange={e => setReason(e.target.value)}
+                onChange={e => { setReason(e.target.value); if (reasonError) setReasonError(false) }}
                 disabled={submitting}
                 autoFocus
               />
-              <div className="qa-card-actions-row">
-                <button className="qa-card-pill qa-card-pill--save" onClick={handleSubmitChallenge} disabled={submitting || !reason.trim()}>
-                  <span style={{ visibility: submitting ? 'hidden' : 'visible' }}>Submit</span>
-                  {submitting && (
-                    <span className="qa-card-pill-spinner-overlay">
-                      <IconSpinner />
-                    </span>
-                  )}
-                </button>
-                <button
-                  className="qa-card-pill qa-card-pill--cancel"
-                  onClick={() => { setChallenging(false); setReason(''); setSubmitError('') }}
-                  disabled={submitting}
-                  aria-label="Cancel"
-                >
-                  <IconX />
-                </button>
-              </div>
+              <button
+                className="student-quiz-qa-challenge-submit"
+                onClick={handleSubmitChallenge}
+                disabled={submitting}
+                aria-label="Submit challenge"
+              >
+                {submitting ? <IconSpinner /> : <IconArrow />}
+              </button>
+              <button
+                className="qa-card-pill qa-card-pill--cancel student-quiz-qa-challenge-cancel"
+                onClick={() => { setChallenging(false); setReason(''); setReasonError(false); setSubmitError('') }}
+                disabled={submitting}
+                aria-label="Cancel"
+              >
+                <IconX />
+              </button>
             </div>
           ) : (
             <button className="qa-card-pill qa-card-pill--flag" onClick={() => setChallenging(true)}>
@@ -179,6 +217,13 @@ export default function StudentQuizQaItem({ q, quizId }) {
       )}
 
       {submitError && <p className="qa-card-error">{submitError}</p>}
+
+      {alreadyChallenged && (
+        <div className="student-quiz-qa-challenge-result">
+          <p className="student-quiz-qa-challenge-reason">You challenged: <MathText text={q.challenge_reason} /></p>
+          {q.challenge_response && <p className="student-quiz-qa-challenge-response"><MathText text={q.challenge_response} /></p>}
+        </div>
+      )}
     </div>
   )
 }

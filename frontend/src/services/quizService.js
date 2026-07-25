@@ -51,12 +51,16 @@ export async function fetchQuizDetail(quizId) {
   return res.json() // { quiz_id, subject_id, topic_id, grade_name, date_created, total_marks, total_score, questions: [{..., challenged}] }
 }
 
+// Resolves synchronously server-side (a single LLM call, not a background
+// pass) — bump the timeout past the default 20s the same way qaService does
+// for its own LLM-backed calls.
 export async function challengeQuizQuestion(quizId, qaId, reason) {
   const res = await apiFetch(`/quizzes/${quizId}/questions/${qaId}/challenge`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ reason }),
+    timeoutMs: 30000,
   })
   if (!res.ok) throw new Error(await apiErrorMessage(res))
-  return res.json() // { challenge_id, date_created }
+  return res.json() // { challenge_id, date_created, challenge_reason, challenge_response, score, marks, answer, total_score, total_marks }
 }
