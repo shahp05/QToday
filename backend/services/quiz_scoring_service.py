@@ -192,6 +192,26 @@ async def _evaluate_one(
     return result
 
 
+def _build_challenge_display(quiz_score: QuizScore) -> tuple[str, str, str]:
+    """Folds question-type framing (MCQ options, boolean choices) directly
+    into the question/answer text so the challenge prompt doesn't need a
+    separate format note per type — see conversation history for why this
+    replaced the old options_block/answer_format_note split."""
+    if quiz_score.question_type == "mcq":
+        options = quiz_score.options
+        option_lines = " ".join(f"({k}) {v}" for k, v in sorted(options.items()))
+        question = f"{quiz_score.question} {option_lines}"
+        default_answer = f"({quiz_score.answer}) {options[quiz_score.answer]}"
+        student_answer = f"({quiz_score.student_response}) {options[quiz_score.student_response]}"
+        return question, default_answer, student_answer
+
+    if quiz_score.question_type == "true_false":
+        question = f"{quiz_score.question} (a) True (b) False"
+        return question, quiz_score.answer, quiz_score.student_response
+
+    return quiz_score.question, quiz_score.answer, quiz_score.student_response
+
+
 async def evaluate_challenge(
     quiz_score: QuizScore, *, context: GradingContext, grade_name: str, reason: str,
 ) -> dict:
@@ -201,75 +221,64 @@ async def evaluate_challenge(
     while the student waits — there's no polling UI for it, so a failure here
     is raised straight back as an error rather than left pending for a retry.
     Marks can move in either direction: a re-check may find the original
-    scoring pass (auto or LLM) was too generous, not just too strict."""
-    has_latex = _has_latex(quiz_score.question, quiz_score.answer, quiz_score.student_response)
+    scoring pass (auto or LLM) was too generous, not just too strict.
 
-    options_block = ""
-    answer_format_note = ""
-    if quiz_score.question_type == "mcq" and quiz_score.options:
-        options_block = "\nOptions:\n" + "\n".join(f"{k}) {v}" for k, v in sorted(quiz_score.options.items()))
-        answer_format_note = (
-            "\nBoth the reference answer and the student's answer are given as option keys "
-            "(a/b/c/d) referring to the Options listed above — resolve each key to its option "
-            "text before judging it."
+    The default answer has already passed independent blind-solve
+    verification before ever being served to a student (see
+    qa_service._verify_qa_batch) — this prompt does not ask the LLM to
+    re-derive it from scratch, only to re-check it against the challenge
+    reason and re-score the student."""
+    question, default_answer, student_answer = _build_challenge_display(quiz_score)
+
+    latex_note = ""
+    if _has_latex(quiz_score.question, quiz_score.answer, quiz_score.student_response):
+        latex_note = (
+            "\nThis item includes LaTeX notation. Evaluate the underlying mathematical/conceptual "
+            "content, not exact LaTeX syntax or formatting, unless the question specifically tests "
+            "notation itself."
         )
-    elif quiz_score.question_type == "true_false":
-        answer_format_note = "\nBoth answers are the string \"True\" or \"False\"."
 
-    latex_note = (
-        "\nThis item includes LaTeX notation. Evaluate the underlying mathematical/conceptual "
-        "content, not exact LaTeX syntax or formatting, unless the question specifically tests "
-        "notation itself."
-        if has_latex else ""
-    )
-
+    marks = float(quiz_score.marks)
     llm = get_llm_client(LLMPurpose.VALIDATE)
     return await llm.generate_json(
         system=(
             f"You are an expert academician in {context.country.country_name} following the "
-            f"{context.board.board_name} board, with deep knowledge of the topic "
+            f"{context.board.board_name} board and have deep knowledge of the topic "
             f"{context.topic.topic_name} in the curriculum subject {context.subject.subject_name}. "
-            f"A student of grade {grade_name} has challenged the marks awarded for this question "
-            f"and provided a reason. Your role is to re-check the reference answer and the "
-            f"student's answer, re-score the student accurately, and (a) correct the reference "
-            f"answer if it is wrong, and (b) re-score the student's answer with an explanation."
+            f"A student of grade {grade_name} has challenged the marks awarded by the class teacher "
+            f"and has provided the reason for the challenge. Your role is to re-check the default "
+            f"answer, the student's answer, re-score the student accurately, and (a) provide the "
+            f"correct answer if the default answer is wrong, and (b) re-score the student's answer "
+            f"with explanation."
         ),
         user=(
-            f"Question type: {quiz_score.question_type}\n"
-            f'Question: "{quiz_score.question}"{options_block}\n'
-            f'Reference answer: "{quiz_score.answer}"\n'
-            f'Student\'s answer: "{quiz_score.student_response}"\n'
-            f"Full marks: {float(quiz_score.marks)}\n"
-            f"Marks currently awarded: {float(quiz_score.score)}\n"
-            f'Student\'s reason for challenging: "{reason}"'
-            f"{answer_format_note}{latex_note}\n\n"
+            f"Re-check the given question, default answer, student's answer and the reason to "
+            f"challenge the marks awarded. If the default answer is wrong, provide the correct "
+            f"answer. Check the student's answer and award marks according to the rules specified "
+            f"below.\n\n"
+            f"Question: {question}\n"
+            f"Default Answer: {default_answer}\n"
+            f"Student Answer: {student_answer}\n"
+            f"Full Marks: {marks}\n"
+            f"Marks awarded to student: {float(quiz_score.score)}\n"
+            f"Reason for challenge: {reason}"
+            f"{latex_note}\n\n"
             f"Follow these rules strictly:\n"
-            f"(1) Actually work out the answer to this question yourself, step by step — if it "
-            f"involves arithmetic, write out the calculation digit by digit rather than "
-            f"estimating. Do not just check whether the reference answer looks plausible; compute "
-            f"or derive the answer independently first, then compare.\n"
-            f"(2) If your own worked answer matches the reference answer, set "
-            f"stored_answer_correct=true. If it disagrees, set it false and give your own answer "
-            f"in corrected_answer.\n"
-            f"(3) If the student's answer is fully correct or equivalent in meaning (judge "
-            f"concept/knowledge, not exact wording or syntax, unless the question specifically "
-            f"tests wording or syntax), award full marks.\n"
-            f"(4) If the student's answer is partially correct, award proportionate marks as "
-            f"appropriate (mainly applies to descriptive answers).\n"
-            f"(5) If the student's answer is wrong, award 0 marks.\n"
-            f"(6) Return the marks you actually arrive at in revised_score — this can be higher "
-            f"or lower than what was currently awarded if the original scoring pass got it "
-            f"wrong, not just a one-directional correction.\n"
-            f"(7) Provide a concise, informative explanation (like a teacher would) for the marks "
-            f"awarded, naming the concept(s) the student should revise if marks were lost. Write "
-            f"it directly to the student, in second person ('you', 'your').\n\n"
-            f"Output must be only the following JSON format, with no explanation, extra text, "
-            f"characters or fields. Fill 'working' first — your own step-by-step derivation of the "
-            f"answer, shown in full, not skipped — before committing to the other fields; "
-            f"'explanation' is the separate, concise, student-facing summary for field (7):\n"
-            f'{{"working": "...", "stored_answer_correct": true/false, '
+            f"(1) If the default answer is correct, set stored_answer_correct=true; else set "
+            f"stored_answer_correct=false and provide the correct answer in corrected_answer.\n"
+            f"(2) If the student's answer is correct, award full {marks} marks.\n"
+            f"(3) If the student's answer is partially correct, award partial marks as "
+            f"appropriate.\n"
+            f"(4) If the student's answer is wrong, award 0 marks.\n"
+            f"(5) Return the student's marks in revised_score.\n"
+            f"(6) Provide an explanation (concise and informative, like a teacher) in explanation "
+            f"for the marks awarded, specifying the concepts the student should revise. Use second "
+            f"person (\"you\", \"your\") sentence construct in your explanation.\n\n"
+            f"Output must be only in the following JSON format, with no explanation, extra text, "
+            f"characters or fields:\n"
+            f'{{"stored_answer_correct": true/false, '
             f'"corrected_answer": "..." or null (only if stored_answer_correct is false), '
-            f'"revised_score": <number, 0 to {float(quiz_score.marks)}>, "explanation": "..."}}'
+            f'"revised_score": <number, 0 to {marks}>, "explanation": "..."}}'
         ),
         temperature=0.0,
         max_tokens=800,
