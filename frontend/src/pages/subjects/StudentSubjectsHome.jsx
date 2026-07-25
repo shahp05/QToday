@@ -44,6 +44,22 @@ function IconTopics() {
 
 const NOT_ATTEMPTED = { student_avg_pct: 0, max_score_pct: 0, last_played: null, attempts: 0 }
 
+// Resolves once a store's status reaches 'loaded' or 'error' — waits on the
+// in-flight fetch each store already kicks off at mount rather than
+// triggering a redundant second one.
+function waitForStatus(useStore) {
+  return new Promise(resolve => {
+    const isDone = state => state.status === 'loaded' || state.status === 'error'
+    if (isDone(useStore.getState())) return resolve()
+    const unsubscribe = useStore.subscribe(state => {
+      if (isDone(state)) {
+        unsubscribe()
+        resolve()
+      }
+    })
+  })
+}
+
 function formatLastPlayed(isoDate) {
   if (!isoDate) return 'Not attempted yet'
   const date = new Date(`${isoDate}T00:00:00`)
@@ -61,6 +77,7 @@ export default function StudentSubjectsHome() {
   const quizHistory = useQuizHistoryStore(s => s.quizzes)
   const fetchQuizHistory = useQuizHistoryStore(s => s.fetchQuizHistory)
   const refreshQuizHistory = useQuizHistoryStore(s => s.refreshQuizHistory)
+  const [progressLoading, setProgressLoading] = useState(false)
   const [selectedSubjectId, setSelectedSubjectId] = useState(null)
   const [activeQuiz, setActiveQuiz] = useState(null) // { topicId, gradeId, subjectName, topicName, questions, totalMarks } | null
   const [loadingQuiz, setLoadingQuiz] = useState(null) // { topicId, source: 'play' | 'card' } | null
@@ -163,6 +180,20 @@ export default function StudentSubjectsHome() {
     return { key: s.subject_id, label: s.subject_name, icon: <Icon /> }
   })
 
+  // Guards against the Progress page ever rendering its own inline loader on
+  // first show — quizHistory/quizProgress are fetched eagerly at mount, but
+  // this covers the slow-network case where the click lands before either
+  // has settled.
+  async function openProgress() {
+    setProgressLoading(true)
+    await Promise.all([
+      waitForStatus(useQuizHistoryStore),
+      waitForStatus(useQuizProgressStore),
+    ])
+    setProgressLoading(false)
+    setView('progress')
+  }
+
   async function startQuiz(topic, source) {
     if (loadingQuiz || scoringTopics[topic.topic_id]) return
     const gradeId = topic.grades[0]?.grade_id
@@ -192,9 +223,9 @@ export default function StudentSubjectsHome() {
         <h2 className="student-subjects-title">Play</h2>
         <div className="student-subjects-header-actions">
           {view === 'topics' ? (
-            <button className="student-subjects-progress-btn" onClick={() => setView('progress')}>
-              <IconProgress /> Progress
-              {quizHistory.length > 0 && <span className="student-subjects-progress-count">{quizHistory.length}</span>}
+            <button className="student-subjects-progress-btn" onClick={openProgress} disabled={progressLoading}>
+              {progressLoading ? <span className="student-topic-spinner" /> : <IconProgress />} Progress
+              {!progressLoading && quizHistory.length > 0 && <span className="student-subjects-progress-count">{quizHistory.length}</span>}
             </button>
           ) : (
             <button className="student-subjects-progress-btn" onClick={() => setView('topics')}>

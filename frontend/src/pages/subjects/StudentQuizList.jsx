@@ -34,32 +34,34 @@ function IconChevron({ open }) {
 // at, snapshotted server-side on submit) — not the student's current
 // grade, since a topic can be replayed across grades over time.
 // autoExpandKey: changes whenever the caller switches to a different topic —
-// triggers auto-opening the most recent (first) scored quiz in `quizzes`.
+// collapses whatever was open, since it belonged to the previous topic's list.
 export default function StudentQuizList({ quizzes, status, error, onDismissError, autoExpandKey }) {
   // Single-open accordion (matches TeachLogList.jsx's subject-row pattern) —
-  // expanding a quiz collapses whichever one was open before it.
+  // expanding a quiz collapses whichever one was open before it. The row
+  // only opens once its detail has actually loaded — loadingQuizId drives a
+  // spinner in the row header instead, so the body never expands empty and
+  // then pops content in underneath the spinner.
   const [expandedQuizId, setExpandedQuizId] = useState(null)
-  const [detail, setDetail] = useState(null) // fetchQuizDetail() result for expandedQuizId, or null while loading
-  const [detailStatus, setDetailStatus] = useState('idle') // idle | loading | loaded | error
+  const [detail, setDetail] = useState(null) // fetchQuizDetail() result for expandedQuizId
+  const [loadingQuizId, setLoadingQuizId] = useState(null)
   const [detailError, setDetailError] = useState('')
 
   async function openQuiz(quiz) {
-    setExpandedQuizId(quiz.quiz_id)
-    setDetail(null)
-    setDetailStatus('loading')
+    setLoadingQuizId(quiz.quiz_id)
     setDetailError('')
     try {
       const data = await fetchQuizDetail(quiz.quiz_id)
       setDetail(data)
-      setDetailStatus('loaded')
+      setExpandedQuizId(quiz.quiz_id)
     } catch (err) {
       setDetailError(err.message)
-      setDetailStatus('error')
+    } finally {
+      setLoadingQuizId(null)
     }
   }
 
   function toggleQuiz(quiz) {
-    if (!quiz.is_scored) return
+    if (!quiz.is_scored || loadingQuizId) return
     if (expandedQuizId === quiz.quiz_id) {
       setExpandedQuizId(null)
       return
@@ -69,13 +71,10 @@ export default function StudentQuizList({ quizzes, status, error, onDismissError
 
   useEffect(() => {
     if (autoExpandKey == null) return
-    const mostRecent = quizzes[0]
-    if (mostRecent?.is_scored) {
-      openQuiz(mostRecent)
-    } else {
-      setExpandedQuizId(null)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setExpandedQuizId(null)
+    setDetail(null)
+    setLoadingQuizId(null)
+    setDetailError('')
   }, [autoExpandKey])
 
   if (status === 'loading' || status === 'idle') {
@@ -122,26 +121,24 @@ export default function StudentQuizList({ quizzes, status, error, onDismissError
               {quiz.is_scored && <IconChevron open={isOpen} />}
             </button>
 
-            {isOpen && (
+            {loadingQuizId === quiz.quiz_id && (
+              <div className="student-quiz-row-overlay">
+                <span className="student-topic-spinner student-topic-spinner--lg" />
+              </div>
+            )}
+
+            {isOpen && detail && (
               <div className="student-quiz-detail">
-                {detailStatus === 'loading' && (
-                  <div className="student-quiz-list-loading">
-                    <span className="student-topic-spinner student-topic-spinner--lg" />
-                  </div>
-                )}
-                {detailStatus === 'error' && (
-                  <Toast message={detailError} onDismiss={() => setExpandedQuizId(null)} />
-                )}
-                {detailStatus === 'loaded' && detail && (
-                  <div className="student-quiz-detail-list">
-                    {detail.questions.map(q => <StudentQuizQaItem key={q.qa_id} q={q} quizId={quiz.quiz_id} />)}
-                  </div>
-                )}
+                <div className="student-quiz-detail-list">
+                  {detail.questions.map(q => <StudentQuizQaItem key={q.qa_id} q={q} quizId={quiz.quiz_id} />)}
+                </div>
               </div>
             )}
           </div>
         )
       })}
+
+      {detailError && <Toast message={detailError} onDismiss={() => setDetailError('')} />}
     </div>
   )
 }
