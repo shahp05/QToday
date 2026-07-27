@@ -3,7 +3,7 @@ import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
 import { useQuizProgressStore } from '../../store/quizProgressStore'
 import { useQuizHistoryStore } from '../../store/quizHistoryStore'
 import { fetchQuizStatus, startQuiz as fetchQuizQuestions } from '../../services/quizService'
-import { scoreColor } from '../../lib/scoreColor'
+import { scoreColor, scoreTextColor } from '../../lib/scoreColor'
 import { getSubjectIcon } from './subjectIconMatch'
 import Dropdown from '../../components/Dropdown'
 import { Toast } from '../../components/ui/Toast'
@@ -269,7 +269,7 @@ export default function StudentSubjectsHome() {
                 onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startQuiz(topic, 'card') } }}
               >
                 <div className="student-topic-card-header">
-                  <span className="student-topic-seq" style={{ background: scoreColor(stats.student_avg_pct) }}>{index + 1}</span>
+                  <span className="student-topic-seq" style={{ background: scoreColor(stats.student_avg_pct), color: scoreTextColor(stats.student_avg_pct) }}>{index + 1}</span>
                   <h3 className="student-topic-card-name">{topic.topic_name}</h3>
                 </div>
 

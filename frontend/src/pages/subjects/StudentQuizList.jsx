@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { scoreColor } from '../../lib/scoreColor'
+import { scoreColor, scoreTextColor } from '../../lib/scoreColor'
 import { Toast } from '../../components/ui/Toast'
 import { fetchQuizDetail } from '../../services/quizService'
 import StudentQuizQaItem from './StudentQuizQaItem'
@@ -105,7 +105,7 @@ function StudentQuizAccordion({ quizzes }) {
               disabled={!quiz.is_scored}
             >
               {quiz.is_scored ? (
-                <span className="student-quiz-score" style={{ background: scoreColor(pct) }}>{pct}%</span>
+                <span className="student-quiz-score" style={{ background: scoreColor(pct), color: scoreTextColor(pct) }}>{pct}%</span>
               ) : (
                 <span className="student-quiz-score student-quiz-score--pending"><IconClock /></span>
               )}
