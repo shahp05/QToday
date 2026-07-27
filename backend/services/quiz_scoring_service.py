@@ -1,22 +1,24 @@
 """
 Async LLM grading pass for whatever submit_quiz (quiz_service.py) couldn't
-score outright — a mismatched MCQ/true_false answer with no prior attempt to
-trust, or a descriptive answer that didn't exactly match the stored text.
+score outright. MCQ/true_false and exact-match descriptive answers are always
+resolved in submit_quiz itself now — every row that reaches this module is a
+descriptive answer that didn't exactly match its stored answer, still needing
+a judgment call on partial/full credit.
 
 Deferred from the /submit route as a Procrastinate task (jobs/tasks.py) so
-the student isn't blocked waiting on one LLM call per ambiguous question —
-see conversation history for why polling was chosen over a push transport.
-Runs to completion independently of the request, so it still finishes (and
-the DB still gets updated) even if the student closes the app.
+the student isn't blocked waiting on the LLM call — see conversation history
+for why polling was chosen over a push transport. Runs to completion
+independently of the request, so it still finishes (and the DB still gets
+updated) even if the student closes the app.
 """
-import asyncio
+import json
 import re
 from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from db.models import QA, Board, Country, Quiz, QuizScore, Student, Subject, Topic
+from db.models import Board, Country, Grade, Quiz, QuizScore, Student, Subject, Topic
 from llm.factory import LLMPurpose, get_llm_client
 
 _LATEX_PATTERN = re.compile(r"\$.+?\$")
@@ -27,20 +29,24 @@ def _has_latex(*texts: str | None) -> bool:
 
 
 class GradingContext:
-    __slots__ = ("subject", "topic", "board", "country")
+    __slots__ = ("subject", "topic", "board", "country", "grade_name")
 
-    def __init__(self, subject: Subject, topic: Topic, board: Board, country: Country):
+    def __init__(self, subject: Subject, topic: Topic, board: Board, country: Country, grade_name: str):
         self.subject = subject
         self.topic = topic
         self.board = board
         self.country = country
+        self.grade_name = grade_name
 
 
 def resolve_grading_context(db: Session, quiz: Quiz) -> GradingContext | None:
     """Everything an LLM grading prompt needs beyond the question itself.
-    None if any piece is missing (a data-integrity gap upstream) — callers
-    must not fall back to "unknown" placeholders, which would silently
-    degrade every score/explanation the LLM produces."""
+    None if subject/topic/board/country is missing (a data-integrity gap
+    upstream) — callers must not fall back to "unknown" placeholders for
+    those, which would silently degrade every score/explanation the LLM
+    produces. grade is the one exception: quizzes.grade_id is nullable, so a
+    missing grade falls back to "unknown" rather than blocking scoring
+    entirely over a single lenient/strict grading cue."""
     subject = db.get(Subject, quiz.subject_id)
     topic = db.get(Topic, quiz.topic_id)
     student = db.get(Student, quiz.student_id)
@@ -52,7 +58,10 @@ def resolve_grading_context(db: Session, quiz: Quiz) -> GradingContext | None:
 
     if not (subject and topic and board and country):
         return None
-    return GradingContext(subject=subject, topic=topic, board=board, country=country)
+
+    grade = db.get(Grade, quiz.grade_id) if quiz.grade_id else None
+    grade_name = str(grade.grade_name) if grade else "unknown"
+    return GradingContext(subject=subject, topic=topic, board=board, country=country, grade_name=grade_name)
 
 
 async def score_pending_quiz(db: Session, *, quiz_id: int) -> dict:
@@ -75,31 +84,28 @@ async def score_pending_quiz(db: Session, *, quiz_id: int) -> dict:
         # this call runs again.
         return {"skipped": True, "reason": "scoring context missing"}
 
-    results = await asyncio.gather(
-        *[
-            _evaluate_one(quiz_score, context.subject, context.topic, context.country.country_name, context.board.board_name)
-            for quiz_score in pending
-        ],
-        return_exceptions=True,
-    )
+    try:
+        items = await _evaluate_batch(pending, context)
+    except Exception:
+        return {"skipped": True, "reason": "LLM call failed"}
 
+    # Matched by quiz_score_id, not position — a partial/reordered response
+    # still scores whatever it did answer for; anything missing or malformed
+    # stays is_scored=False for a future batch retry (not yet built) rather
+    # than blocking the rows the LLM did handle correctly.
+    by_id = {quiz_score.quiz_score_id: quiz_score for quiz_score in pending}
     scored_count = 0
-    for quiz_score, result in zip(pending, results):
-        if isinstance(result, BaseException):
-            continue  # left is_scored=False — picked up by the next call for this quiz
-        awarded = max(0.0, min(float(quiz_score.marks), float(result["awarded_score"])))
+    for item in items:
+        quiz_score = by_id.get(item.get("question_id"))
+        if quiz_score is None:
+            continue
+        try:
+            awarded = max(0.0, min(float(quiz_score.marks), float(item["score"])))
+        except (KeyError, TypeError, ValueError):
+            continue
         quiz_score.score = awarded
         quiz_score.is_scored = True
         scored_count += 1
-
-        if result.get("stored_answer_correct") is False and result.get("corrected_answer"):
-            # Only the live QA row changes — QuizScore.answer stays frozen so
-            # this and every already-scored quiz keeps reflecting what the
-            # student actually saw (see QuizScore's class docstring). Future
-            # quizzes on this qa_id pick up the correction; past ones don't.
-            qa = db.get(QA, quiz_score.qa_id)
-            if qa is not None:
-                qa.answer = result["corrected_answer"]
 
     db.commit()
     _finalize_if_complete(db, quiz)
@@ -118,78 +124,54 @@ def _finalize_if_complete(db: Session, quiz: Quiz) -> None:
     db.commit()
 
 
-async def _evaluate_one(
-    quiz_score: QuizScore, subject: Subject, topic: Topic, country_name: str, board_name: str,
-) -> dict:
-    qa = quiz_score.qa  # frozen text lives on quiz_score itself; qa is only needed for its grade
-    grade_name = qa.grade.grade_name if qa and qa.grade else "unknown"
-    has_latex = _has_latex(quiz_score.question, quiz_score.answer, quiz_score.student_response)
-
-    options_block = ""
-    answer_format_note = ""
-    if quiz_score.question_type == "mcq" and quiz_score.options:
-        options_block = "\nOptions:\n" + "\n".join(f"{k}) {v}" for k, v in sorted(quiz_score.options.items()))
-        answer_format_note = (
-            "\nBoth the reference answer and the student's answer are given as option keys "
-            "(a/b/c/d) referring to the Options listed above — resolve each key to its option "
-            "text before judging it."
-        )
-    elif quiz_score.question_type == "true_false":
-        answer_format_note = "\nBoth answers are the string \"True\" or \"False\"."
-
-    latex_note = (
-        "\nThis item includes LaTeX notation. Evaluate the underlying mathematical/conceptual "
-        "content, not exact LaTeX syntax or formatting, unless the question specifically tests "
-        "notation itself."
-        if has_latex else ""
-    )
+async def _evaluate_batch(pending: list[QuizScore], context: GradingContext) -> list[dict]:
+    """One call grades every pending question in the quiz together — country/
+    board/topic/subject/grade context is established once instead of being
+    repeated per question. Every row here is a descriptive answer that failed
+    an exact-match against its stored answer (see module docstring), so there
+    is no default/reference answer worth sending: the student's own wording
+    will rarely match it verbatim regardless of whether the answer is right,
+    and the LLM judges correctness from its own knowledge of the question —
+    the same way a teacher grades free-text answers without an answer key."""
+    items = [
+        {
+            "question_id": quiz_score.quiz_score_id,
+            "question": quiz_score.question,
+            "answer": quiz_score.student_response,
+            "marks": float(quiz_score.marks),
+            "score": "",
+        }
+        for quiz_score in pending
+    ]
 
     llm = get_llm_client(LLMPurpose.VALIDATE)
     result = await llm.generate_json(
         system=(
-            f"You are an expert academician for schools in {country_name} following the "
-            f"{board_name} board, with deep knowledge of the topic {topic.topic_name} in the "
-            f"curriculum subject {subject.subject_name}. You are grading one quiz question at a "
-            f"time and must return only the requested JSON, with no explanation, extra text, "
-            f"characters, or fields outside it."
+            f"You are an expert academician for schools in {context.country.country_name} "
+            f"following the {context.board.board_name} board, and have deep knowledge of the topic "
+            f"{context.topic.topic_name} in the curriculum subject {context.subject.subject_name}. "
+            f"The student is of grade {context.grade_name}. Your task is to accurately evaluate and "
+            f"score the student's answer for each question listed in the output json."
         ),
         user=(
-            f"Grade: {grade_name}\n"
-            f"Question type: {quiz_score.question_type}\n"
-            f'Question: "{quiz_score.question}"{options_block}\n'
-            f'Reference answer: "{quiz_score.answer}"\n'
-            f'Student\'s answer: "{quiz_score.student_response}"\n'
-            f"Marks available: {float(quiz_score.marks)}"
-            f"{answer_format_note}{latex_note}\n\n"
+            f"Evaluate each question and student's answer provided in the output json, and score "
+            f"each answer on the total marks specified for each question.\n\n"
             f"Follow these rules strictly:\n"
-            f"(1) Actually work out the correct answer to this question yourself, step by step — "
-            f"if it involves arithmetic, write out the calculation digit by digit rather than "
-            f"estimating. Do not just check whether the reference answer looks plausible; compute "
-            f"or derive the answer independently first, then compare. Do not simply assume the "
-            f"reference answer is right.\n"
-            f"(2) Compare your own answer to the reference answer. If they disagree, the "
-            f"reference answer is wrong; note what the correct answer actually is.\n"
-            f"(3) Score the student's answer against whichever answer is actually correct (your "
-            f"own, if the reference was wrong).\n"
-            f"(4) Award full marks if the student's answer is fully correct or equivalent in "
-            f"meaning — judge concept/knowledge, not exact wording, spelling, or syntax, unless "
-            f"the question specifically tests wording or syntax.\n"
-            f"(5) Award proportionate marks only where the answer is genuinely partially correct "
-            f"(mainly applies to descriptive answers).\n"
-            f"(6) Award zero marks if the answer is wrong.\n"
-            f"(7) Grade leniently for grades 1 to 5, and strictly for grade 6 and above.\n\n"
+            f"(1) Award full marks if the answer is fully correct.\n"
+            f"(2) Award proportionate marks if the answer is partially correct.\n"
+            f"(3) Award zero marks if the answer is wrong.\n"
+            f"(4) Award marks leniently for junior grades 1 to 5, and strictly for grades 6 and "
+            f"above.\n"
+            f"(5) Return the marks awarded in \"score\" for every item — do not omit, merge, or "
+            f"reorder items.\n\n"
             f"Output must be only the following JSON format, with no explanation, extra text, "
-            f"characters or fields. Fill 'reasoning' first — your own step-by-step worked answer, "
-            f"shown in full and not skipped, the comparison against the reference, and the "
-            f"justification for the score — before committing to the other fields:\n"
-            f'{{"reasoning": "...", "stored_answer_correct": true/false, '
-            f'"corrected_answer": "..." or null (only if stored_answer_correct is false), '
-            f'"awarded_score": <number, 0 to {float(quiz_score.marks)}>}}'
+            f"characters or fields:\n"
+            f'{{"content": {json.dumps(items)}}}'
         ),
         temperature=0.0,
-        max_tokens=800,
+        max_tokens=3200,
     )
-    return result
+    return result["content"]
 
 
 def _build_challenge_display(quiz_score: QuizScore) -> tuple[str, str, str]:

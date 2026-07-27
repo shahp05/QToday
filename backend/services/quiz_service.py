@@ -1,5 +1,6 @@
 import math
 import random
+import re
 from datetime import datetime, timezone
 
 from sqlalchemy import select, text
@@ -185,7 +186,10 @@ def get_quiz_questions(db: Session, *, claims: dict, topic_id: int, grade_id: in
 
 
 def _normalize(value: str | None) -> str:
-    return " ".join((value or "").strip().lower().split())
+    # Case-insensitive and blind to all whitespace (leading, trailing, and
+    # inline) — an exact-match check for short answers (a word/number/
+    # option key), not a text-similarity comparison.
+    return re.sub(r"\s+", "", (value or "").lower())
 
 
 def submit_quiz(db: Session, *, claims: dict, payload) -> dict:
@@ -221,23 +225,6 @@ def submit_quiz(db: Session, *, claims: dict, payload) -> dict:
     marks_per_qa = get_setting("default_marks_per_qa", 5)
     subject_id = qa_rows[0].subject_id
 
-    # A mismatched MCQ/true_false answer means either the student got it
-    # wrong, or the stored answer itself is wrong — which one is decided by
-    # whether any other student has already been scored against this exact
-    # qa_id (see class docstring/original spec): if so, the stored answer is
-    # trusted and this student is simply wrong; if this is the first attempt
-    # ever on the question, it's queued for LLM review instead of guessed at.
-    needs_other_check = [
-        a.qa_id for a in payload.answers
-        if a.student_response and qa_by_id[a.qa_id].question_type in ("mcq", "true_false")
-        and _normalize(a.student_response) != _normalize(qa_by_id[a.qa_id].answer)
-    ]
-    other_exists: set[int] = set()
-    if needs_other_check:
-        other_exists = set(db.execute(
-            select(QuizScore.qa_id).where(QuizScore.qa_id.in_(needs_other_check)).distinct()
-        ).scalars().all())
-
     quiz = Quiz(
         subject_id=subject_id,
         topic_id=payload.topic_id,
@@ -260,11 +247,10 @@ def submit_quiz(db: Session, *, claims: dict, payload) -> dict:
         if response is None:
             score, is_scored = 0, True
         elif qa.question_type in ("mcq", "true_false"):
-            if _normalize(response) == _normalize(qa.answer):
-                score, is_scored = marks_per_qa, True
-            elif qa.qa_id in other_exists:
-                score, is_scored = 0, True
-            # else: first attempt on a mismatch — leave unscored for LLM review
+            # qa.answer is already blind-solve verified before ever being
+            # served (see qa_service._verify_qa_batch) — no "first attempt,
+            # maybe the stored answer is wrong" escape hatch needed here.
+            score, is_scored = (marks_per_qa if _normalize(response) == _normalize(qa.answer) else 0), True
         else:  # descriptive
             if _normalize(response) == _normalize(qa.answer):
                 score, is_scored = marks_per_qa, True
