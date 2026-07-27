@@ -1,3 +1,4 @@
+import math
 import random
 from datetime import datetime, timezone
 
@@ -456,6 +457,7 @@ async def challenge_quiz_question(db: Session, *, claims: dict, quiz_id: int, qa
         raise AppError(ErrorCode.EXTERNAL_SERVICE_FAILED)
 
     grade_name = str(quiz_score.qa.grade.grade_name) if quiz_score.qa and quiz_score.qa.grade else "unknown"
+    previous_score = float(quiz_score.score)
     try:
         result = await evaluate_challenge(quiz_score, context=context, grade_name=grade_name, reason=reason)
         revised_score = max(0.0, min(float(quiz_score.marks), float(result["revised_score"])))
@@ -463,6 +465,11 @@ async def challenge_quiz_question(db: Session, *, claims: dict, quiz_id: int, qa
         raise AppError(ErrorCode.EXTERNAL_SERVICE_FAILED)
 
     explanation = result.get("explanation") or ""
+    # The LLM only ever writes the answer explanation — whether the score
+    # changed (up, down, or partially) is a plain number comparison, not
+    # something worth asking the model to classify and prefix itself.
+    if not math.isclose(revised_score, previous_score, abs_tol=1e-9):
+        explanation = f"Revised score: {explanation}"
     quiz_score.score = revised_score
     if result.get("stored_answer_correct") is False and result.get("corrected_answer"):
         # Unlike the batch scoring pass, a challenge is an adjudicated

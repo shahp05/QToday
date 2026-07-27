@@ -131,7 +131,9 @@ export default function StudentQuizQaItem({ q, quizId, onChallengeResolved }) {
             const isCorrectOption = isMcq
               ? q.answer.toLowerCase().split(',').includes(key.toLowerCase())
               : q.answer.toLowerCase() === text.toLowerCase()
-            const isStudentPick = q.student_response != null && key.toLowerCase() === q.student_response.toLowerCase()
+            const isStudentPick = q.student_response != null && (isMcq
+              ? key.toLowerCase() === q.student_response.toLowerCase()
+              : text.toLowerCase() === q.student_response.toLowerCase())
             let modifier = ''
             let content = key.toUpperCase()
             if (isStudentPick && q.is_scored) {

@@ -352,23 +352,30 @@ export default function QuizPage({ subjectName, topicName, topicId, gradeId, que
               <div className="quiz-answer-zone">
                 {renderOptions ? (
                   <ul className="quiz-options">
-                    {Object.entries(renderOptions).map(([key, text]) => (
-                      <li
-                        key={key}
-                        className={`quiz-option-item${answers[q.qa_id] === key ? ' quiz-option-item--selected' : ''}`}
-                        onClick={() => handleSelectOption(q.qa_id, key)}
-                      >
-                        <button
-                          type="button"
-                          className={`quiz-option-key${answers[q.qa_id] === key ? ' quiz-option-key--selected' : ''}`}
-                          onClick={() => handleSelectOption(q.qa_id, key)}
-                          aria-label={`Select option ${key.toUpperCase()}`}
+                    {Object.entries(renderOptions).map(([key, text]) => {
+                      // MCQ answers are stored as the option key (a/b/c/d); true/false
+                      // answers are stored as the full word (True/False) — see QA.answer
+                      // convention. The submitted/compared value must match whichever
+                      // convention this question type actually uses.
+                      const value = q.question_type === 'true_false' ? text : key
+                      return (
+                        <li
+                          key={key}
+                          className={`quiz-option-item${answers[q.qa_id] === value ? ' quiz-option-item--selected' : ''}`}
+                          onClick={() => handleSelectOption(q.qa_id, value)}
                         >
-                          {key.toUpperCase()}
-                        </button>
-                        <MathText text={text} />
-                      </li>
-                    ))}
+                          <button
+                            type="button"
+                            className={`quiz-option-key${answers[q.qa_id] === value ? ' quiz-option-key--selected' : ''}`}
+                            onClick={() => handleSelectOption(q.qa_id, value)}
+                            aria-label={`Select option ${key.toUpperCase()}`}
+                          >
+                            {key.toUpperCase()}
+                          </button>
+                          <MathText text={text} />
+                        </li>
+                      )
+                    })}
                   </ul>
                 ) : (
                   <textarea
