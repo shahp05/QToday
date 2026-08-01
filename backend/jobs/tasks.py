@@ -13,7 +13,7 @@ from jobs.app import app
 from services.batch_job_service import close_job, fail_job, is_due, start_job
 from services.country_service import fetch_and_sync_countries
 from services.error_log_service import mark_old_error_logs_for_purge, physically_delete_purged_error_logs
-from services.qa_service import poll_and_finalize_qa_batch, should_top_up_qa, submit_qa_top_up_batch
+from services.qa_service import poll_and_finalize_qa_batch, should_top_up_qa, submit_qa_top_up_batch, verify_pending_qa
 from services.quiz_scoring_service import score_pending_quiz
 
 REQUEST_TYPE_COUNTRY_LIST = "country_list"
@@ -21,6 +21,7 @@ REQUEST_TYPE_ERROR_LOG_PURGE_MARK = "error_log_purge_mark"
 REQUEST_TYPE_ERROR_LOG_PURGE_DELETE = "error_log_purge_delete"
 REQUEST_TYPE_QUIZ_SCORING = "qa_scoring"
 REQUEST_TYPE_QA_TOP_UP = "qa_generation"
+REQUEST_TYPE_QA_VERIFICATION = "qa_verification"
 
 
 @app.periodic(cron="0 3 * * *", periodic_id="refresh_countries")  # checked daily; only acts when actually due
@@ -157,5 +158,30 @@ async def poll_qa_generation_batches(timestamp: int) -> dict:
                 db.rollback()
                 fail_job(db, job)
         return {"checked": len(pending), "results": results}
+    finally:
+        db.close()
+
+
+# Third of three places the QA quality-check call fires (see
+# qa_service.verify_pending_qa's docstring for the other two) — an
+# independent daily sweep so nothing generated is ever left permanently
+# unverified just because both other triggers happened to miss a row.
+@app.periodic(cron="0 6 * * *", periodic_id="verify_pending_qa")  # daily; is_due below makes this the real gate
+@app.task(queue="qa_generation")
+async def verify_pending_qa_task(timestamp: int) -> dict:
+    db = SessionLocal()
+    try:
+        if not is_due(db, REQUEST_TYPE_QA_VERIFICATION):
+            return {"skipped": True, "reason": "not due yet"}
+
+        job = start_job(db, REQUEST_TYPE_QA_VERIFICATION)
+        try:
+            result = await verify_pending_qa(db)
+            close_job(db, job)
+            return {"skipped": False, **result}
+        except Exception:
+            db.rollback()
+            fail_job(db, job)
+            raise
     finally:
         db.close()

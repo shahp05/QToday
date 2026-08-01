@@ -247,7 +247,7 @@ def submit_quiz(db: Session, *, claims: dict, payload) -> dict:
         if response is None:
             score, is_scored = 0, True
         elif qa.question_type in ("mcq", "true_false"):
-            # qa.answer is already blind-solve verified before ever being
+            # qa.answer is already independently verified before ever being
             # served (see qa_service._verify_qa_batch) — no "first attempt,
             # maybe the stored answer is wrong" escape hatch needed here.
             score, is_scored = (marks_per_qa if _normalize(response) == _normalize(qa.answer) else 0), True

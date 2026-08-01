@@ -16,6 +16,7 @@ See conversation history for the full design rationale. Summary:
      names (catches typos), then create whatever's still missing.
 """
 import asyncio
+import json
 import math
 import traceback
 from datetime import date, datetime
@@ -317,7 +318,7 @@ async def _get_verified_qa(
     pending = [q for q in existing if not q.is_verified]
 
     if pending:
-        verified += await _verify_qa_batch(pending)
+        verified += await _verify_qa_batch(db, subject, topic, grade_row, pending)
         db.commit()
 
     if verified:
@@ -325,104 +326,152 @@ async def _get_verified_qa(
 
     new_rows = await _generate_and_save_qa(db, subject, topic, subject_area, grade_row, grade)
     db.commit()
-    return await _verify_qa_batch(new_rows)
+    return await _verify_qa_batch(db, subject, topic, grade_row, new_rows)
 
 
-async def _verify_qa_batch(qa_rows: list[QA]) -> list[QA]:
-    """Generator/verifier pattern: an independent LLM call answers each
-    question blind (never shown the stored answer, see _blind_solve) and its
-    answer is graded against what's actually stored. Passing sets
-    is_verified=True. Failing — either the question itself was unanswerable/
-    ambiguous, or the derived answer doesn't match the stored one — retires
-    the row (is_active=False, flag_reason) the same way a teacher's manual
-    flag does, rather than leaving it to sit unverified and unserved
-    forever. A verifier-call error (network/parse failure, not a content
-    problem) leaves the row untouched so it's simply retried on a later
-    request, instead of being punished for an infra hiccup."""
-    results = await asyncio.gather(*[_verify_one(qa) for qa in qa_rows], return_exceptions=True)
-
-    passed = []
-    for qa, result in zip(qa_rows, results):
-        if isinstance(result, BaseException):
-            continue
-        ok, flag_reason = result
-        if ok:
-            qa.is_verified = True
-            passed.append(qa)
-        else:
-            qa.is_verified = False
-            qa.is_active = False
-            qa.flag_reason = flag_reason
-    return passed
+_FLAG_REASONS = ("incorrect", "unclear", "irrelevant")  # must match db.models.QA's chk_flag_reason
 
 
-async def _verify_one(qa: QA) -> tuple[bool, str | None]:
-    solved = await _blind_solve(qa)
-    if not solved.get("answerable", True):
-        return False, "unclear"
-
-    derived = solved.get("answer")
-    if qa.question_type == "descriptive":
-        equivalent = await _check_equivalence(qa.question, derived, qa.answer)
-        return (True, None) if equivalent else (False, "incorrect")
-
-    matches = isinstance(derived, str) and derived.strip().lower() == qa.answer.strip().lower()
-    return (True, None) if matches else (False, "incorrect")
-
-
-async def _blind_solve(qa: QA) -> dict:
-    """Independently answers the question WITHOUT ever seeing the stored
-    answer — the model only sees what a student would see. Sending the
-    'correct' answer alongside the question in the same call would make
-    this a rubber stamp instead of a real check (anchoring bias)."""
-    if qa.question_type == "mcq":
-        options_block = "\n".join(f"{k}) {v}" for k, v in sorted(qa.options.items()))
-        question_block = f'Question: "{qa.question}"\nOptions:\n{options_block}'
-        answer_format = '"answer" as the single correct option key ("a", "b", "c", or "d")'
-    elif qa.question_type == "true_false":
-        question_block = f'Statement: "{qa.question}"\nIs this statement True or False?'
-        answer_format = '"answer" as the string "True" or "False"'
+def _verify_item_payload(qa: QA) -> dict:
+    """true_false is folded into the same shape as mcq — two options,
+    answer given as the option key — so the verifier needs only one item
+    shape, not a third branch (per .NET: boolean questions were treated as
+    MCQ with two choices there too)."""
+    if qa.question_type == "true_false":
+        options = {"a": "True", "b": "False"}
+        answer = "a" if qa.answer.strip().lower() == "true" else "b"
     else:
-        question_block = f'Question: "{qa.question}"'
-        answer_format = '"answer" as your free-text answer'
-
-    llm = get_llm_client(LLMPurpose.VALIDATE)
-    return await llm.generate_json(
-        system=(
-            "You are a diligent student answering a practice question independently, without "
-            "knowing what answer is expected. Solve it carefully and show your reasoning. If the "
-            "question is ambiguous, has no single correct answer, or cannot be answered as "
-            "written, say so honestly rather than guessing."
-        ),
-        user=(
-            f"{question_block}\n\n"
-            f'Respond as JSON: {{"answerable": true/false, "reasoning": "<your work>", {answer_format}}}'
-        ),
-        temperature=0.2,
-        max_tokens=1000,
-    )
+        options = qa.options
+        answer = qa.answer
+    return {"qa_id": qa.qa_id, "question": qa.question, "options": options, "answer": answer}
 
 
-async def _check_equivalence(question: str, derived_answer, stored_answer: str) -> bool:
-    """Free-text answers can be phrased differently while meaning the same
-    thing (e.g. "12" vs "twelve"), so equivalence is judged by the model
-    rather than a string comparison that would false-negative on wording."""
+def _verify_max_tokens(total_items: int) -> int:
+    """Output per item is tiny (qa_id + failed + a one-word reason), so this
+    scales far more gently than generation's per-item budget."""
+    return min(16000, 500 + 120 * total_items)
+
+
+async def _verify_qa_batch(db: Session, subject: Subject, topic: Topic, grade_row: Grade, qa_rows: list[QA]) -> list[QA]:
+    """One call checks every pending row together — subject/topic/country
+    context is established once instead of repeated per row (same pattern
+    as quiz_scoring_service._evaluate_batch). An independent expert-
+    academician persona is shown each question AND its stored answer
+    directly and asked to work out its own answer and compare — not a
+    blind solve; matches the .NET version this is based on, and avoids a
+    second answer needing to be derived and reconciled for every item.
+    Passing sets is_verified=True. Failing (can't answer it, or the stored
+    answer is wrong) retires the row (is_active=False, flag_reason) the
+    same way a teacher's manual flag does. A row absent from the response —
+    call failure, or the model just omitted it — is left untouched
+    (still pending) for a later retry rather than punished for it."""
+    if not qa_rows:
+        return []
+
+    country_id = topic.country_id or subject.country_id
+    country = db.get(Country, country_id) if country_id else None
+    country_txt = f"in {country.country_name}" if country else "globally"
+    curriculum_txt = f" specific to the school curriculum in {country.country_name}" if country else ""
+
+    items = [_verify_item_payload(qa) for qa in qa_rows]
+
     llm = get_llm_client(LLMPurpose.VALIDATE)
     result = await llm.generate_json(
         system=(
-            "You judge whether two answers to the same question are substantively equivalent, "
-            "allowing for different wording, formatting, or equivalent units — not exact text match."
+            f"You are an expert academician representing schools {country_txt}, and have deep "
+            f"knowledge of the curriculum subject {subject.subject_name}, topic {topic.topic_name}."
         ),
         user=(
-            f'Question: "{question}"\n'
-            f'Answer A: "{derived_answer}"\n'
-            f'Answer B: "{stored_answer}"\n\n'
-            f'Respond as JSON: {{"equivalent": true/false}}'
+            f"Answer each question provided in the 'content' array below, using your knowledge of "
+            f"the topic {topic.topic_name} in subject {subject.subject_name}{curriculum_txt}. "
+            f"Questions and answers may be in LaTeX.\n\n"
+            f"Follow these rules strictly:\n"
+            f"(1) Work out your own answer to each question — select from 'options' when given, "
+            f"otherwise answer directly.\n"
+            f"(2) Check if your answer matches the given 'answer' (match the final answer only, "
+            f"allowing for different wording or equivalent units).\n"
+            f"(3) If you cannot understand or answer the question, or the given answer is wrong, "
+            f'set "failed": true and set "reason" to whichever of {list(_FLAG_REASONS)} best fits. '
+            f'Otherwise set "failed": false and "reason": null.\n'
+            f'(4) Include "qa_id" from the input in every item of your response.\n\n'
+            f"Output must be only the following JSON format, with no explanation, extra text, "
+            f"characters or fields:\n"
+            f'{{"content": {json.dumps(items)}}}'
         ),
         temperature=0.0,
-        max_tokens=200,
+        max_tokens=_verify_max_tokens(len(items)),
     )
-    return bool(result.get("equivalent"))
+
+    by_id = {qa.qa_id: qa for qa in qa_rows}
+    passed = []
+    for item in result.get("content", []):
+        qa = by_id.get(item.get("qa_id"))
+        if qa is None:
+            continue
+        if item.get("failed"):
+            qa.is_verified = False
+            qa.is_active = False
+            qa.flag_reason = item.get("reason") if item.get("reason") in _FLAG_REASONS else "incorrect"
+        else:
+            qa.is_verified = True
+            passed.append(qa)
+    return passed
+
+
+def _pending_qa_groups(db: Session) -> list[tuple[int, int, int]]:
+    return db.execute(
+        select(QA.subject_id, QA.topic_id, QA.grade_id)
+        .where(QA.is_verified == False, QA.is_active == True)  # noqa: E712
+        .distinct()
+    ).all()
+
+
+async def verify_pending_qa(db: Session) -> dict:
+    """Daily sweep (jobs/tasks.py:verify_pending_qa_task) — the third of
+    three places the quality-check call fires (real-time fetch in
+    _get_verified_qa; right after a batch top-up lands in
+    poll_and_finalize_qa_batch; and this, independently, once a day) so
+    nothing generated ever sits permanently unverified just because both of
+    the other triggers happened to miss it — e.g. a batch job whose
+    generation succeeded but whose verify call then errored (rows are left
+    pending exactly for this to pick up, see poll_and_finalize_qa_batch),
+    or any other path that saved QA rows without a verification pass
+    completing. Groups pending rows by (subject, topic, grade) — the
+    context _verify_qa_batch needs — and verifies one group at a time
+    (sequential, not gathered: all groups share this one db Session, which
+    isn't safe for concurrent use). A group whose call fails is rolled back
+    and left pending for tomorrow's sweep rather than aborting the rest."""
+    groups = _pending_qa_groups(db)
+
+    groups_processed = 0
+    verified_count = 0
+    for subject_id, topic_id, grade_id in groups:
+        subject = db.get(Subject, subject_id)
+        topic = db.get(Topic, topic_id)
+        grade_row = db.get(Grade, grade_id)
+        if subject is None or topic is None or grade_row is None:
+            continue
+
+        pending_rows = db.execute(
+            select(QA).where(
+                QA.subject_id == subject_id, QA.topic_id == topic_id, QA.grade_id == grade_id,
+                QA.is_verified == False, QA.is_active == True,  # noqa: E712
+            )
+        ).scalars().all()
+        if not pending_rows:
+            continue
+
+        try:
+            verified = await _verify_qa_batch(db, subject, topic, grade_row, pending_rows)
+            db.commit()
+        except Exception:
+            db.rollback()
+            continue
+
+        groups_processed += 1
+        verified_count += len(verified)
+
+    return {"groups_found": len(groups), "groups_processed": groups_processed, "verified": verified_count}
 
 
 async def _validate_subject_topic(
@@ -965,7 +1014,7 @@ async def poll_and_finalize_qa_batch(db: Session, job: BatchJob) -> dict:
     Still running -> left untouched (checked again next poll). Failed/
     expired/cancelled -> fail_job. Completed -> download results, build+save
     QA rows (same validation/format path as the real-time generator), run
-    the normal blind-solve verification pass, close_job. Called by
+    the normal verification pass (_verify_qa_batch), close_job. Called by
     jobs/tasks.py:poll_qa_generation_batches, once per pending job."""
     llm = get_llm_client(LLMPurpose.GENERATE)
     status = await llm.get_batch_status(job.batch_id)
@@ -1009,7 +1058,7 @@ async def poll_and_finalize_qa_batch(db: Session, job: BatchJob) -> dict:
     db.flush()
     db.commit()
 
-    verified = await _verify_qa_batch(qa_rows)
+    verified = await _verify_qa_batch(db, subject, topic, grade_row, qa_rows)
     db.commit()
     close_job(db, job)
     return {"status": "completed", "added": len(verified)}

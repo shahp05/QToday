@@ -205,11 +205,10 @@ async def evaluate_challenge(
     Marks can move in either direction: a re-check may find the original
     scoring pass (auto or LLM) was too generous, not just too strict.
 
-    The default answer has already passed independent blind-solve
-    verification before ever being served to a student (see
-    qa_service._verify_qa_batch) — this prompt does not ask the LLM to
-    re-derive it from scratch, only to re-check it against the challenge
-    reason and re-score the student."""
+    The default answer has already passed independent verification before
+    ever being served to a student (see qa_service._verify_qa_batch) — this
+    prompt does not ask the LLM to re-derive it from scratch, only to
+    re-check it against the challenge reason and re-score the student."""
     question, default_answer, student_answer = _build_challenge_display(quiz_score)
 
     latex_note = ""

@@ -72,7 +72,7 @@ DEFAULT_SETTINGS: dict[str, tuple[Any, str]] = {
         {
             "country_list": {"interval_days": 90},
             "qa_generation": {"interval_days": 45},
-            "qa_verification": {},
+            "qa_verification": {"interval_days": 1},
             "qa_scoring": {},
             "qa_time_recalibration": {"interval_days": 7},
             "error_log_purge_mark": {"interval_days": 1},
