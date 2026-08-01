@@ -5,12 +5,15 @@ its job — registered once with @app.task(), it can be triggered either:
   - from the scheduler:   automatically, via @app.periodic's cron
 Both paths execute this exact function. No duplicate logic anywhere else.
 """
+from sqlalchemy import select
+
 from db.database import SessionLocal
+from db.models import BatchJob
 from jobs.app import app
 from services.batch_job_service import close_job, fail_job, is_due, start_job
 from services.country_service import fetch_and_sync_countries
 from services.error_log_service import mark_old_error_logs_for_purge, physically_delete_purged_error_logs
-from services.qa_service import top_up_qa
+from services.qa_service import poll_and_finalize_qa_batch, should_top_up_qa, submit_qa_top_up_batch
 from services.quiz_scoring_service import score_pending_quiz
 
 REQUEST_TYPE_COUNTRY_LIST = "country_list"
@@ -105,21 +108,54 @@ async def score_quiz_task(quiz_id: int) -> dict:
 
 
 # Not periodic — deferred once per quiz submission so the QA bank for a
-# (subject, topic, grade) keeps growing over time. top_up_qa itself no-ops
-# without calling the LLM once the pool is already large enough, so this is
-# cheap to trigger on every submission rather than needing its own schedule.
+# (subject, topic, grade) keeps growing over time. should_top_up_qa is a
+# read-only, no-LLM check (pool count + 45-day staleness), so this is cheap
+# to trigger on every submission rather than needing its own schedule. Only
+# *submits* the batch — the actual QA rows land later via
+# poll_qa_generation_batches once OpenAI finishes processing it, so there's
+# nothing to close_job here; submit_qa_top_up_batch creates the batch_jobs
+# row itself (only once it actually has a batch_id to record).
 @app.task(queue="qa_generation")
 async def top_up_qa_task(subject_id: int, topic_id: int, grade_id: int) -> dict:
     db = SessionLocal()
     try:
-        job = start_job(db, REQUEST_TYPE_QA_TOP_UP, subject_id=subject_id, topic_id=topic_id)
-        try:
-            added = await top_up_qa(db, subject_id=subject_id, topic_id=topic_id, grade_id=grade_id)
-            close_job(db, job)
-            return {"added": added}
-        except Exception:
-            db.rollback()
-            fail_job(db, job)
-            raise
+        if not should_top_up_qa(db, subject_id=subject_id, topic_id=topic_id, grade_id=grade_id):
+            return {"skipped": True, "reason": "not due yet"}
+        job = await submit_qa_top_up_batch(db, subject_id=subject_id, topic_id=topic_id, grade_id=grade_id)
+        if job is None:
+            return {"skipped": True, "reason": "nothing to submit"}
+        return {"skipped": False, "batch_id": job.batch_id}
+    finally:
+        db.close()
+
+
+# Polls every pending qa_generation batch against OpenAI's Batch API and
+# finalizes any that have completed (or fails ones OpenAI reports as failed/
+# expired/cancelled) — see qa_service.poll_and_finalize_qa_batch. Runs
+# frequently since a batch can complete well before its 24h window closes,
+# and nothing else drives this forward — unlike top_up_qa_task there's no
+# per-submission trigger for "check if my batch is done".
+@app.periodic(cron="*/10 * * * *", periodic_id="poll_qa_generation_batches")
+@app.task(queue="qa_generation")
+async def poll_qa_generation_batches(timestamp: int) -> dict:
+    db = SessionLocal()
+    try:
+        pending = db.execute(
+            select(BatchJob).where(
+                BatchJob.request_type == REQUEST_TYPE_QA_TOP_UP,
+                BatchJob.is_active == True,  # noqa: E712
+                BatchJob.is_closed == False,  # noqa: E712
+                BatchJob.batch_id.isnot(None),
+            )
+        ).scalars().all()
+
+        results = []
+        for job in pending:
+            try:
+                results.append(await poll_and_finalize_qa_batch(db, job))
+            except Exception:
+                db.rollback()
+                fail_job(db, job)
+        return {"checked": len(pending), "results": results}
     finally:
         db.close()

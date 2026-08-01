@@ -67,8 +67,9 @@ async def submit_quiz_route(
 
     if result["pending_count"] > 0:
         await score_quiz_task.defer_async(quiz_id=result["quiz_id"])
-    # Deferred regardless of whether LLM scoring was needed — top_up_qa
-    # itself no-ops (no LLM call) once the pool is already large enough.
+    # Deferred regardless of whether LLM scoring was needed — top_up_qa_task
+    # itself skips without any LLM call once the pool is large enough and
+    # the last top-up isn't stale yet (see qa_service.should_top_up_qa).
     await top_up_qa_task.defer_async(
         subject_id=result["subject_id"], topic_id=payload.topic_id, grade_id=payload.grade_id,
     )

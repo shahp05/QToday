@@ -48,3 +48,24 @@ def compute_allocation(qa_count: int, grade: int) -> dict[str, dict[int, int]]:
         grid[q_type] = {int(level): n for level, n in rounded.items()}
 
     return grid
+
+
+def active_cells() -> list[tuple[str, int]]:
+    """Which (question_type, difficulty_level) combinations have non-zero
+    weight in the configured content mix — same percentages compute_allocation
+    uses, just without a total to round into counts. Used by qa_service's
+    top-up path to decide which cells are worth a generation call, WITHOUT
+    ever turning that into an item count told to the LLM (top-ups ask for an
+    open-ended 'as many good ones as you can' per cell — see qa_service)."""
+    descriptive_pct = get_setting("descriptive_pct", 0.25)
+    mcq_pct = get_setting("mcq_pct", 0.50)
+    boolean_pct = 1.0 - descriptive_pct - mcq_pct
+    type_pcts = {"descriptive": descriptive_pct, "mcq": mcq_pct, "true_false": boolean_pct}
+
+    difficulty_pcts = get_setting("difficulty_default", [0.125, 0.125, 0.125, 0.125, 0.5])
+
+    return [
+        (q_type, level)
+        for q_type, t_pct in type_pcts.items() if t_pct > 0
+        for level, d_pct in enumerate(difficulty_pcts, start=1) if d_pct > 0
+    ]

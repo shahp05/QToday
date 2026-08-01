@@ -439,6 +439,7 @@ CREATE TABLE IF NOT EXISTS batch_jobs (
     country_id      INTEGER         NULL REFERENCES countries(country_id),
     subject_id      INTEGER         NULL REFERENCES subjects(subject_id),
     topic_id        INTEGER         NULL REFERENCES topics(topic_id),
+    grade_id        INTEGER         NULL REFERENCES grades(grade_id),
     qa_id           INTEGER         NULL REFERENCES qa(qa_id),
     quiz_id         INTEGER         NULL REFERENCES quizzes(quiz_id),
     challenge_id    INTEGER         NULL REFERENCES quiz_challenges(challenge_id),
@@ -512,6 +513,7 @@ CREATE INDEX IF NOT EXISTS idx_quiz_challenges_qa    ON quiz_challenges(qa_id);
 CREATE INDEX IF NOT EXISTS idx_batch_jobs_country    ON batch_jobs(country_id);
 CREATE INDEX IF NOT EXISTS idx_batch_jobs_subject    ON batch_jobs(subject_id);
 CREATE INDEX IF NOT EXISTS idx_batch_jobs_topic      ON batch_jobs(topic_id);
+CREATE INDEX IF NOT EXISTS idx_batch_jobs_grade      ON batch_jobs(grade_id);
 CREATE INDEX IF NOT EXISTS idx_batch_jobs_lookup      -- "find last successful run" query
     ON batch_jobs(request_type, is_active, is_closed, date_created);
 CREATE INDEX IF NOT EXISTS idx_error_logs_type        ON error_logs(type);

@@ -16,6 +16,7 @@ See conversation history for the full design rationale. Summary:
      names (catches typos), then create whatever's still missing.
 """
 import asyncio
+import math
 import traceback
 from datetime import date, datetime
 
@@ -23,11 +24,14 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from config.app_config import get_setting
-from db.models import Country, Customer, Grade, QA, Student, StudentGrade, Subject, SubjectArea, TeachLog, Topic, User
+from db.models import (
+    BatchJob, Country, Customer, Grade, QA, Student, StudentGrade, Subject, SubjectArea, TeachLog, Topic, User,
+)
 from errors.app_error import AppError
 from errors.error_codes import ErrorCode
 from llm.factory import LLMPurpose, get_llm_client
-from services.allocation_service import compute_allocation
+from services.allocation_service import active_cells, compute_allocation
+from services.batch_job_service import close_job, fail_job, is_due, start_job
 from services.error_log_service import log_error
 from services.subject_icon_service import resolve_icon_key
 from services.matching_service import match_subject, match_subject_area, match_subject_area_globally, match_topic
@@ -48,9 +52,23 @@ _TYPE_INSTRUCTIONS = {
         "'All of the above' or 'None of the above' as an option."
     ),
     "true_false": (
-        "Each item needs 'question' phrased as a true/false statement, and 'answer' as the string "
-        "'True' or 'False'."
+        "Each item needs 'question' phrased as a single, unambiguous true/false statement, and "
+        "'answer' as the string 'True' or 'False'. The statement must be objectively and wholly "
+        "true or wholly false — never partially true, an opinion, or dependent on interpretation. "
+        "Avoid trick wording; the statement should test the concept, not close reading."
     ),
+}
+
+# Per-difficulty-level briefs used when a level is generated on its own (top-
+# up path, see submit_qa_top_up_batch) — keeps the model focused on exactly
+# one complexity target instead of splitting attention across a mix.
+_LEVEL_BRIEFS = {
+    1: "basic recall — a single, straightforward fact or step",
+    2: "basic application — direct, single-step application of the concept",
+    3: "moderate — connects more than one idea, or a short multi-step solution",
+    4: "advanced — long-tail, computational or analytical, multi-step",
+    5: "most demanding — long-tail, computational and analytical, multi-step, "
+       "at the edge of what's expected for the grade",
 }
 
 
@@ -457,24 +475,36 @@ async def _validate_subject_topic(
 async def _generate_and_save_qa(
     db: Session, subject: Subject, topic: Topic, subject_area: SubjectArea, grade_row: Grade, grade: int
 ) -> list[QA]:
-    qa_count = get_setting("qa_count", 30)
-    allocation = compute_allocation(qa_count, grade)
+    """Real-time path — only ever reached when this topic/grade has no
+    active QA at all yet (see _get_verified_qa), i.e. quizzes can't be
+    played on it until this returns something. That's the ONE case where a
+    count is given to the LLM at all, and even then only as a floor
+    ('minimum'), not an exact target — see conversation history for why an
+    exact-count instruction hurts question quality. Every later top-up
+    (services.qa_service.submit_qa_top_up_batch) asks for no count
+    whatsoever, directly or indirectly."""
+    # +50% over what one quiz needs, so verification failures still leave
+    # enough to actually play a quiz on the first try.
+    min_count = math.ceil(get_setting("default_questions_per_quiz", 20) * 1.5)
+    allocation = compute_allocation(min_count, grade)
+    type_counts = {q_type: sum(levels.values()) for q_type, levels in allocation.items()}
     is_country_specific = subject.country_id is not None or topic.country_id is not None
     area_name = subject_area.area_name if subject_area.area_name != _GENERAL_AREA else None
     prior_failures = _get_prior_failures(db, topic, grade_row)
+    existing_questions = _get_existing_questions(db, topic, grade_row)
 
     results = await asyncio.gather(
         *[
             _generate_type_batch(
-                subject.subject_name, area_name, topic.topic_name, grade, q_type, counts,
-                is_country_specific, prior_failures,
+                subject.subject_name, area_name, topic.topic_name, grade, q_type, count,
+                is_country_specific, prior_failures, existing_questions,
             )
-            for q_type, counts in allocation.items()
+            for q_type, count in type_counts.items()
         ]
     )
 
     qa_rows = []
-    for q_type, items in zip(allocation.keys(), results):
+    for q_type, items in zip(type_counts.keys(), results):
         for item in items:
             qa_rows.append(
                 QA(
@@ -527,6 +557,27 @@ def _prior_failures_block(prior_failures: list[dict]) -> str:
     )
 
 
+def _get_existing_questions(db: Session, topic: Topic, grade_row: Grade) -> list[str]:
+    """Every currently-active question (any type) already on file for this
+    topic/grade, fed back into the generation prompt so the model can't
+    produce a near-duplicate of something already served."""
+    rows = db.execute(
+        select(QA.question).where(
+            QA.topic_id == topic.topic_id,
+            QA.grade_id == grade_row.grade_id,
+            QA.is_active == True,  # noqa: E712
+        )
+    ).scalars().all()
+    return list(rows)
+
+
+def _existing_questions_block(existing_questions: list[str]) -> str:
+    if not existing_questions:
+        return ""
+    lines = "\n".join(f'- "{q}"' for q in existing_questions)
+    return f"\nDo not duplicate or closely rephrase these existing questions:\n{lines}\n"
+
+
 def _format_answer(answer) -> str:
     """MCQ answers come back as a list of option keys; store as comma-joined
     string to match the qa.answer TEXT column. Other types are already strings."""
@@ -576,62 +627,87 @@ def _validate_items(items: list, question_type: str) -> list[dict]:
     return valid
 
 
-def _shortfall_by_level(requested: dict[int, int], valid_items: list[dict]) -> dict[int, int]:
-    have: dict[int, int] = {}
-    for item in valid_items:
-        level = item["difficulty_level"]
-        have[level] = have.get(level, 0) + 1
-    return {level: max(0, count - have.get(level, 0)) for level, count in requested.items()}
-
-
 async def _generate_type_batch(
     subject_name: str,
     area_name: str | None,
     topic_name: str,
     grade: int,
     question_type: str,
-    difficulty_counts: dict[int, int],
+    count: int,
     is_country_specific: bool,
     prior_failures: list[dict],
+    existing_questions: list[str],
 ) -> list[dict]:
-    total = sum(difficulty_counts.values())
-    if total == 0:
+    """Real-time path only (see _generate_and_save_qa) — one mixed-difficulty
+    call asking for a MINIMUM of `count` (never 'exactly'), model's own
+    judgement on the easy/hard split. If validation-eligible items come back
+    under that floor, one bounded mechanical retry asks for the shortfall —
+    a code-level guarantee that quizzes have enough to work with, without
+    ever hardening the *prompt* itself into an exact-count demand."""
+    if count <= 0:
         return []
 
     items = await _call_generate(
-        subject_name, area_name, topic_name, grade, question_type, difficulty_counts,
-        is_country_specific, prior_failures,
+        subject_name, area_name, topic_name, grade, question_type, count,
+        is_country_specific, prior_failures, existing_questions,
     )
     valid_items = _validate_items(items, question_type)
 
-    # One bounded retry for whatever fell out of validation, requesting
-    # exactly the shortfall per difficulty level — not the whole batch again.
-    remaining = _shortfall_by_level(difficulty_counts, valid_items)
-    if sum(remaining.values()) > 0:
+    shortfall = count - len(valid_items)
+    if shortfall > 0:
         retry_items = await _call_generate(
-            subject_name, area_name, topic_name, grade, question_type, remaining,
-            is_country_specific, prior_failures,
+            subject_name, area_name, topic_name, grade, question_type, shortfall,
+            is_country_specific, prior_failures, existing_questions,
         )
         valid_items += _validate_items(retry_items, question_type)
 
     return valid_items
 
 
-async def _call_generate(
+_TOPUP_MAX_TOKENS = 3000  # room for "a handful" of items per cell — a token ceiling, not a count told to the LLM
+
+
+def _build_generate_request(
     subject_name: str,
     area_name: str | None,
     topic_name: str,
     grade: int,
     question_type: str,
-    difficulty_counts: dict[int, int],
     is_country_specific: bool,
     prior_failures: list[dict],
-) -> list[dict]:
-    total = sum(difficulty_counts.values())
-    if total == 0:
-        return []
+    existing_questions: list[str],
+    *,
+    is_first_batch: bool,
+    count: int | None = None,
+    level: int | None = None,
+) -> dict:
+    """Builds the system/user/temperature/max_tokens for one generation
+    call — pure, no LLM call — so the exact same prompt can be either
+    awaited immediately (_call_generate, the real-time first-ever batch for
+    a topic, `count` set) or queued as one line of an OpenAI Batch API
+    submission (_build_topup_batch_lines, every top-up after that, `level`
+    set, no count at all — see conversation history for why an exact- or
+    even a minimum-count instruction is reserved for the real-time path
+    only, where it's the difference between a quiz being playable or not)."""
+    if is_first_batch:
+        difficulty_instruction = (
+            f"Generate a minimum of {count} questions. This is the first batch for this topic and "
+            f"grade, so use your own judgement to produce a natural mix of easy, medium and hard "
+            f"questions — assign each item a 'difficulty_level' from 1 (easiest) to 5 (hardest) "
+            f"that honestly reflects it."
+        )
+        max_tokens = _generation_max_tokens(count)
+    else:
+        difficulty_instruction = (
+            f"Generate new questions on this topic at difficulty_level {level}: "
+            f"{_LEVEL_BRIEFS[level]}. Set 'difficulty_level' to {level} for every item. Write as "
+            f"many meaningfully distinct, non-duplicate questions as you can for this topic at "
+            f"this level — do not pad to reach any particular number; a handful of well-crafted "
+            f"questions is better than a forced quantity, and it's fine to return few or even none "
+            f"if the topic is genuinely exhausted at this level."
+        )
+        max_tokens = _TOPUP_MAX_TOKENS
 
-    counts_str = ", ".join(f"{n} at difficulty {level}" for level, n in difficulty_counts.items() if n > 0)
     locale_instruction = (
         "This topic may be localized — use regional context (e.g. currency, place names) where "
         "natural and appropriate."
@@ -642,71 +718,89 @@ async def _call_generate(
     area_line = f'Subject Area: "{area_name}"\n' if area_name else ""
     exam_level_instruction = _exam_level_instruction(grade)
 
-    llm = get_llm_client(LLMPurpose.GENERATE)
-    result = await llm.generate_json(
-        system=(
-            "You generate academic practice questions focused on testing CONCEPTUAL understanding, "
-            "not exam-board-specific phrasing or wording. Generate content in English only. "
-            "Use LaTeX only for mathematical notation, restricted to syntax supported by KaTeX — "
-            "avoid \\begin{align}, \\newcommand, and other unsupported environments. "
-            "Wrap inline math in $...$ and block math in $$...$$. "
-            "Do not invent or guess facts, statistics, dates, quotes, or attributions. Only use "
-            "real-world facts you are confident are accurate; if you are not certain of a fact, "
-            "write a question that does not depend on it."
+    return {
+        "system": (
+            f"You are an expert academician with deep knowledge of the curriculum subject "
+            f"{subject_name}. You generate academic practice questions that test CONCEPTUAL "
+            f"understanding, not exam-board-specific phrasing or wording."
         ),
-        user=(
+        "user": (
             f'Subject: "{subject_name}"\n'
             f"{area_line}"
             f'Topic: "{topic_name}"\n'
             f"Grade: {grade}\n"
             f"Question type: {question_type}\n\n"
-            f"Generate exactly: {counts_str}\n"
+            f"{difficulty_instruction}\n"
             f"{_TYPE_INSTRUCTIONS[question_type]}\n"
-            f"{locale_instruction}\n"
             f"{exam_level_instruction}\n"
-            f"{_prior_failures_block(prior_failures)}\n"
-            f"Difficulty guidance: levels 1-2 are recall/basic application. Levels 3-5 must be "
-            f"long-tail, computational, analytical, and complex — level 5 being the most demanding.\n\n"
-            f"For each item, work out the correct answer step-by-step (e.g. show the actual "
-            f"arithmetic/logic) in a 'reasoning' field BEFORE writing 'answer' — commit to the "
-            f"worked-out result rather than guessing, and make sure 'question'/'options'/'answer' "
-            f"are all consistent with that reasoning.\n\n"
-            f"Also estimate 'eta' — the time in seconds a student of that grade would realistically "
-            f"need to read and answer THIS SPECIFIC question. Judge it per-question, weighing: "
-            f"(a) how long-tail the question or expected answer is (a one-word/one-number answer "
-            f"needs far less time than a multi-step written response), and (b) how conceptually "
-            f"complex it is — whether answering requires combining multiple distinct concepts or "
-            f"knowledge areas versus a single fact or operation. Do not default to a fixed number "
-            f"per difficulty level or question type — a difficulty-5 question with a short, simple "
-            f"answer should still get a low eta, and a difficulty-1 question should not be padded "
-            f"up to some assumed minimum.\n\n"
+            f"{_prior_failures_block(prior_failures)}"
+            f"{_existing_questions_block(existing_questions)}\n"
+            f"Follow these rules strictly:\n"
+            f"(1) {locale_instruction}\n"
+            f"(2) Do not add questions based on non-text content — images, audio, video, maps, "
+            f"diagrams — or that require a physical action (underline, circle, tick/cross, etc.).\n"
+            f"(3) Do not mention the student's grade or level in the question text.\n"
+            f"(4) Do not add questions that are factually incorrect, ambiguous, or whose correct "
+            f"answer could change over time or depends on real-time/current data (e.g. current "
+            f"office-holders, latest statistics, today's date). Every question must have one "
+            f"single, permanently correct answer.\n"
+            f"(5) Do not invent or guess facts, statistics, dates, quotes, or attributions — only "
+            f"use real-world facts you are confident are accurate; if unsure, write a question "
+            f"that does not depend on that fact.\n"
+            f"(6) Do not duplicate or repeat any question listed above as already existing or "
+            f"previously rejected.\n"
+            f"(7) Provide all content in English. If a question or answer contains a math "
+            f"expression, write it in LaTeX compatible with KaTeX, wrapped in $...$ (inline) or "
+            f"$$...$$ (block) — avoid \\begin{{align}}, \\newcommand, and other unsupported "
+            f"environments.\n"
+            f"(8) Estimate 'eta': the seconds a grade {grade} student would realistically need to "
+            f"read and answer that specific question — short-answer items get a low eta even at "
+            f"high difficulty, long/multi-step items get a higher one.\n\n"
             f'Respond as JSON: {{"items": [{{"question": "...", '
             f'"options": {{"a":"...","b":"...","c":"...","d":"..."}} or null, '
-            f'"reasoning": "<step-by-step work>", "answer": ..., '
-            f'"difficulty_level": N, "eta": <seconds>}}, ...]}}'
+            f'"answer": ..., "difficulty_level": N, "eta": <seconds>}}, ...]}}'
         ),
-        temperature=0.3,
-        max_tokens=_generation_max_tokens(total),
+        "temperature": 0.3,
+        "max_tokens": max_tokens,
+    }
+
+
+async def _call_generate(
+    subject_name: str,
+    area_name: str | None,
+    topic_name: str,
+    grade: int,
+    question_type: str,
+    count: int,
+    is_country_specific: bool,
+    prior_failures: list[dict],
+    existing_questions: list[str],
+) -> list[dict]:
+    if count <= 0:
+        return []
+
+    req = _build_generate_request(
+        subject_name, area_name, topic_name, grade, question_type,
+        is_country_specific, prior_failures, existing_questions,
+        is_first_batch=True, count=count,
     )
+    llm = get_llm_client(LLMPurpose.GENERATE)
+    result = await llm.generate_json(**req)
     return result["items"]
 
 
 def _exam_level_instruction(grade: int) -> str:
-    """Grades 9-10 and 11-12 must target India's exam standards regardless
-    of the student's actual country — per product spec, these grades are
-    universally benchmarked against the India curriculum. Phrased as a
-    difficulty/rigor target rather than naming exam boards, so the model
-    calibrates depth without mimicking exam-paper phrasing or notation."""
-    if grade in (9, 10):
+    """Grade 10 and grade 12 must target India's exam standards regardless
+    of the student's actual country — per product spec, these two grades
+    are universally benchmarked against the India curriculum (matches the
+    qualifier10/qualifier12 constants from the prior .NET implementation:
+    scoped to exactly grade 10 and grade 12, not their 9/11 neighbors)."""
+    if grade == 10:
+        return "IMPORTANT: Questions must be of highest-level complexity equivalent to grade 10 Board Exams in India."
+    if grade == 12:
         return (
-            "Match the difficulty and depth expected of a strong Grade 9-10 student in India "
-            "under CBSE/ICSE-level rigor, regardless of the student's actual country."
-        )
-    if grade in (11, 12):
-        return (
-            "Match the difficulty and depth expected of a strong Grade 11-12 student in India "
-            "preparing for competitive entrance exams (IIT-JEE/NEET/CUET) and board-level rigor, "
-            "regardless of the student's actual country."
+            "IMPORTANT: Questions must be of highest-level complexity equivalent to grade 12 Board "
+            "Exams, IITJEE, NEET, CUET and other competitive exams in India."
         )
     return ""
 
@@ -756,34 +850,169 @@ def update_qa(db: Session, *, qa_id: int, user_id: int, customer_id: int, payloa
     return _serialize([qa])[0]
 
 
-async def top_up_qa(db: Session, *, subject_id: int, topic_id: int, grade_id: int) -> int:
-    """Best-effort background replenishment of the QA pool for a
-    (subject, topic, grade), triggered after a quiz submission (see
-    jobs/tasks.py:top_up_qa_task) so the bank keeps growing instead of a
-    student cycling through the same fixed set of verified questions.
-    Returns 0 (without calling the LLM) if the pool is already large enough."""
-    subject = db.get(Subject, subject_id)
-    topic = db.get(Topic, topic_id)
-    grade_row = db.get(Grade, grade_id)
-    if subject is None or topic is None or grade_row is None:
-        return 0
+QA_GENERATION_REQUEST_TYPE = "qa_generation"
 
-    threshold = get_setting("qa_top_up_threshold", 40)
-    existing_count = db.execute(
+
+def _qa_pool_count(db: Session, subject_id: int, topic_id: int, grade_id: int) -> int:
+    return db.execute(
         select(func.count()).select_from(QA).where(
             QA.subject_id == subject_id, QA.topic_id == topic_id, QA.grade_id == grade_id,
             QA.is_active == True, QA.is_verified == True,  # noqa: E712
         )
     ).scalar_one()
-    if existing_count >= threshold:
-        return 0
 
+
+def should_top_up_qa(db: Session, *, subject_id: int, topic_id: int, grade_id: int) -> bool:
+    """True if this (subject, topic, grade)'s verified+active QA pool is
+    below qa_top_up_threshold, or it's been qa_generation's interval_days
+    (45 by default) since the last successful top-up — whichever fires
+    first. Read-only, no LLM call — gates whether jobs/tasks.py even bothers
+    submitting a batch for this quiz submission."""
+    threshold = get_setting("qa_top_up_threshold", 100)
+    if _qa_pool_count(db, subject_id, topic_id, grade_id) < threshold:
+        return True
+    return is_due(db, QA_GENERATION_REQUEST_TYPE, subject_id=subject_id, topic_id=topic_id, grade_id=grade_id)
+
+
+def _build_topup_batch_lines(
+    subject_name: str,
+    area_name: str | None,
+    topic_name: str,
+    grade: int,
+    cells: list[tuple[str, int]],
+    is_country_specific: bool,
+    prior_failures: list[dict],
+    existing_questions: list[str],
+) -> list[dict]:
+    """One line per (question_type, difficulty_level) cell — no count
+    anywhere, directly or indirectly (see conversation history: an
+    exact-count instruction measurably hurts question quality, so only the
+    very first, real-time batch for a topic ever gets one, and even that is
+    phrased as a floor, not a target). custom_id encodes the cell so results
+    can be routed back to the right QA rows once the batch lands."""
+    lines = []
+    for q_type, level in cells:
+        req = _build_generate_request(
+            subject_name, area_name, topic_name, grade, q_type,
+            is_country_specific, prior_failures, existing_questions,
+            is_first_batch=False, level=level,
+        )
+        lines.append({
+            "custom_id": f"{q_type}:{level}",
+            "question_type": q_type,
+            "difficulty_level": level,
+            **req,
+        })
+    return lines
+
+
+async def submit_qa_top_up_batch(db: Session, *, subject_id: int, topic_id: int, grade_id: int) -> BatchJob | None:
+    """Submits one OpenAI Batch API job covering the full top-up for a
+    (subject, topic, grade) — called by jobs/tasks.py:top_up_qa_task once
+    should_top_up_qa has confirmed one is due. Only the very first,
+    teacher-triggered generation for a topic (_generate_and_save_qa, via
+    get_or_generate_qa) is real-time; every top-up after that goes through
+    here instead, trading immediacy (already a background job the student
+    never waits on) for the Batch API's ~50% lower per-token cost — and,
+    deliberately, for no item count at all: one call per (type, level) cell
+    in the configured content mix, each asking for as many good, distinct
+    questions as the model can produce, never a target number. Returns None
+    if there was nothing to submit (no cells configured); the actual QA
+    rows aren't created yet — jobs/tasks.py:poll_qa_generation_batches picks
+    the result up once OpenAI finishes processing it."""
+    subject = db.get(Subject, subject_id)
+    topic = db.get(Topic, topic_id)
+    grade_row = db.get(Grade, grade_id)
+    if subject is None or topic is None or grade_row is None:
+        return None
+
+    cells = active_cells()
+    if not cells:
+        return None
+
+    is_country_specific = subject.country_id is not None or topic.country_id is not None
     subject_area = db.get(SubjectArea, topic.subject_area_id)
-    new_rows = await _generate_and_save_qa(db, subject, topic, subject_area, grade_row, grade_row.grade_name)
+    area_name = subject_area.area_name if subject_area.area_name != _GENERAL_AREA else None
+    prior_failures = _get_prior_failures(db, topic, grade_row)
+    existing_questions = _get_existing_questions(db, topic, grade_row)
+
+    lines = _build_topup_batch_lines(
+        subject.subject_name, area_name, topic.topic_name, grade_row.grade_name, cells,
+        is_country_specific, prior_failures, existing_questions,
+    )
+
+    llm = get_llm_client(LLMPurpose.GENERATE)
+    batch_id, input_file_id = await llm.submit_batch([
+        {"custom_id": line["custom_id"], "system": line["system"], "user": line["user"],
+         "temperature": line["temperature"], "max_tokens": line["max_tokens"]}
+        for line in lines
+    ])
+
+    custom_id_map = [
+        {"custom_id": line["custom_id"], "question_type": line["question_type"],
+         "difficulty_level": line["difficulty_level"]}
+        for line in lines
+    ]
+    return start_job(
+        db, QA_GENERATION_REQUEST_TYPE,
+        batch_id=batch_id, custom_ids=custom_id_map, file_ids={"input": input_file_id},
+        subject_id=subject_id, topic_id=topic_id, grade_id=grade_id,
+    )
+
+
+async def poll_and_finalize_qa_batch(db: Session, job: BatchJob) -> dict:
+    """Checks one pending qa_generation BatchJob against OpenAI's Batch API.
+    Still running -> left untouched (checked again next poll). Failed/
+    expired/cancelled -> fail_job. Completed -> download results, build+save
+    QA rows (same validation/format path as the real-time generator), run
+    the normal blind-solve verification pass, close_job. Called by
+    jobs/tasks.py:poll_qa_generation_batches, once per pending job."""
+    llm = get_llm_client(LLMPurpose.GENERATE)
+    status = await llm.get_batch_status(job.batch_id)
+
+    if status["status"] in ("failed", "expired", "cancelled"):
+        fail_job(db, job)
+        return {"status": status["status"], "added": 0}
+    if status["status"] != "completed":
+        return {"status": status["status"], "added": 0}
+
+    subject = db.get(Subject, job.subject_id)
+    topic = db.get(Topic, job.topic_id)
+    grade_row = db.get(Grade, job.grade_id)
+    if subject is None or topic is None or grade_row is None:
+        fail_job(db, job)
+        return {"status": "orphaned", "added": 0}
+
+    results = await llm.fetch_batch_results(status["output_file_id"])
+
+    qa_rows = []
+    for line in job.custom_ids or []:
+        payload = results.get(line["custom_id"])
+        if not payload:
+            continue
+        for item in _validate_items(payload.get("items", []), line["question_type"]):
+            qa_rows.append(
+                QA(
+                    subject_id=subject.subject_id,
+                    topic_id=topic.topic_id,
+                    grade_id=grade_row.grade_id,
+                    question_type=line["question_type"],
+                    question=item["question"],
+                    answer=_format_answer(item["answer"]),
+                    options=item.get("options"),
+                    difficulty_level=item["difficulty_level"],
+                    expected_time_seconds=item.get("eta"),
+                    is_verified=False,
+                )
+            )
+    db.add_all(qa_rows)
+    db.flush()
     db.commit()
-    verified = await _verify_qa_batch(new_rows)
+
+    verified = await _verify_qa_batch(qa_rows)
     db.commit()
-    return len(verified)
+    close_job(db, job)
+    return {"status": "completed", "added": len(verified)}
 
 
 def _serialize(qa_rows: list[QA]) -> list[dict]:

@@ -19,9 +19,8 @@ DEFAULT_SETTINGS: dict[str, tuple[Any, str]] = {
     "match_llm_verify_floor": (
         0.90, "Trigram similarity score above which an ambiguous match is sent to the LLM for same/different disambiguation",
     ),
-    "qa_count": (30, "Total QA items generated per subject+topic+grade"),
-    "descriptive_pct": (0.20, "Share of qa_count that should be descriptive questions"),
-    "mcq_pct": (0.60, "Share of qa_count that should be MCQ questions"),
+    "descriptive_pct": (0.20, "Share of generated questions that should be descriptive"),
+    "mcq_pct": (0.60, "Share of generated questions that should be MCQ"),
     "difficulty_default": (
         [0.20, 0.20, 0.20, 0.20, 0.20], "Difficulty level 1-5 distribution for grades below the skew threshold",
     ),
@@ -56,7 +55,9 @@ DEFAULT_SETTINGS: dict[str, tuple[Any, str]] = {
         "Trigram similarity score above which a descriptive answer is auto-scored from a precedent match "
         "(master answer or another student's past scored response) without an LLM call",
     ),
-    "qa_pool_min_size": (30, "Minimum qa rows per subject+topic+grade before usage-triggered replenishment is considered"),
+    "qa_top_up_threshold": (
+        100, "Verified+active qa row count per subject+topic+grade below which a top-up is triggered",
+    ),
     "rest_countries_api_url": (
         "https://api.worldbank.org/v2/country?format=json&per_page=300",
         "External source for the country_list background job (World Bank — free, no key; REST Countries deprecated its free tier)",
@@ -70,7 +71,7 @@ DEFAULT_SETTINGS: dict[str, tuple[Any, str]] = {
     "batch_request_types": (
         {
             "country_list": {"interval_days": 90},
-            "qa_generation": {},
+            "qa_generation": {"interval_days": 45},
             "qa_verification": {},
             "qa_scoring": {},
             "qa_time_recalibration": {"interval_days": 7},
