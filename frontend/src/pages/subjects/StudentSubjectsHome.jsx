@@ -79,6 +79,18 @@ function isRepeatDue(stats) {
   return monthsElapsed >= REPEAT_ELAPSED_MONTHS
 }
 
+// The sequence badge normally mirrors student_avg_pct via scoreColor(). Once
+// a repeat is due, green gets downgraded to amber (there's more to do, so it
+// shouldn't read as "all good") — red stays red either way, since it's
+// already the most urgent color.
+function topicSeqColors(stats) {
+  const pct = stats.student_avg_pct
+  if (isRepeatDue(stats) && pct >= 40) {
+    return { background: 'var(--color-yellow)', color: 'var(--color-white)' }
+  }
+  return { background: scoreColor(pct), color: scoreTextColor(pct) }
+}
+
 export default function StudentSubjectsHome() {
   // subjects (and each subject's topics) already arrive alphabetically
   // sorted from the backend — see teach_log_service.list_subjects_taught.
@@ -282,7 +294,7 @@ export default function StudentSubjectsHome() {
                 onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startQuiz(topic, 'card') } }}
               >
                 <div className="student-topic-card-header">
-                  <span className="student-topic-seq" style={{ background: scoreColor(stats.student_avg_pct), color: scoreTextColor(stats.student_avg_pct) }}>{index + 1}</span>
+                  <span className="student-topic-seq" style={topicSeqColors(stats)}>{index + 1}</span>
                   <h3 className="student-topic-card-name">{topic.topic_name}</h3>
                 </div>
 
