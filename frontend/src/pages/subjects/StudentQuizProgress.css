@@ -2,6 +2,46 @@
    flex row (parent .student-subjects-body--progress supplies the bound) so
    the subject panel and the QA pane each own their own overflow-y:auto,
    instead of the whole page scrolling as one. */
+/* Sits above .student-quiz-progress-scroll, which owns its own
+   overflow-y:auto — the toggle never scrolls out of view since it's
+   outside that scroll container, same effect as position:sticky. */
+.student-quiz-progress-toggle {
+  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.student-quiz-progress-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: var(--radius-sm, 6px);
+  background: none;
+  color: rgba(255,255,255,0.65);
+  font-size: var(--font-size-sm, 13px);
+  font-weight: 500;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+.student-quiz-progress-toggle-btn:hover {
+  border-color: var(--color-green-light, #8EEB65);
+  color: var(--color-white);
+}
+
+.student-quiz-progress-toggle-btn--active {
+  border-color: var(--color-green-light, #8EEB65);
+  background: var(--color-green-light, #8EEB65);
+  color: var(--color-dark, #343434);
+}
+
+.student-quiz-progress-toggle-btn--active:hover {
+  color: var(--color-dark, #343434);
+}
+
 .student-quiz-progress-columns {
   display: flex;
   align-items: stretch;
@@ -130,6 +170,72 @@
 .student-quiz-progress-empty {
   font-size: var(--font-size-md, 14px);
   color: rgba(255,255,255,0.5);
+}
+
+.student-progress-chart-wrap {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 320px;
+}
+
+.student-progress-chart {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: var(--radius-sm, 6px);
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.student-progress-chart-plot {
+  flex: 1;
+  min-height: 0;
+}
+
+.student-progress-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  flex-shrink: 0;
+  margin-bottom: 8px;
+}
+
+.student-progress-chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-sm, 11px);
+  color: rgba(255,255,255,0.65);
+}
+
+.student-progress-chart-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.student-progress-chart-tooltip {
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-dark, #343434);
+  padding: 6px 10px;
+}
+
+.student-progress-chart-tooltip-date {
+  margin: 0;
+  font-size: var(--font-size-sm, 11px);
+  color: rgba(255,255,255,0.6);
+}
+
+.student-progress-chart-tooltip-score {
+  margin: 0;
+  font-size: var(--font-size-md, 14px);
+  font-weight: 600;
+  color: var(--color-white);
 }
 
 @media (max-width: 900px) {

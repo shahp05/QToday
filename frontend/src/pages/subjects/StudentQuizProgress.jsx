@@ -4,6 +4,7 @@ import { useQuizProgressStore } from '../../store/quizProgressStore'
 import { useQuizHistoryStore } from '../../store/quizHistoryStore'
 import { getSubjectIcon } from './subjectIconMatch'
 import StudentQuizList from './StudentQuizList'
+import StudentProgressChart from './StudentProgressChart'
 import './StudentQuizProgress.css'
 
 function IconChevron({ open }) {
@@ -12,6 +13,34 @@ function IconChevron({ open }) {
       strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
       style={{ transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>
       <path d="M9 6l6 6-6 6" />
+    </svg>
+  )
+}
+
+// Same bar-chart icon as StudentSubjectsHome's IconProgress, for visual
+// consistency between the two "progress" affordances.
+function IconChart() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="4" y1="20" x2="4" y2="14" />
+      <line x1="10" y1="20" x2="10" y2="8" />
+      <line x1="16" y1="20" x2="16" y2="4" />
+      <line x1="2" y1="20" x2="20" y2="20" />
+    </svg>
+  )
+}
+
+function IconTrophy() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+      <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+      <path d="M4 22h16" />
+      <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+      <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+      <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
     </svg>
   )
 }
@@ -27,6 +56,7 @@ export default function StudentQuizProgress() {
   const quizHistoryError = useQuizHistoryStore(s => s.error)
   const dismissQuizHistoryError = useQuizHistoryStore(s => s.dismissQuizHistoryError)
 
+  const [activeView, setActiveView] = useState('quizzes') // 'chart' | 'quizzes'
   const [expandedSubjectId, setExpandedSubjectId] = useState(null)
   const [selectedTopicId, setSelectedTopicId] = useState(null)
 
@@ -104,8 +134,27 @@ export default function StudentQuizProgress() {
       </div>
 
       <div className="student-quiz-progress-detail">
+        <div className="student-quiz-progress-toggle">
+          <button
+            className={`student-quiz-progress-toggle-btn ${activeView === 'quizzes' ? 'student-quiz-progress-toggle-btn--active' : ''}`}
+            onClick={() => setActiveView('quizzes')}
+          >
+            <IconTrophy /> Quizzes Played
+          </button>
+          <button
+            className={`student-quiz-progress-toggle-btn ${activeView === 'chart' ? 'student-quiz-progress-toggle-btn--active' : ''}`}
+            onClick={() => setActiveView('chart')}
+          >
+            <IconChart /> Progress Chart
+          </button>
+        </div>
+
         <div className="student-quiz-progress-scroll">
-          {quizHistoryStatus === 'loading' || quizHistoryStatus === 'idle' ? (
+          {activeView === 'chart' ? (
+            selectedTopic
+              ? <StudentProgressChart topic={selectedTopic} quizzes={topicQuizzes} />
+              : <p className="student-quiz-progress-empty">Pick a topic to see its progress chart.</p>
+          ) : quizHistoryStatus === 'loading' || quizHistoryStatus === 'idle' ? (
             <div className="student-quiz-list-loading">
               <span className="student-topic-spinner student-topic-spinner--lg" />
             </div>
