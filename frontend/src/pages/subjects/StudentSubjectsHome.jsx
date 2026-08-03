@@ -42,7 +42,7 @@ function IconTopics() {
   )
 }
 
-const NOT_ATTEMPTED = { student_avg_pct: 0, max_score_pct: 0, last_played: null, attempts: 0 }
+const NOT_ATTEMPTED = { student_avg_pct: 0, max_score_pct: 0, last_score_pct: null, last_played: null, attempts: 0 }
 
 // Resolves once a store's status reaches 'loaded' or 'error' — waits on the
 // in-flight fetch each store already kicks off at mount rather than
@@ -60,10 +60,23 @@ function waitForStatus(useStore) {
   })
 }
 
-function formatLastPlayed(isoDate) {
-  if (!isoDate) return 'Not attempted yet'
+function formatDate(isoDate) {
   const date = new Date(`${isoDate}T00:00:00`)
-  return `Last played ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+// Repeat-prompt threshold — not yet backed by an app_settings row.
+const REPEAT_ELAPSED_MONTHS = 4
+
+// Repeat is due once a quiz has been played for this topic and either the
+// most recent attempt fell into the yellow/red band (last_score_pct < 75,
+// same threshold scoreColor() uses) or REPEAT_ELAPSED_MONTHS have passed since.
+function isRepeatDue(stats) {
+  if (!stats.last_played) return false
+  if (stats.last_score_pct < 75) return true
+  const lastPlayed = new Date(`${stats.last_played}T00:00:00`)
+  const monthsElapsed = (Date.now() - lastPlayed.getTime()) / (1000 * 60 * 60 * 24 * 30.44)
+  return monthsElapsed >= REPEAT_ELAPSED_MONTHS
 }
 
 export default function StudentSubjectsHome() {
@@ -274,6 +287,17 @@ export default function StudentSubjectsHome() {
                 </div>
 
                 <div className="student-topic-progress">
+                  {stats.last_played ? (
+                    <div className="student-topic-progress-row">
+                      <span className="student-topic-progress-label">{formatDate(stats.last_played)}</span>
+                      <div className="student-topic-progress-track">
+                        <div className="student-topic-progress-fill" style={{ width: `${stats.last_score_pct}%`, background: scoreColor(stats.last_score_pct) }} />
+                      </div>
+                      <span className="student-topic-progress-value">{stats.last_score_pct}%</span>
+                    </div>
+                  ) : (
+                    <p className="student-topic-not-attempted">Not attempted yet</p>
+                  )}
                   <div className="student-topic-progress-row">
                     <span className="student-topic-progress-label">Your average</span>
                     <div className="student-topic-progress-track">
@@ -282,23 +306,29 @@ export default function StudentSubjectsHome() {
                     <span className="student-topic-progress-value">{stats.student_avg_pct}%</span>
                   </div>
                   <div className="student-topic-progress-row">
-                    <span className="student-topic-progress-label">Class best</span>
+                    <span className="student-topic-progress-label">Top score</span>
                     <div className="student-topic-progress-track">
                       <div className="student-topic-progress-fill" style={{ width: `${stats.max_score_pct}%`, background: scoreColor(stats.max_score_pct) }} />
                     </div>
                     <span className="student-topic-progress-value">{stats.max_score_pct}%</span>
                   </div>
-                  <p className="student-topic-last-played">{formatLastPlayed(stats.last_played)}</p>
                 </div>
 
                 <div className="student-topic-actions">
                   <button
-                    className="student-topic-play-btn"
+                    className={`student-topic-play-btn${isRepeatDue(stats) ? ' student-topic-play-btn--repeat' : ''}`}
                     onClick={e => { e.stopPropagation(); startQuiz(topic, 'play') }}
                     aria-label={`Play ${topic.topic_name} quiz`}
                     disabled={!!loadingQuiz || isScoringThis}
                   >
-                    {isLoadingThis && loadingQuiz.source === 'play' ? <span className="student-topic-spinner" /> : <IconPlay />}
+                    {isLoadingThis && loadingQuiz.source === 'play' ? (
+                      <span className="student-topic-spinner" />
+                    ) : (
+                      <>
+                        {isRepeatDue(stats) && <span className="student-topic-play-btn-label">Repeat</span>}
+                        <IconPlay />
+                      </>
+                    )}
                   </button>
                 </div>
 

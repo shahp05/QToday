@@ -7,7 +7,7 @@ export async function fetchQuizProgress(studentId) {
   const query = studentId != null ? `?student_id=${studentId}` : ''
   const res = await apiFetch(`/quizzes/progress${query}`)
   if (!res.ok) throw new Error(await apiErrorMessage(res))
-  return res.json() // { topics: [{topic_id, subject_id, student_avg_pct, max_score_pct, last_played, attempts}] }
+  return res.json() // { topics: [{topic_id, subject_id, student_avg_pct, max_score_pct, last_score_pct, last_played, attempts}] }
 }
 
 export async function startQuiz(topicId, gradeId) {

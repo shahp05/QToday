@@ -61,11 +61,11 @@ def resolve_authorized_student_id(
 def get_student_quiz_progress(db: Session, *, student_id: int) -> dict:
     """Per-topic quiz stats for one student: their own average score, the
     best score across every student at the same school for that topic, the
-    date they last played it, and how many attempts they've made. Only
-    quizzes that have actually been scored (total_score IS NOT NULL) count
-    toward averages — an in-progress/unscored quiz shouldn't drag down or
-    inflate either number. Percentages are rounded to the nearest whole
-    number since that's all the progress bars display."""
+    score and date of their most recent attempt, and how many attempts
+    they've made. Only quizzes that have actually been scored (total_score
+    IS NOT NULL) count toward averages — an in-progress/unscored quiz
+    shouldn't drag down or inflate either number. Percentages are rounded to
+    the nearest whole number since that's all the progress bars display."""
     customer_row = db.execute(
         text("SELECT customer_id FROM students WHERE student_id = :sid"),
         {"sid": student_id},
@@ -86,20 +86,39 @@ def get_student_quiz_progress(db: Session, *, student_id: int) -> dict:
     ).fetchall()
 
     max_by_topic: dict[int, float] = {}
-    if customer_id is not None and own_rows:
+    last_by_topic: dict[int, float] = {}
+    if own_rows:
         topic_ids = [r.topic_id for r in own_rows]
-        max_rows = db.execute(
+
+        if customer_id is not None:
+            max_rows = db.execute(
+                text("""
+                    SELECT q.topic_id, ROUND(MAX(q.total_score / q.total_marks * 100)) AS max_pct
+                    FROM quizzes q
+                    JOIN students st ON st.student_id = q.student_id
+                    WHERE st.customer_id = :cid AND q.topic_id = ANY(:tids)
+                      AND q.is_active = TRUE AND q.total_score IS NOT NULL
+                    GROUP BY q.topic_id
+                """),
+                {"cid": customer_id, "tids": topic_ids},
+            ).fetchall()
+            max_by_topic = {r.topic_id: float(r.max_pct) for r in max_rows}
+
+        # DISTINCT ON picks the newest quizzes row per topic (Postgres
+        # requires the leading ORDER BY column to match the DISTINCT ON
+        # expression), giving the score of the student's most recent attempt.
+        last_rows = db.execute(
             text("""
-                SELECT q.topic_id, ROUND(MAX(q.total_score / q.total_marks * 100)) AS max_pct
-                FROM quizzes q
-                JOIN students st ON st.student_id = q.student_id
-                WHERE st.customer_id = :cid AND q.topic_id = ANY(:tids)
-                  AND q.is_active = TRUE AND q.total_score IS NOT NULL
-                GROUP BY q.topic_id
+                SELECT DISTINCT ON (topic_id) topic_id,
+                       ROUND(total_score / total_marks * 100) AS last_pct
+                FROM quizzes
+                WHERE student_id = :sid AND is_active = TRUE AND total_score IS NOT NULL
+                  AND topic_id = ANY(:tids)
+                ORDER BY topic_id, date_created DESC
             """),
-            {"cid": customer_id, "tids": topic_ids},
+            {"sid": student_id, "tids": topic_ids},
         ).fetchall()
-        max_by_topic = {r.topic_id: float(r.max_pct) for r in max_rows}
+        last_by_topic = {r.topic_id: float(r.last_pct) for r in last_rows}
 
     topics = [
         {
@@ -107,6 +126,7 @@ def get_student_quiz_progress(db: Session, *, student_id: int) -> dict:
             "subject_id": r.subject_id,
             "student_avg_pct": float(r.avg_pct),
             "max_score_pct": max_by_topic.get(r.topic_id, float(r.avg_pct)),
+            "last_score_pct": last_by_topic.get(r.topic_id, float(r.avg_pct)),
             "last_played": r.last_played.isoformat(),
             "attempts": r.attempts,
         }

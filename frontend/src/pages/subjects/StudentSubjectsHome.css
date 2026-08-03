@@ -246,15 +246,24 @@
   text-align: right;
 }
 
-.student-topic-last-played {
-  margin: 2px 0 0;
+.student-topic-not-attempted {
+  margin: 0;
   font-size: var(--font-size-xs);
-  color: var(--color-text-muted);
+  color: var(--color-red);
+}
+
+.student-topic-play-btn-label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .student-topic-actions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 8px;
 }
 
 .student-topic-play-btn {
@@ -280,6 +289,12 @@
 
 .student-topic-play-btn:disabled {
   cursor: not-allowed;
+}
+
+.student-topic-play-btn--repeat {
+  width: auto;
+  padding: 0 10px 0 12px;
+  gap: 6px;
 }
 
 .student-topic-spinner {
