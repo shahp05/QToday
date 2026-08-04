@@ -61,6 +61,15 @@ const NAV_ITEMS = [
   { id: 'account',   label: 'Account',   Icon: IconAccount  },
 ]
 
+function roleLabel(profile) {
+  if (profile.is_student)      return 'Student'
+  if (profile.is_parent)       return 'Parent'
+  if (profile.is_school_admin) return 'School Admin'
+  if (profile.is_school_teacher) return 'Teacher'
+  if (profile.is_system_admin) return 'Admin'
+  return '—'
+}
+
 export default function LeftNav() {
   const { activePage, setActivePage, setActiveSubject } = useUI()
   const profile = useProfileStore()
@@ -82,6 +91,7 @@ export default function LeftNav() {
   }
 
   const infoItems = [
+    { label: 'Role',    value: roleLabel(profile) },
     { label: 'School',  value: profile.customer_acronym || '—' },
     { label: 'Board',   value: profile.board_code       || '—' },
     { label: 'Country', value: profile.country_name     || '—' },

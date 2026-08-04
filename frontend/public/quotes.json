@@ -1,0 +1,26 @@
+{
+  "quotes": [
+    { "message": "Practice makes perfect.", "author": "Benjamin Franklin" },
+    { "message": "Wisdom is not a product of schooling but of the lifelong attempt to acquire it.", "author": "Albert Einstein" },
+    { "message": "You don’t understand anything until you learn it more than one way.", "author": "Marvin Minsky" },
+    { "message": "Spoon feeding in the long run teaches us nothing but the shape of the spoon.", "author": "E. M. Forster" },
+    { "message": "Anyone who stops learning is old, whether at twenty or eighty. Anyone who keeps learning stays young.", "author": "Henry Ford" },
+    { "message": "In the end we retain from our studies only that which we practically apply.", "author": "Johann Wolfgang Von Goethe" },
+    { "message": "The beautiful thing about learning is nobody can take it away from you.", "author": "B.B. King" },
+    { "message": "Being a student is easy. Learning requires actual work.", "author": "William Crawford" },
+    { "message": "Study without desire spoils the memory, and it retains nothing that it takes in.", "author": "Leonardo da Vinci" },
+    { "message": "A man who asks is a fool for five minutes. A man who never asks is a fool for life.", "author": "Chinese Proverb" },
+    { "message": "An investment in knowledge pays the best interest.", "author": "Benjamin Franklin" },
+    { "message": "Leadership and learning are indispensable to each other.", "author": "John F. Kennedy" },
+    { "message": "If you are willing to learn, no one can help you. If you are determined to learn, no one can stop you.", "author": "Anonymous" },
+    { "message": "The expert in anything was once a beginner.", "author": "Anonymous" },
+    { "message": "Learn continually. There’s always ‘one more thing’ to learn!", "author": "Steve Jobs" },
+    { "message": "Live as if you were to die tomorrow. Learn as if you were to live forever.", "author": "Mahatma Gandhi" },
+    { "message": "I am always ready to learn although I do not always like being taught.", "author": "Winston Churchill" },
+    { "message": "Develop a passion for learning. If you do, you will never cease to grow.", "author": "Anthony J. D’Angelo" },
+    { "message": "Change is the end result of all true learning.", "author": "Leo Buscaglia" },
+    { "message": "If you think education is expensive, try estimating the cost of ignorance.", "author": "Howard Gardner" },
+    { "message": "I am still learning.", "author": "Michelangelo (age 87)" },
+    { "message": "He who learns but does not think, is lost! He who thinks but does not learn is in great danger.", "author": "Confucius" }
+  ]
+}

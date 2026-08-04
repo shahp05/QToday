@@ -1,16 +1,13 @@
 import { createContext, useContext, useState } from 'react'
-import { ROLES } from './roles'
 
 const UIContext = createContext(null)
 
 export function UIProvider({ children }) {
-  const [activeRole, setActiveRole]     = useState(ROLES.SUPER_ADMIN)
   const [activePage, setActivePage]     = useState(null)
   const [activeSubject, setActiveSubject] = useState(null)
 
   return (
     <UIContext.Provider value={{
-      activeRole, setActiveRole,
       activePage, setActivePage,
       activeSubject, setActiveSubject,
     }}>

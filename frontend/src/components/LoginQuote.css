@@ -1,0 +1,36 @@
+.loginquote {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 32px;
+  width: 100%;
+  max-width: 768px;
+  margin: 0 auto;
+  flex: 1;
+  text-align: center;
+}
+
+.loginquote-message {
+  font-family: var(--font-family);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-normal);
+  color: #aaaaaa;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.loginquote-author {
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm, 11px);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--color-green-light, #8EEB65);
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .loginquote-message {
+    font-size: var(--font-size-xl);
+  }
+}

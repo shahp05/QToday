@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import LeftNav from '../components/LeftNav'
-import RoleSwitcher from '../components/RoleSwitcher'
-import IntroMessage from '../components/IntroMessage'
+import LoginQuote from '../components/LoginQuote'
 import StudentsPage from './students/StudentsPage'
 import TeachersPage from './teachers/TeachersPage'
 import SubjectsHome from './subjects/SubjectsHome'
@@ -15,14 +14,6 @@ import { useSubjectsTaughtStore } from '../store/subjectsTaughtStore'
 import { useTopicCatalogStore } from '../store/topicCatalogStore'
 import './Dashboard.css'
 
-function IconDemo() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12l-5.5-2.5z"/>
-    </svg>
-  )
-}
-
 const PAGE_TITLES = {
   subjects:  'Subjects',
   students:  'Students',
@@ -30,9 +21,14 @@ const PAGE_TITLES = {
   account:   'Account',
 }
 
-function PageContent({ activePage, isStudent }) {
+const LOGIN_QUOTE_DURATION_MS = 5000
+
+function PageContent({ activePage, isStudent, isCustomerSysadmin }) {
   switch (activePage) {
-    case 'subjects':  return isStudent ? <StudentSubjectsHome /> : <SubjectsHome />
+    case 'subjects':
+      return isStudent
+        ? <StudentSubjectsHome />
+        : <SubjectsHome defaultView={isCustomerSysadmin ? 'teachLog' : undefined} />
     default:
       return (
         <div className="content-card">
@@ -48,7 +44,8 @@ function PageContent({ activePage, isStudent }) {
 export default function Dashboard() {
   const { activePage, setActivePage } = useUI()
   const isStudent                     = useProfileStore(s => s.is_student)
-  const navigate                      = useNavigate()
+  const isSchoolTeacher               = useProfileStore(s => s.is_school_teacher)
+  const isCustomerSysadmin            = useProfileStore(s => s.is_school_admin)
   const location                      = useLocation()
   const fetchStudents                 = useStudentsStore(s => s.fetchStudents)
   const fetchTeachers                 = useTeachersStore(s => s.fetchTeachers)
@@ -58,12 +55,21 @@ export default function Dashboard() {
   const teachersStatus                = useTeachersStore(s => s.status)
   const subjectsStatus                = useSubjectsTaughtStore(s => s.status)
   const [displayedPage, setDisplayedPage] = useState(null)
+  const [showLoginQuote, setShowLoginQuote] = useState(!location.state?.firstVisit)
 
   // Runs once, on arrival, not on every location.state change.
   useEffect(() => {
     if (location.state?.firstVisit) {
       setActivePage('students')
+      return
     }
+    const timer = setTimeout(() => {
+      if (isStudent || isSchoolTeacher || isCustomerSysadmin) {
+        setActivePage('subjects')
+      }
+      setShowLoginQuote(false)
+    }, LOGIN_QUOTE_DURATION_MS)
+    return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -101,23 +107,20 @@ export default function Dashboard() {
 
       {/* ── Panel 3: main content ─────────────────────────────────────────── */}
       <div className="dashboard-panel3">
-        {displayedPage === 'students'
-          ? <StudentsPage />
-          : displayedPage === 'teachers'
-            ? <TeachersPage />
-            : displayedPage
-              ? <PageContent activePage={displayedPage} isStudent={isStudent} />
-              : <IntroMessage />
+        {showLoginQuote
+          ? <LoginQuote />
+          : displayedPage === 'students'
+            ? <StudentsPage />
+            : displayedPage === 'teachers'
+              ? <TeachersPage />
+              : displayedPage
+                ? <PageContent activePage={displayedPage} isStudent={isStudent} isCustomerSysadmin={isCustomerSysadmin} />
+                : (
+                  <div className="content-card">
+                    <p className="content-card-placeholder">Select a page from the menu to get started.</p>
+                  </div>
+                )
         }
-      </div>
-
-      {/* ── Dev bar: Demo + Role switcher ─────────────────────────────────── */}
-      <div className="dev-bar">
-        <button className="demo-trigger" onClick={() => navigate('/demo')} title="Demo">
-          <IconDemo />
-          <span>Demo</span>
-        </button>
-        <RoleSwitcher />
       </div>
 
     </div>

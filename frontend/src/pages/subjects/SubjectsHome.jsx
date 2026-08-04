@@ -2,8 +2,8 @@ import { useState } from 'react'
 import SubjectsPage from './SubjectsPage'
 import TeachLogList from './TeachLogList'
 
-export default function SubjectsHome() {
-  const [showList, setShowList] = useState(false)
+export default function SubjectsHome({ defaultView }) {
+  const [showList, setShowList] = useState(defaultView === 'teachLog')
   const [initialSelection, setInitialSelection] = useState(null)
   const [logDate, setLogDate] = useState(null)
 
@@ -19,6 +19,7 @@ export default function SubjectsHome() {
           setShowList(false)
         }}
         initialSelection={initialSelection}
+        initialShowCalendar={defaultView === 'teachLog'}
       />
     )
   }

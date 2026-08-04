@@ -70,7 +70,7 @@ function IconClose() {
   )
 }
 
-export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayClick }) {
+export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayClick, initialShowCalendar }) {
   const subjects = useSubjectsTaughtStore(s => s.subjects)
   const mostRecent = useSubjectsTaughtStore(s => s.mostRecent)
   const status = useSubjectsTaughtStore(s => s.status)
@@ -89,7 +89,7 @@ export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayCli
   // so the list never goes blank while a fetch is in flight.
   const [displayedTopicId, setDisplayedTopicId] = useState(initialSelection?.topicId ?? null)
   const [displayedGradeId, setDisplayedGradeId] = useState(initialSelection?.gradeId ?? null)
-  const [showCalendar, setShowCalendar] = useState(false)
+  const [showCalendar, setShowCalendar] = useState(Boolean(initialShowCalendar))
   // { key, topicId, gradeId, topicName, message } | null — set once when a
   // fetch fails, cleared on dismiss/retry/auto-timeout.
   const [toast, setToast] = useState(null)
