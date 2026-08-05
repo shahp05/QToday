@@ -63,6 +63,10 @@ export default function Dashboard() {
       setActivePage('students')
       return
     }
+    // Nothing should appear selected in the left nav while the quote is
+    // showing — activePage can carry a stale value from a prior session
+    // (UIProvider isn't remounted on login/logout) if we don't clear it here.
+    setActivePage(null)
     const timer = setTimeout(() => {
       if (isStudent || isSchoolTeacher || isCustomerSysadmin) {
         setActivePage('subjects')

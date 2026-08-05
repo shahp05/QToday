@@ -109,6 +109,8 @@ export default function LeftNav() {
     clearSubjectsTaught()
     clearQuizProgress()
     clearQuizHistory()
+    setActivePage(null)
+    setActiveSubject(null)
     navigate('/')
   }
 

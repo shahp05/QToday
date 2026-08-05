@@ -151,7 +151,7 @@ function FilterDropdown({ label, options, isChecked, onToggle, renderOption }) {
   )
 }
 
-export default function TeachLogCalendar({ onEmptyDayClick }) {
+export default function TeachLogCalendar({ onEmptyDayClick, viewDate, onViewDateChange }) {
   const subjects = useSubjectsTaughtStore(s => s.subjects)
   const status = useSubjectsTaughtStore(s => s.status)
   const error = useSubjectsTaughtStore(s => s.error)
@@ -203,12 +203,6 @@ export default function TeachLogCalendar({ onEmptyDayClick }) {
     topicFilter.reset()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedGradeId, selectedSection])
-
-  const [viewDate, setViewDate] = useState(() => {
-    const d = new Date()
-    d.setDate(1)
-    return d
-  })
 
   const entriesForGradeSection = useMemo(
     () => entries.filter(e => e.grade_id === selectedGradeId && (!hasSections || e.section === selectedSection)),
@@ -263,7 +257,7 @@ export default function TeachLogCalendar({ onEmptyDayClick }) {
   const isCurrentMonth = viewDate.getFullYear() === today.getFullYear() && viewDate.getMonth() === today.getMonth()
 
   function shiftMonth(delta) {
-    setViewDate(d => {
+    onViewDateChange(d => {
       const next = new Date(d.getFullYear(), d.getMonth() + delta, 1)
       const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1)
       return next > currentMonthStart ? currentMonthStart : next

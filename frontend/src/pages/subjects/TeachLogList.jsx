@@ -70,7 +70,12 @@ function IconClose() {
   )
 }
 
-export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayClick, initialShowCalendar }) {
+export default function TeachLogList({
+  onLogNew, onEmptyDayClick,
+  selection, onSelectionChange,
+  showCalendar, onShowCalendarChange,
+  calendarMonth, onCalendarMonthChange,
+}) {
   const subjects = useSubjectsTaughtStore(s => s.subjects)
   const mostRecent = useSubjectsTaughtStore(s => s.mostRecent)
   const status = useSubjectsTaughtStore(s => s.status)
@@ -80,16 +85,15 @@ export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayCli
   const ensureQaLoaded = useSubjectsTaughtStore(s => s.ensureQaLoaded)
   const loadingQaKeys = useSubjectsTaughtStore(s => s.loadingQaKeys)
   const qaLoadErrors = useSubjectsTaughtStore(s => s.qaLoadErrors)
-  const [expandedSubjectId, setExpandedSubjectId] = useState(initialSelection?.subjectId ?? null)
-  const [selectedTopicId, setSelectedTopicId] = useState(initialSelection?.topicId ?? null)
-  const [selectedGradeId, setSelectedGradeId] = useState(initialSelection?.gradeId ?? null)
+  const [expandedSubjectId, setExpandedSubjectId] = useState(selection?.subjectId ?? null)
+  const [selectedTopicId, setSelectedTopicId] = useState(selection?.topicId ?? null)
+  const [selectedGradeId, setSelectedGradeId] = useState(selection?.gradeId ?? null)
   // The QA pane keeps rendering whatever topic/grade it last had loaded data
   // for, even after the user clicks a different topic — these only catch up
   // to selectedTopicId/selectedGradeId once that topic's qa_items are ready,
   // so the list never goes blank while a fetch is in flight.
-  const [displayedTopicId, setDisplayedTopicId] = useState(initialSelection?.topicId ?? null)
-  const [displayedGradeId, setDisplayedGradeId] = useState(initialSelection?.gradeId ?? null)
-  const [showCalendar, setShowCalendar] = useState(Boolean(initialShowCalendar))
+  const [displayedTopicId, setDisplayedTopicId] = useState(selection?.topicId ?? null)
+  const [displayedGradeId, setDisplayedGradeId] = useState(selection?.gradeId ?? null)
   // { key, topicId, gradeId, topicName, message } | null — set once when a
   // fetch fails, cleared on dismiss/retry/auto-timeout.
   const [toast, setToast] = useState(null)
@@ -161,36 +165,37 @@ export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayCli
     if (qaScrollRef.current) qaScrollRef.current.scrollTop = 0
   }, [displayedTopicId, displayedGradeId])
 
-  // initialSelection (arriving right after generating QA) isn't guaranteed
-  // to be the eagerly-loaded "most recent" grade — e.g. ties on the same
-  // day — so make sure its qa_items are actually loaded, same as any other
-  // topic/grade the user might click into.
+  // selection (arriving right after generating QA, or restored from a prior
+  // visit) isn't guaranteed to be the eagerly-loaded "most recent" grade —
+  // e.g. ties on the same day — so make sure its qa_items are actually
+  // loaded, same as any other topic/grade the user might click into.
   useEffect(() => {
-    if (initialSelection?.topicId != null && initialSelection?.gradeId != null) {
-      ensureQaLoaded(initialSelection.topicId, initialSelection.gradeId)
+    if (selection?.topicId != null && selection?.gradeId != null) {
+      ensureQaLoaded(selection.topicId, selection.gradeId)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Auto-expand + auto-select the most-recently-taught topic/grade when
-  // nothing was explicitly requested via initialSelection (e.g. arriving
-  // fresh via "Topics Covered" rather than right after generating QA) —
-  // land on the subject list with that topic's questions already showing.
-  // Its qa_items are eagerly attached by the subjects-taught response, so
-  // this never needs an on-demand fetch. The store is usually already
-  // loaded (fetched at login), so this typically fires on the very first
-  // render; the flag just guards against re-running it later if the store
-  // data changes while the user has already navigated around. Done directly
-  // during render (not in an effect) for the same reason as the QA sync
-  // above — it's a one-time state adjustment, not a sync with an external
-  // system.
-  const [didAutoExpand, setDidAutoExpand] = useState(Boolean(initialSelection))
+  // nothing was explicitly requested via selection (e.g. arriving fresh via
+  // "Topics Covered" for the very first time, with nothing logged yet in
+  // this session) — land on the subject list with that topic's questions
+  // already showing. Its qa_items are eagerly attached by the
+  // subjects-taught response, so this never needs an on-demand fetch. The
+  // store is usually already loaded (fetched at login), so this typically
+  // fires on the very first render; the flag just guards against re-running
+  // it later if the store data changes while the user has already
+  // navigated around. Done directly during render (not in an effect) for
+  // the same reason as the QA sync above — it's a one-time state
+  // adjustment, not a sync with an external system.
+  const [didAutoExpand, setDidAutoExpand] = useState(Boolean(selection))
   if (!didAutoExpand && status === 'loaded') {
     setDidAutoExpand(true)
     if (mostRecent) {
       setExpandedSubjectId(mostRecent.subject_id)
       setSelectedTopicId(mostRecent.topic_id)
       setSelectedGradeId(mostRecent.grade_id)
+      onSelectionChange?.({ subjectId: mostRecent.subject_id, topicId: mostRecent.topic_id, gradeId: mostRecent.grade_id })
     }
   }
 
@@ -199,6 +204,7 @@ export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayCli
       setExpandedSubjectId(null)
       setSelectedTopicId(null)
       setSelectedGradeId(null)
+      onSelectionChange?.(null)
     } else {
       setExpandedSubjectId(subjectId)
       const subject = subjects.find(s => s.subject_id === subjectId)
@@ -208,6 +214,11 @@ export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayCli
         setSelectedTopicId(topicId)
         setSelectedGradeId(gradeId)
         ensureQaLoaded(topicId, gradeId)
+        onSelectionChange?.({ subjectId, topicId, gradeId })
+      } else {
+        setSelectedTopicId(null)
+        setSelectedGradeId(null)
+        onSelectionChange?.({ subjectId, topicId: null, gradeId: null })
       }
     }
   }
@@ -218,11 +229,13 @@ export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayCli
     const gradeId = topic.grades[0]?.grade_id ?? null
     setSelectedGradeId(gradeId)
     if (gradeId != null) ensureQaLoaded(topic.topic_id, gradeId)
+    onSelectionChange?.({ subjectId, topicId: topic.topic_id, gradeId })
   }
 
   function selectGrade(topicId, gradeId) {
     setSelectedGradeId(gradeId)
     ensureQaLoaded(topicId, gradeId)
+    onSelectionChange?.({ subjectId: expandedSubjectId, topicId, gradeId })
   }
 
   const currentSubject = subjects.find(s => s.subject_id === expandedSubjectId)
@@ -241,7 +254,7 @@ export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayCli
         <div className="teach-log-list-header-actions">
           <button
             className={`teach-log-list-history-btn ${!showCalendar ? 'teach-log-list-history-btn--active' : ''}`}
-            onClick={() => setShowCalendar(false)}
+            onClick={() => onShowCalendarChange?.(false)}
             aria-label="View subject list"
             title="View subject list"
           >
@@ -249,7 +262,7 @@ export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayCli
           </button>
           <button
             className={`teach-log-list-history-btn ${showCalendar ? 'teach-log-list-history-btn--active' : ''}`}
-            onClick={() => setShowCalendar(true)}
+            onClick={() => onShowCalendarChange?.(true)}
             aria-label="View log history"
             title="View log history"
           >
@@ -261,7 +274,13 @@ export default function TeachLogList({ onLogNew, initialSelection, onEmptyDayCli
         </div>
       </div>
 
-      {showCalendar && <TeachLogCalendar onEmptyDayClick={onEmptyDayClick} />}
+      {showCalendar && (
+        <TeachLogCalendar
+          onEmptyDayClick={onEmptyDayClick}
+          viewDate={calendarMonth}
+          onViewDateChange={onCalendarMonthChange}
+        />
+      )}
 
       {!showCalendar && status === 'error' && <p className="teach-log-list-empty">{error}</p>}
 
