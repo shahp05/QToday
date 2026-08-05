@@ -116,6 +116,43 @@
   width: 100%;
 }
 
+.student-topic-status-strip {
+  /* Spans every track after the dropdown's own column, so on desktop it can
+     use all the row's remaining width instead of being squeezed into a
+     single card-width column like the dropdown. */
+  grid-column: 2 / -1;
+  justify-self: end;
+  align-self: center;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.student-topic-status-dot {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+}
+
+.student-topic-status-dot--none {
+  background: var(--color-grey-light);
+}
+
+.student-topic-status-dot--green {
+  background: var(--color-green-light, #8EEB65);
+}
+
+.student-topic-status-dot--amber {
+  background: var(--color-yellow);
+}
+
+.student-topic-status-dot--red {
+  background: var(--color-red);
+}
+
 .student-subjects-body {
   padding: 8px 24px 24px;
 }

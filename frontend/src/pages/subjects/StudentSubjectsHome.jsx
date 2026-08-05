@@ -91,6 +91,18 @@ function topicSeqColors(stats) {
   return { background: scoreColor(pct), color: scoreTextColor(pct) }
 }
 
+// Same red/amber/green computation as topicSeqColors, but for the subject-level
+// status strip: a never-attempted topic reads as neutral ('none') here instead
+// of red, since there's no score to color-code yet.
+function topicSummaryStatus(stats) {
+  if (!stats.last_played) return 'none'
+  const pct = stats.student_avg_pct
+  if (isRepeatDue(stats) && pct >= 40) return 'amber'
+  if (pct >= 75) return 'green'
+  if (pct >= 40) return 'amber'
+  return 'red'
+}
+
 export default function StudentSubjectsHome() {
   // subjects (and each subject's topics) already arrive alphabetically
   // sorted from the backend — see teach_log_service.list_subjects_taught.
@@ -270,6 +282,18 @@ export default function StudentSubjectsHome() {
             options={subjectOptions}
             onChange={key => setSelectedSubjectId(key)}
           />
+          <div className="student-topic-status-strip" role="img" aria-label="Topic status overview">
+            {activeSubject.topics.map(topic => {
+              const stats = topicStatsById[topic.topic_id] ?? NOT_ATTEMPTED
+              return (
+                <span
+                  key={topic.topic_id}
+                  className={`student-topic-status-dot student-topic-status-dot--${topicSummaryStatus(stats)}`}
+                  title={topic.topic_name}
+                />
+              )
+            })}
+          </div>
         </div>
       )}
 
