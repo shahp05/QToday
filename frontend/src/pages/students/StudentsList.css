@@ -15,8 +15,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 24px 24px 0;
-  margin-bottom: 10px;
+  padding: 24px 24px 10px;
   background: var(--color-dark);
 }
 
@@ -47,15 +46,20 @@
   color: var(--color-white);
 }
 
-/* ─── Grades / Sections filter bar — sticky right below the title ───────── */
+/* ─── Grades / Sections filter bar — sticky right below the title. Grades
+   and the legend are two children of the same wrapping flex row (not
+   stacked in a column) so the legend rides alongside the grade pills
+   whenever there's room, and only drops to its own line when there isn't. ── */
 .students-filter-bar {
   position: sticky;
   top: 56px;
   z-index: 6;
   flex-shrink: 0;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   padding: 10px 24px;
   background: var(--color-dark);
 }
@@ -65,6 +69,29 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+/* Same recipe as StudentProgressChart's legend (subjects page) — small
+   swatch, muted white text on the dark page background — kept in sync by
+   eye rather than a shared component since the two pages are unrelated. */
+.students-status-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.students-status-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-sm, 11px);
+  color: rgba(255,255,255,0.65);
+}
+
+.students-status-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
 }
 
 /* ─── Grade tiles — squares, rounded corners ──────────────────────────────── */
@@ -138,28 +165,36 @@
   column-gap: 16px;
 }
 
+/* Standard card padding lives here, once — every child below sizes off this
+   instead of carrying its own one-off padding. */
 .students-row {
-  display: grid;
-  grid-template-columns: 44px 80px 1fr 24px;
-  align-items: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   background: var(--color-white);
   border-radius: var(--radius-sm, 6px);
   margin-bottom: 2px;
+  padding: 10px 12px;
   break-inside: avoid;
 }
 
-/* Thumbnail sits flush against the row's own border — no padding — while
-   every other column gets its spacing via its own padding instead. Clipped
-   here (not on .students-row) so the parent popover isn't cut off too. */
+.students-row-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .students-row-photo {
   display: flex;
+  flex-shrink: 0;
+  border-radius: 50%;
   overflow: hidden;
-  border-radius: var(--radius-sm, 6px) 0 0 var(--radius-sm, 6px);
 }
 
 .students-thumb {
-  width: 44px;
-  height: 100%;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
 }
@@ -178,7 +213,6 @@
 .students-row-name {
   display: flex;
   align-items: center;
-  padding: 8px;
   font-size: var(--font-size-md, 14px);
   color: var(--color-text, #343434);
   white-space: nowrap;
@@ -187,7 +221,14 @@
 }
 
 .students-row-id {
-  padding-left: 12px;
+  flex-shrink: 0;
+  color: var(--color-text-light, #666666);
+}
+
+.students-row-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
 }
 
 /* ─── Contact icon + popover ──────────────────────────────────────────────── */
@@ -196,7 +237,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding-right: 8px;
+  flex-shrink: 0;
 }
 
 .students-contact-btn {
@@ -293,6 +334,70 @@
   vertical-align: middle;
 }
 
+/* ─── Per-subject status chips — one per subject taught to this student's
+   grade, each showing green/amber/red/not-played topic counts. The
+   container gets its own background so each white subject div reads as a
+   distinct tile sitting on it, not just floating text. ───────────────────── */
+.students-row-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  background: var(--color-grey-light, #f2f4f7);
+  border-radius: var(--radius-sm, 6px);
+  padding: 6px;
+}
+
+.students-subject-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--color-white, #ffffff);
+  border-radius: var(--radius-sm, 6px);
+  padding: 3px 4px;
+}
+
+.students-subject-chip-name {
+  font-size: var(--font-size-xs, 11px);
+  font-weight: 600;
+  color: var(--color-text, #343434);
+  padding: 0 4px 0 2px;
+}
+
+.students-status-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 3px;
+  border-radius: 4px;
+  font-size: var(--font-size-xs, 11px);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.students-status-count--green {
+  background: var(--color-green-light, #8EEB65);
+  color: var(--color-dark, #343434);
+}
+
+.students-status-count--amber {
+  background: var(--color-yellow, #F9A825);
+  color: var(--color-white, #ffffff);
+}
+
+.students-status-count--red {
+  background: var(--color-red, #D32F2F);
+  color: var(--color-white, #ffffff);
+}
+
+/* Not-played — same neutral used for the 'none' dot on the student-facing
+   status strip (StudentSubjectsHome.css), kept consistent on purpose. */
+.students-status-count--none {
+  background: var(--color-grey-light, #f2f4f7);
+  color: var(--color-text-light, #666666);
+}
+
 @media (max-width: 900px) {
   .students-rows {
     column-count: 1;
@@ -300,10 +405,6 @@
 }
 
 @media (max-width: 640px) {
-  .students-row {
-    grid-template-columns: 44px 60px 1fr 24px;
-  }
-
   .students-filter-row {
     gap: 14px;
   }

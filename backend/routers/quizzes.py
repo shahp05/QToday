@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from db.database import get_db
@@ -15,12 +15,14 @@ from schemas.quiz import (
 from services.auth_service import get_current_user
 from services.quiz_service import (
     challenge_quiz_question,
+    get_class_quiz_progress,
     get_quiz_detail,
     get_quiz_questions,
     get_quiz_status,
     get_student_quiz_history,
     get_student_quiz_progress,
     resolve_authorized_student_id,
+    resolve_authorized_student_ids,
     submit_quiz,
 )
 
@@ -35,6 +37,16 @@ def get_progress(
 ):
     resolved_student_id = resolve_authorized_student_id(db, claims=claims, requested_student_id=student_id)
     return get_student_quiz_progress(db, student_id=resolved_student_id)
+
+
+@router.get("/progress/class")
+def get_class_progress(
+    student_ids: list[int] = Query(...),
+    claims: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    resolved_ids = resolve_authorized_student_ids(db, claims=claims, requested_student_ids=student_ids)
+    return get_class_quiz_progress(db, student_ids=resolved_ids)
 
 
 @router.get("/history", response_model=QuizHistoryResponse)

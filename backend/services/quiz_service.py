@@ -58,6 +58,88 @@ def resolve_authorized_student_id(
     raise AppError(ErrorCode.AUTH_FORBIDDEN)
 
 
+def resolve_authorized_student_ids(
+    db: Session, *, claims: dict, requested_student_ids: list[int],
+) -> list[int]:
+    """Batched sibling of resolve_authorized_student_id for the teacher
+    class-status view (Students list) — there's no batch use case for a
+    student looking up their own data, so only a school admin (any student
+    at their own school) or system admin (any student at all) may call this.
+    Silently drops any id that doesn't resolve rather than erroring, since
+    the caller only ever passes ids it already fetched from /students/mine."""
+    if not requested_student_ids:
+        return []
+    if claims.get("is_system_admin"):
+        rows = db.execute(
+            text("SELECT student_id FROM students WHERE student_id = ANY(:sids) AND is_active = TRUE"),
+            {"sids": requested_student_ids},
+        ).fetchall()
+    elif claims.get("is_school_admin"):
+        rows = db.execute(
+            text("""
+                SELECT student_id FROM students
+                WHERE student_id = ANY(:sids) AND customer_id = :cid AND is_active = TRUE
+            """),
+            {"sids": requested_student_ids, "cid": claims.get("customer_id")},
+        ).fetchall()
+    else:
+        raise AppError(ErrorCode.AUTH_FORBIDDEN)
+    return [r.student_id for r in rows]
+
+
+def get_class_quiz_progress(db: Session, *, student_ids: list[int]) -> dict:
+    """Same per-topic stats get_student_quiz_progress computes, batched across
+    many students in two queries instead of one round-trip per student — the
+    source for the teacher Students list's per-subject status chips. Only
+    student_avg_pct, last_score_pct, and last_played are needed there (the
+    same fields topicSummaryStatus() in the frontend already keys its
+    red/amber/green/not-played classification on), so max_score_pct and
+    attempts — only used by the student's own Progress screen — are left out."""
+    if not student_ids:
+        return {"progress": []}
+
+    avg_rows = db.execute(
+        text("""
+            SELECT student_id, topic_id, subject_id,
+                   ROUND(AVG(total_score / total_marks * 100)) AS avg_pct
+            FROM quizzes
+            WHERE student_id = ANY(:sids) AND is_active = TRUE AND total_score IS NOT NULL
+            GROUP BY student_id, topic_id, subject_id
+        """),
+        {"sids": student_ids},
+    ).fetchall()
+    if not avg_rows:
+        return {"progress": []}
+
+    # DISTINCT ON picks each student's newest quiz per topic, same technique
+    # as get_student_quiz_progress's last_rows query.
+    last_rows = db.execute(
+        text("""
+            SELECT DISTINCT ON (student_id, topic_id) student_id, topic_id,
+                   ROUND(total_score / total_marks * 100) AS last_pct,
+                   date_created::date AS last_played
+            FROM quizzes
+            WHERE student_id = ANY(:sids) AND is_active = TRUE AND total_score IS NOT NULL
+            ORDER BY student_id, topic_id, date_created DESC
+        """),
+        {"sids": student_ids},
+    ).fetchall()
+    last_by_key = {(r.student_id, r.topic_id): r for r in last_rows}
+
+    progress = [
+        {
+            "student_id": r.student_id,
+            "topic_id": r.topic_id,
+            "subject_id": r.subject_id,
+            "student_avg_pct": float(r.avg_pct),
+            "last_score_pct": float(last_by_key[(r.student_id, r.topic_id)].last_pct),
+            "last_played": last_by_key[(r.student_id, r.topic_id)].last_played.isoformat(),
+        }
+        for r in avg_rows
+    ]
+    return {"progress": progress}
+
+
 def get_student_quiz_progress(db: Session, *, student_id: int) -> dict:
     """Per-topic quiz stats for one student: their own average score, the
     best score across every student at the same school for that topic, the

@@ -3,9 +3,35 @@ import { useProfileStore } from '../../store/profileStore'
 import { useStudentsStore } from '../../store/studentsStore'
 import { useStudentGradesStore } from '../../store/studentGradesStore'
 import { useStudentParentsStore } from '../../store/studentParentsStore'
+import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
+import { useClassQuizProgressStore } from '../../store/classQuizProgressStore'
+import { topicSummaryStatus } from '../../lib/topicStatus'
 import './StudentsList.css'
 
 const NO_SECTION = '—'
+
+// Same bands/wording as StudentProgressChart's legend (subjects page), plus
+// a 4th 'not played' band that chart doesn't need — kept local rather than
+// shared since the two legends live on otherwise-unrelated components.
+const STATUS_LEGEND_BANDS = [
+  { label: '75% or more', color: 'var(--color-green-light)' },
+  { label: '40-75%', color: 'var(--color-yellow)' },
+  { label: 'Below 40%', color: 'var(--color-red)' },
+  { label: 'Not played', color: 'var(--color-grey-light)' },
+]
+
+function StatusLegend() {
+  return (
+    <div className="students-status-legend">
+      {STATUS_LEGEND_BANDS.map(band => (
+        <span key={band.label} className="students-status-legend-item">
+          <span className="students-status-legend-swatch" style={{ background: band.color }} />
+          {band.label}
+        </span>
+      ))}
+    </div>
+  )
+}
 
 function initials(name) {
   return name
@@ -149,17 +175,19 @@ function useGroupedStudents() {
       parentsByStudent.set(p.student_id, list)
     }
 
-    const grades = new Map() // grade_name -> section -> rows[]
+    const grades = new Map() // grade_name -> { gradeId, sections: section -> rows[] }
     for (const student of students) {
       const grade = gradeByStudent.get(student.student_id)
       if (!grade) continue
       const gradeName = grade.grade_name
       const section = grade.section || NO_SECTION
 
-      if (!grades.has(gradeName)) grades.set(gradeName, new Map())
-      const sections = grades.get(gradeName)
+      if (!grades.has(gradeName)) grades.set(gradeName, { gradeId: grade.grade_id, sections: new Map() })
+      const { sections } = grades.get(gradeName)
       if (!sections.has(section)) sections.set(section, [])
       sections.get(section).push({
+        student_id: student.student_id,
+        grade_id: grade.grade_id,
         org_id: student.org_id,
         name: student.name,
         photo_url: student.photo_url,
@@ -169,8 +197,9 @@ function useGroupedStudents() {
 
     return [...grades.entries()]
       .sort((a, b) => a[0] - b[0])
-      .map(([gradeName, sections]) => ({
+      .map(([gradeName, { gradeId, sections }]) => ({
         gradeName,
+        gradeId,
         sections: [...sections.entries()]
           .sort((a, b) => a[0].localeCompare(b[0]))
           .map(([section, rows]) => ({
@@ -184,6 +213,11 @@ function useGroupedStudents() {
 export default function StudentsList({ onUploadNew }) {
   const isAdmin = useProfileStore(s => s.is_school_admin)
   const grades = useGroupedStudents()
+
+  const subjectsTaught = useSubjectsTaughtStore(s => s.subjects)
+  const fetchSubjectsTaught = useSubjectsTaughtStore(s => s.fetchSubjectsTaught)
+  const progressByStudent = useClassQuizProgressStore(s => s.progressByStudent)
+  const fetchClassProgress = useClassQuizProgressStore(s => s.fetchClassProgress)
 
   const [selectedGrade, setSelectedGrade] = useState(null)
   const [selectedSection, setSelectedSection] = useState(null)
@@ -202,6 +236,46 @@ export default function StudentsList({ onUploadNew }) {
   const currentGrade = grades.find(g => g.gradeName === selectedGrade)
   const currentSection = currentGrade?.sections.find(s => s.section === selectedSection)
   const rows = currentSection?.rows ?? []
+
+  useEffect(() => { fetchSubjectsTaught() }, [fetchSubjectsTaught])
+
+  // Refetches whenever the visible grade/section (and therefore its student
+  // roster) changes — keyed on the actual id list, not just selectedGrade/
+  // selectedSection, so a roster edit within the same grade/section refetches too.
+  const rowStudentIdsKey = rows.map(r => r.student_id).join(',')
+  useEffect(() => {
+    if (rows.length > 0) fetchClassProgress(rows.map(r => r.student_id))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowStudentIdsKey, fetchClassProgress])
+
+  // Every subject taught to this grade, with just the topic ids each row
+  // needs to count against — filtered from the school-wide subjects-taught
+  // tree (whole-school scope for a teacher/admin, see list_subjects_taught)
+  // down to whichever grade is currently selected.
+  const gradeSubjects = useMemo(() => {
+    if (currentGrade?.gradeId == null) return []
+    return subjectsTaught
+      .map(subject => ({
+        subject_id: subject.subject_id,
+        subject_name: subject.subject_name,
+        topicIds: subject.topics
+          .filter(topic => topic.grades.some(g => g.grade_id === currentGrade.gradeId))
+          .map(topic => topic.topic_id),
+      }))
+      .filter(subject => subject.topicIds.length > 0)
+  }, [subjectsTaught, currentGrade])
+
+  function subjectChipsForStudent(studentId) {
+    const statsByTopic = progressByStudent[studentId]
+    return gradeSubjects.map(subject => {
+      const counts = { green: 0, amber: 0, red: 0, none: 0 }
+      for (const topicId of subject.topicIds) {
+        const stats = statsByTopic?.[topicId]
+        counts[stats ? topicSummaryStatus(stats) : 'none']++
+      }
+      return { subject_id: subject.subject_id, subject_name: subject.subject_name, ...counts }
+    })
+  }
 
   function selectGrade(gradeName) {
     setSelectedGrade(gradeName)
@@ -244,20 +318,39 @@ export default function StudentsList({ onUploadNew }) {
             </Fragment>
           ))}
         </div>
+        <StatusLegend />
       </div>
 
       <div className="students-list-body">
         <div className="students-rows">
-          {rows.map(row => (
-            <div className="students-row" key={row.org_id}>
-              <span className="students-row-photo">
-                <StudentThumbnail name={row.name} photoUrl={row.photo_url} />
-              </span>
-              <span className="students-row-id">{row.org_id}</span>
-              <span className="students-row-name">{row.name}</span>
-              <ParentsPopover emails={row.parent_emails} />
-            </div>
-          ))}
+          {rows.map(row => {
+            const subjectChips = subjectChipsForStudent(row.student_id)
+            return (
+              <div className="students-row" key={row.org_id}>
+                <div className="students-row-top">
+                  <span className="students-row-photo">
+                    <StudentThumbnail name={row.name} photoUrl={row.photo_url} />
+                  </span>
+                  <span className="students-row-id">{row.org_id}</span>
+                  <span className="students-row-name">{row.name}</span>
+                  <ParentsPopover emails={row.parent_emails} />
+                </div>
+                {subjectChips.length > 0 && (
+                  <div className="students-row-status">
+                    {subjectChips.map(chip => (
+                      <span className="students-subject-chip" key={chip.subject_id}>
+                        <span className="students-subject-chip-name">{chip.subject_name}</span>
+                        <span className="students-status-count students-status-count--green">{chip.green}</span>
+                        <span className="students-status-count students-status-count--amber">{chip.amber}</span>
+                        <span className="students-status-count students-status-count--red">{chip.red}</span>
+                        <span className="students-status-count students-status-count--none">{chip.none}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
     </div>

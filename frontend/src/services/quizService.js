@@ -10,6 +10,15 @@ export async function fetchQuizProgress(studentId) {
   return res.json() // { topics: [{topic_id, subject_id, student_avg_pct, max_score_pct, last_score_pct, last_played, attempts}] }
 }
 
+// studentIds: the students visible on the current teacher Students-list
+// grade/section — see backend/services/quiz_service.py:get_class_quiz_progress.
+export async function fetchClassQuizProgress(studentIds) {
+  const query = studentIds.map(id => `student_ids=${id}`).join('&')
+  const res = await apiFetch(`/quizzes/progress/class?${query}`)
+  if (!res.ok) throw new Error(await apiErrorMessage(res))
+  return res.json() // { progress: [{student_id, topic_id, subject_id, student_avg_pct, last_score_pct, last_played}] }
+}
+
 export async function startQuiz(topicId, gradeId) {
   const res = await apiFetch(`/quizzes/start?topic_id=${topicId}&grade_id=${gradeId}`)
   if (!res.ok) throw new Error(await apiErrorMessage(res))
