@@ -38,7 +38,11 @@ function IconChevron({ open }) {
 // key remounts StudentQuizAccordion with its state reset to initial values,
 // collapsing whatever was open (which belonged to the previous topic's
 // list) without a setState-in-effect render pass.
-export default function StudentQuizList({ quizzes, status, error, onDismissError, autoExpandKey }) {
+// readOnly: teacher-viewing-a-student mode — GET /quizzes/{id}/detail is
+// gated to the student themselves (see backend's _resolve_own_student_id),
+// so expand-to-see-answers isn't available for another viewer; rows still
+// show the score/date/topic summary, just aren't clickable.
+export default function StudentQuizList({ quizzes, status, error, onDismissError, autoExpandKey, readOnly = false }) {
   if (status === 'loading' || status === 'idle') {
     return (
       <div className="student-quiz-list-loading">
@@ -55,7 +59,7 @@ export default function StudentQuizList({ quizzes, status, error, onDismissError
     return <p className="content-card-placeholder">No quizzes played for this subject yet.</p>
   }
 
-  return <StudentQuizAccordion key={autoExpandKey} quizzes={quizzes} />
+  return <StudentQuizAccordion key={autoExpandKey} quizzes={quizzes} readOnly={readOnly} />
 }
 
 // Single-open accordion (matches TeachLogList.jsx's subject-row pattern) —
@@ -63,7 +67,7 @@ export default function StudentQuizList({ quizzes, status, error, onDismissError
 // opens once its detail has actually loaded — loadingQuizId drives a spinner
 // in the row header instead, so the body never expands empty and then pops
 // content in underneath the spinner.
-function StudentQuizAccordion({ quizzes }) {
+function StudentQuizAccordion({ quizzes, readOnly }) {
   const [expandedQuizId, setExpandedQuizId] = useState(null)
   const [detail, setDetail] = useState(null) // fetchQuizDetail() result for expandedQuizId
   const [loadingQuizId, setLoadingQuizId] = useState(null)
@@ -84,7 +88,7 @@ function StudentQuizAccordion({ quizzes }) {
   }
 
   function toggleQuiz(quiz) {
-    if (!quiz.is_scored || loadingQuizId) return
+    if (readOnly || !quiz.is_scored || loadingQuizId) return
     if (expandedQuizId === quiz.quiz_id) {
       setExpandedQuizId(null)
       return
@@ -102,7 +106,7 @@ function StudentQuizAccordion({ quizzes }) {
             <button
               className={`student-quiz-row ${quiz.is_scored ? '' : 'student-quiz-row--pending'}`}
               onClick={() => toggleQuiz(quiz)}
-              disabled={!quiz.is_scored}
+              disabled={!quiz.is_scored || readOnly}
             >
               {quiz.is_scored ? (
                 <span className="student-quiz-score" style={{ background: scoreColor(pct), color: scoreTextColor(pct) }}>{pct}%</span>
@@ -117,16 +121,16 @@ function StudentQuizAccordion({ quizzes }) {
                   {!quiz.is_scored && ' · Scoring in progress'}
                 </p>
               </div>
-              {quiz.is_scored && <IconChevron open={isOpen} />}
+              {quiz.is_scored && !readOnly && <IconChevron open={isOpen} />}
             </button>
 
-            {loadingQuizId === quiz.quiz_id && (
+            {!readOnly && loadingQuizId === quiz.quiz_id && (
               <div className="student-quiz-row-overlay">
                 <span className="student-topic-spinner student-topic-spinner--lg" />
               </div>
             )}
 
-            {isOpen && detail && (
+            {!readOnly && isOpen && detail && (
               <div className="student-quiz-detail">
                 <div className="student-quiz-detail-list">
                   {detail.questions.map(q => (

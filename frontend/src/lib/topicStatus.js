@@ -1,3 +1,5 @@
+import { scoreColor, scoreTextColor } from './scoreColor'
+
 // Repeat-prompt threshold — not yet backed by an app_settings row.
 const REPEAT_ELAPSED_MONTHS = 4
 
@@ -24,4 +26,16 @@ export function topicSummaryStatus(stats) {
   if (pct >= 75) return 'green'
   if (pct >= 40) return 'amber'
   return 'red'
+}
+
+// The sequence badge normally mirrors student_avg_pct via scoreColor(). Once
+// a repeat is due, green gets downgraded to amber (there's more to do, so it
+// shouldn't read as "all good") — red stays red either way, since it's
+// already the most urgent color.
+export function topicSeqColors(stats) {
+  const pct = stats.student_avg_pct
+  if (isRepeatDue(stats) && pct >= 40) {
+    return { background: 'var(--color-yellow)', color: 'var(--color-white)' }
+  }
+  return { background: scoreColor(pct), color: scoreTextColor(pct) }
 }

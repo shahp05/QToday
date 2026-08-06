@@ -37,10 +37,36 @@
 
 .student-subjects-title {
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-family: var(--font-family);
   font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-normal);
   color: rgba(255,255,255,0.65);
+}
+
+/* Same 40x40 footprint as the LeftNav logo (.leftnav-logo-img) so the two
+   line up in size across panels. */
+.student-subjects-back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.65);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.student-subjects-back-btn:hover,
+.student-subjects-back-btn:focus-visible {
+  background: rgba(255,255,255,0.16);
+  color: var(--color-white);
 }
 
 .student-subjects-header-actions {

@@ -1,7 +1,4 @@
 import { useState } from 'react'
-import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
-import { useQuizProgressStore } from '../../store/quizProgressStore'
-import { useQuizHistoryStore } from '../../store/quizHistoryStore'
 import { getSubjectIcon } from './subjectIconMatch'
 import StudentQuizList from './StudentQuizList'
 import StudentProgressChart from './StudentProgressChart'
@@ -48,14 +45,14 @@ function IconTrophy() {
 // Two-column layout mirroring TeachLogList.jsx: subject/topic accordion on
 // the left (topic counts + per-topic quiz-played counts), selected topic's
 // quiz history on the right. Replaces the old subject/topic dropdown pair.
-export default function StudentQuizProgress() {
-  const subjects = useSubjectsTaughtStore(s => s.subjects)
-  const topicStatsById = useQuizProgressStore(s => s.topicStatsById)
-  const quizzes = useQuizHistoryStore(s => s.quizzes)
-  const quizHistoryStatus = useQuizHistoryStore(s => s.status)
-  const quizHistoryError = useQuizHistoryStore(s => s.error)
-  const dismissQuizHistoryError = useQuizHistoryStore(s => s.dismissQuizHistoryError)
-
+// subjects/topicStatsById/quizzes/quizHistoryStatus/quizHistoryError are
+// passed in rather than read from stores here, so the teacher-facing
+// single-student view (StudentSubjectDetail) can reuse this exact layout
+// with per-student data instead of the current-user-scoped stores.
+// readOnly: hides per-quiz expand (see StudentQuizList's own readOnly note).
+export default function StudentQuizProgress({
+  subjects, topicStatsById, quizzes, quizHistoryStatus, quizHistoryError, onDismissQuizHistoryError, readOnly = false,
+}) {
   const [activeView, setActiveView] = useState('quizzes') // 'chart' | 'quizzes'
   const [expandedSubjectId, setExpandedSubjectId] = useState(null)
   const [selectedTopicId, setSelectedTopicId] = useState(null)
@@ -163,8 +160,9 @@ export default function StudentQuizProgress() {
               quizzes={topicQuizzes}
               status={quizHistoryStatus}
               error={quizHistoryError}
-              onDismissError={dismissQuizHistoryError}
+              onDismissError={onDismissQuizHistoryError}
               autoExpandKey={selectedTopicId}
+              readOnly={readOnly}
             />
           ) : (
             <p className="student-quiz-progress-empty">No quizzes played yet — pick a topic once you have.</p>

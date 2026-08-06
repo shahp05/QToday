@@ -3,21 +3,11 @@ import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
 import { useQuizProgressStore } from '../../store/quizProgressStore'
 import { useQuizHistoryStore } from '../../store/quizHistoryStore'
 import { fetchQuizStatus, startQuiz as fetchQuizQuestions } from '../../services/quizService'
-import { scoreColor, scoreTextColor } from '../../lib/scoreColor'
-import { getSubjectIcon } from './subjectIconMatch'
-import Dropdown from '../../components/Dropdown'
 import { Toast } from '../../components/ui/Toast'
 import QuizPage from './QuizPage'
 import StudentQuizProgress from './StudentQuizProgress'
+import SubjectTopicGrid from './SubjectTopicGrid'
 import './StudentSubjectsHome.css'
-
-function IconPlay() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M8 5v14l11-7z" />
-    </svg>
-  )
-}
 
 function IconProgress() {
   return (
@@ -42,8 +32,6 @@ function IconTopics() {
   )
 }
 
-const NOT_ATTEMPTED = { student_avg_pct: 0, max_score_pct: 0, last_score_pct: null, last_played: null, attempts: 0 }
-
 // Resolves once a store's status reaches 'loaded' or 'error' — waits on the
 // in-flight fetch each store already kicks off at mount rather than
 // triggering a redundant second one.
@@ -60,49 +48,6 @@ function waitForStatus(useStore) {
   })
 }
 
-function formatDate(isoDate) {
-  const date = new Date(`${isoDate}T00:00:00`)
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-// Repeat-prompt threshold — not yet backed by an app_settings row.
-const REPEAT_ELAPSED_MONTHS = 4
-
-// Repeat is due once a quiz has been played for this topic and either the
-// most recent attempt fell into the yellow/red band (last_score_pct < 75,
-// same threshold scoreColor() uses) or REPEAT_ELAPSED_MONTHS have passed since.
-function isRepeatDue(stats) {
-  if (!stats.last_played) return false
-  if (stats.last_score_pct < 75) return true
-  const lastPlayed = new Date(`${stats.last_played}T00:00:00`)
-  const monthsElapsed = (Date.now() - lastPlayed.getTime()) / (1000 * 60 * 60 * 24 * 30.44)
-  return monthsElapsed >= REPEAT_ELAPSED_MONTHS
-}
-
-// The sequence badge normally mirrors student_avg_pct via scoreColor(). Once
-// a repeat is due, green gets downgraded to amber (there's more to do, so it
-// shouldn't read as "all good") — red stays red either way, since it's
-// already the most urgent color.
-function topicSeqColors(stats) {
-  const pct = stats.student_avg_pct
-  if (isRepeatDue(stats) && pct >= 40) {
-    return { background: 'var(--color-yellow)', color: 'var(--color-white)' }
-  }
-  return { background: scoreColor(pct), color: scoreTextColor(pct) }
-}
-
-// Same red/amber/green computation as topicSeqColors, but for the subject-level
-// status strip: a never-attempted topic reads as neutral ('none') here instead
-// of red, since there's no score to color-code yet.
-function topicSummaryStatus(stats) {
-  if (!stats.last_played) return 'none'
-  const pct = stats.student_avg_pct
-  if (isRepeatDue(stats) && pct >= 40) return 'amber'
-  if (pct >= 75) return 'green'
-  if (pct >= 40) return 'amber'
-  return 'red'
-}
-
 export default function StudentSubjectsHome() {
   // subjects (and each subject's topics) already arrive alphabetically
   // sorted from the backend — see teach_log_service.list_subjects_taught.
@@ -112,6 +57,9 @@ export default function StudentSubjectsHome() {
   const topicStatsById = useQuizProgressStore(s => s.topicStatsById)
   const fetchQuizProgress = useQuizProgressStore(s => s.fetchQuizProgress)
   const quizHistory = useQuizHistoryStore(s => s.quizzes)
+  const quizHistoryStatus = useQuizHistoryStore(s => s.status)
+  const quizHistoryError = useQuizHistoryStore(s => s.error)
+  const dismissQuizHistoryError = useQuizHistoryStore(s => s.dismissQuizHistoryError)
   const fetchQuizHistory = useQuizHistoryStore(s => s.fetchQuizHistory)
   const refreshQuizHistory = useQuizHistoryStore(s => s.refreshQuizHistory)
   const [progressLoading, setProgressLoading] = useState(false)
@@ -212,11 +160,6 @@ export default function StudentSubjectsHome() {
     : subjects[0].subject_id
   const activeSubject = subjects.find(s => s.subject_id === activeSubjectId)
 
-  const subjectOptions = subjects.map(s => {
-    const Icon = getSubjectIcon(s.subject_name, s.icon_key)
-    return { key: s.subject_id, label: s.subject_name, icon: <Icon /> }
-  })
-
   // Guards against the Progress page ever rendering its own inline loader on
   // first show — quizHistory/quizProgress are fetched eagerly at mount, but
   // this covers the slow-network case where the click lands before either
@@ -260,10 +203,16 @@ export default function StudentSubjectsHome() {
         <h2 className="student-subjects-title">Play</h2>
         <div className="student-subjects-header-actions">
           {view === 'topics' ? (
-            <button className="student-subjects-progress-btn" onClick={openProgress} disabled={progressLoading}>
-              {progressLoading ? <span className="student-topic-spinner" /> : <IconProgress />} Progress
-              {!progressLoading && quizHistory.length > 0 && <span className="student-subjects-progress-count">{quizHistory.length}</span>}
-            </button>
+            // Nothing to show progress on until at least one quiz has been
+            // played — quizHistory updates live once a pending quiz's LLM
+            // scoring finishes (see the scoring-poll effect below), so the
+            // button appears the moment that happens, no reload needed.
+            quizHistory.length > 0 && (
+              <button className="student-subjects-progress-btn" onClick={openProgress} disabled={progressLoading}>
+                {progressLoading ? <span className="student-topic-spinner" /> : <IconProgress />} Progress
+                {!progressLoading && <span className="student-subjects-progress-count">{quizHistory.length}</span>}
+              </button>
+            )
           ) : (
             <button className="student-subjects-progress-btn" onClick={() => setView('topics')}>
               <IconTopics /> Topics
@@ -274,118 +223,28 @@ export default function StudentSubjectsHome() {
 
       <Toast message={quizError} onDismiss={() => setQuizError('')} />
 
-      {view === 'topics' && (
-        <div className="student-subjects-bar">
-          <Dropdown
-            className="student-subjects-dropdown"
-            value={activeSubjectId}
-            options={subjectOptions}
-            onChange={key => setSelectedSubjectId(key)}
-          />
-          <div className="student-topic-status-strip" role="img" aria-label="Topic status overview">
-            {activeSubject.topics.map(topic => {
-              const stats = topicStatsById[topic.topic_id] ?? NOT_ATTEMPTED
-              return (
-                <span
-                  key={topic.topic_id}
-                  className={`student-topic-status-dot student-topic-status-dot--${topicSummaryStatus(stats)}`}
-                  title={topic.topic_name}
-                />
-              )
-            })}
-          </div>
-        </div>
-      )}
-
       {view === 'progress' ? (
         <div className="student-subjects-body student-subjects-body--progress">
-          <StudentQuizProgress />
+          <StudentQuizProgress
+            subjects={subjects}
+            topicStatsById={topicStatsById}
+            quizzes={quizHistory}
+            quizHistoryStatus={quizHistoryStatus}
+            quizHistoryError={quizHistoryError}
+            onDismissQuizHistoryError={dismissQuizHistoryError}
+          />
         </div>
       ) : (
-      <div className="student-subjects-body">
-        <div className="student-topic-grid">
-          {activeSubject.topics.map((topic, index) => {
-            const stats = topicStatsById[topic.topic_id] ?? NOT_ATTEMPTED
-            const isLoadingThis = loadingQuiz?.topicId === topic.topic_id
-            const isScoringThis = !!scoringTopics[topic.topic_id]
-            return (
-              <div
-                key={topic.topic_id}
-                className="student-topic-card"
-                role="button"
-                tabIndex={0}
-                onClick={() => startQuiz(topic, 'card')}
-                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startQuiz(topic, 'card') } }}
-              >
-                <div className="student-topic-card-header">
-                  <span className="student-topic-seq" style={topicSeqColors(stats)}>{index + 1}</span>
-                  <h3 className="student-topic-card-name">{topic.topic_name}</h3>
-                </div>
-
-                <div className="student-topic-progress">
-                  {stats.last_played ? (
-                    <div className="student-topic-progress-row">
-                      <span className="student-topic-progress-label">{formatDate(stats.last_played)}</span>
-                      <div className="student-topic-progress-track">
-                        <div className="student-topic-progress-fill" style={{ width: `${stats.last_score_pct}%`, background: scoreColor(stats.last_score_pct) }} />
-                      </div>
-                      <span className="student-topic-progress-value">{stats.last_score_pct}%</span>
-                    </div>
-                  ) : (
-                    <p className="student-topic-not-attempted">Not attempted yet</p>
-                  )}
-                  <div className="student-topic-progress-row">
-                    <span className="student-topic-progress-label">Your average</span>
-                    <div className="student-topic-progress-track">
-                      <div className="student-topic-progress-fill" style={{ width: `${stats.student_avg_pct}%`, background: scoreColor(stats.student_avg_pct) }} />
-                    </div>
-                    <span className="student-topic-progress-value">{stats.student_avg_pct}%</span>
-                  </div>
-                  <div className="student-topic-progress-row">
-                    <span className="student-topic-progress-label">Top score</span>
-                    <div className="student-topic-progress-track">
-                      <div className="student-topic-progress-fill" style={{ width: `${stats.max_score_pct}%`, background: scoreColor(stats.max_score_pct) }} />
-                    </div>
-                    <span className="student-topic-progress-value">{stats.max_score_pct}%</span>
-                  </div>
-                </div>
-
-                <div className="student-topic-actions">
-                  <button
-                    className={`student-topic-play-btn${isRepeatDue(stats) ? ' student-topic-play-btn--repeat' : ''}`}
-                    onClick={e => { e.stopPropagation(); startQuiz(topic, 'play') }}
-                    aria-label={`Play ${topic.topic_name} quiz`}
-                    disabled={!!loadingQuiz || isScoringThis}
-                  >
-                    {isLoadingThis && loadingQuiz.source === 'play' ? (
-                      <span className="student-topic-spinner" />
-                    ) : (
-                      <>
-                        {isRepeatDue(stats) && <span className="student-topic-play-btn-label">Repeat</span>}
-                        <IconPlay />
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {isLoadingThis && loadingQuiz.source === 'card' && (
-                  <div className="student-topic-card-overlay">
-                    <span className="student-topic-spinner student-topic-spinner--lg" />
-                  </div>
-                )}
-
-                {isScoringThis && (
-                  <div className="student-topic-card-overlay">
-                    <span className="student-topic-scoring-label">
-                      <span className="student-topic-spinner" /> Scoring…
-                    </span>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </div>
+        <SubjectTopicGrid
+          subjects={subjects}
+          activeSubjectId={activeSubjectId}
+          onSelectSubject={setSelectedSubjectId}
+          topicStatsById={topicStatsById}
+          onCardClick={topic => startQuiz(topic, 'card')}
+          onPlayClick={topic => startQuiz(topic, 'play')}
+          loadingQuiz={loadingQuiz}
+          scoringTopics={scoringTopics}
+        />
       )}
     </div>
   )

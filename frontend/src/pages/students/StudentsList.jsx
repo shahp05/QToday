@@ -210,7 +210,7 @@ function useGroupedStudents() {
   }, [students, studentGrades, parents])
 }
 
-export default function StudentsList({ onUploadNew }) {
+export default function StudentsList({ onUploadNew, onSubjectClick, loadingChip }) {
   const isAdmin = useProfileStore(s => s.is_school_admin)
   const grades = useGroupedStudents()
 
@@ -325,6 +325,7 @@ export default function StudentsList({ onUploadNew }) {
         <div className="students-rows">
           {rows.map(row => {
             const subjectChips = subjectChipsForStudent(row.student_id)
+            const isRowLoading = loadingChip?.studentId === row.student_id
             return (
               <div className="students-row" key={row.org_id}>
                 <div className="students-row-top">
@@ -337,15 +338,30 @@ export default function StudentsList({ onUploadNew }) {
                 </div>
                 {subjectChips.length > 0 && (
                   <div className="students-row-status">
-                    {subjectChips.map(chip => (
-                      <span className="students-subject-chip" key={chip.subject_id}>
-                        <span className="students-subject-chip-name">{chip.subject_name}</span>
-                        <span className="students-status-count students-status-count--green">{chip.green}</span>
-                        <span className="students-status-count students-status-count--amber">{chip.amber}</span>
-                        <span className="students-status-count students-status-count--red">{chip.red}</span>
-                        <span className="students-status-count students-status-count--none">{chip.none}</span>
-                      </span>
-                    ))}
+                    {subjectChips.map(chip => {
+                      return (
+                        <span
+                          className="students-subject-chip students-subject-chip--clickable"
+                          key={chip.subject_id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => onSubjectClick?.(row, chip.subject_id)}
+                          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSubjectClick?.(row, chip.subject_id) } }}
+                        >
+                          <span className="students-subject-chip-name">{chip.subject_name}</span>
+                          <span className="students-status-count students-status-count--green">{chip.green}</span>
+                          <span className="students-status-count students-status-count--amber">{chip.amber}</span>
+                          <span className="students-status-count students-status-count--red">{chip.red}</span>
+                          <span className="students-status-count students-status-count--none">{chip.none}</span>
+                        </span>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {isRowLoading && (
+                  <div className="students-row-overlay">
+                    <span className="students-row-spinner" />
                   </div>
                 )}
               </div>
