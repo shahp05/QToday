@@ -4,6 +4,7 @@ import { useQuizProgressStore } from '../../store/quizProgressStore'
 import { useQuizHistoryStore } from '../../store/quizHistoryStore'
 import { fetchQuizStatus, startQuiz as fetchQuizQuestions } from '../../services/quizService'
 import { Toast } from '../../components/ui/Toast'
+import PageHeader from '../../components/PageHeader'
 import QuizPage from './QuizPage'
 import StudentQuizProgress from './StudentQuizProgress'
 import SubjectTopicGrid from './SubjectTopicGrid'
@@ -199,10 +200,10 @@ export default function StudentSubjectsHome() {
 
   return (
     <div className="student-subjects">
-      <div className="student-subjects-header">
-        <h2 className="student-subjects-title">Play</h2>
-        <div className="student-subjects-header-actions">
-          {view === 'topics' ? (
+      <PageHeader
+        title="Play"
+        actions={(
+          view === 'topics' ? (
             // Nothing to show progress on until at least one quiz has been
             // played — quizHistory updates live once a pending quiz's LLM
             // scoring finishes (see the scoring-poll effect below), so the
@@ -217,9 +218,9 @@ export default function StudentSubjectsHome() {
             <button className="student-subjects-progress-btn" onClick={() => setView('topics')}>
               <IconTopics /> Topics
             </button>
-          )}
-        </div>
-      </div>
+          )
+        )}
+      />
 
       <Toast message={quizError} onDismiss={() => setQuizError('')} />
 

@@ -7,33 +7,6 @@
   min-height: 0;
 }
 
-.teach-log-list-header {
-  position: sticky;
-  top: 0;
-  z-index: 7;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 24px 24px 0;
-  margin-bottom: 10px;
-  background: var(--color-dark);
-}
-
-.teach-log-list-title {
-  margin: 0;
-  font-family: var(--font-family);
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-normal);
-  color: rgba(255,255,255,0.65);
-}
-
-.teach-log-list-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .teach-log-list-history-btn {
   width: 34px;
   height: 34px;

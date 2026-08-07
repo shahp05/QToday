@@ -59,6 +59,7 @@
   --content-padding-h:   32px;
   --content-padding-v:   28px;
   --pg-gap:              20px;
+  --panel-padding:       24px;   /* shared with .leftnav so panels line up */
 
   /* Borders & radius */
   --radius-sm:   6px;

@@ -3,16 +3,8 @@ import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
 import { useStudentDetailProgressStore } from '../../store/studentDetailProgressStore'
 import SubjectTopicGrid from '../subjects/SubjectTopicGrid'
 import StudentQuizProgress from '../subjects/StudentQuizProgress'
+import PageHeader from '../../components/PageHeader'
 import '../subjects/StudentSubjectsHome.css'
-
-function IconBack() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M15 6l-6 6 6 6" />
-    </svg>
-  )
-}
 
 function IconProgress() {
   return (
@@ -77,15 +69,11 @@ export default function StudentSubjectDetail({ student, initialSubjectId, onBack
 
   return (
     <div className="student-subjects">
-      <div className="student-subjects-header">
-        <h2 className="student-subjects-title">
-          <button className="student-subjects-back-btn" onClick={onBack} aria-label="Back to Students">
-            <IconBack />
-          </button>
-          {student.name}
-        </h2>
-        <div className="student-subjects-header-actions">
-          {view === 'topics' ? (
+      <PageHeader
+        title={student.name}
+        onBack={onBack}
+        actions={(
+          view === 'topics' ? (
             // Same rule as the student's own header (StudentSubjectsHome):
             // nothing to show until at least one quiz has been played.
             quizzes.length > 0 && (
@@ -98,9 +86,9 @@ export default function StudentSubjectDetail({ student, initialSubjectId, onBack
             <button className="student-subjects-progress-btn" onClick={() => setView('topics')}>
               <IconTopics /> Topics
             </button>
-          )}
-        </div>
-      </div>
+          )
+        )}
+      />
 
       {status === 'error' && <p className="student-subjects-error">{error}</p>}
 

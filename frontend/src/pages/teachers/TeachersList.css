@@ -5,27 +5,6 @@
   flex: 1;
 }
 
-.teachers-list-header {
-  position: sticky;
-  top: 0;
-  z-index: 7;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 24px 24px 0;
-  margin-bottom: 10px;
-  background: var(--color-dark);
-}
-
-.teachers-list-title {
-  margin: 0;
-  font-family: var(--font-family);
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-normal);
-  color: rgba(255,255,255,0.65);
-}
-
 .teachers-list-upload-btn {
   border: 1px solid var(--color-green-light, #8EEB65);
   border-radius: var(--radius-sm, 6px);

@@ -10,6 +10,7 @@ import { resolveFileUrl } from '../../lib/api'
 import { uploadMyPhoto, uploadStudentPhoto } from '../../services/photoService'
 import EditablePhoto from '../../components/EditablePhoto'
 import { Toast } from '../../components/ui/Toast'
+import PageHeader from '../../components/PageHeader'
 import './StudentsList.css'
 
 const NO_SECTION = '—'
@@ -286,41 +287,42 @@ export default function StudentsList({
 
   return (
     <div className="students-list">
-      <div className="students-list-header">
-        <h2 className="students-list-title">Students</h2>
-        {isAdmin && (
+      <PageHeader
+        title="Students"
+        actions={isAdmin && (
           <button className="students-list-upload-btn" onClick={onUploadNew}>
             Upload new file
           </button>
         )}
-      </div>
+        filter={(
+          <div className="students-filter-bar">
+            <div className="students-filter-row">
+              {grades.map(({ gradeName, sections }) => (
+                <Fragment key={gradeName}>
+                  <button
+                    className={`students-grade-pill ${gradeName === selectedGrade ? 'students-grade-pill--active' : ''}`}
+                    onClick={() => selectGrade(gradeName)}
+                  >
+                    {gradeName}
+                  </button>
 
-      <div className="students-filter-bar">
-        <div className="students-filter-row">
-          {grades.map(({ gradeName, sections }) => (
-            <Fragment key={gradeName}>
-              <button
-                className={`students-grade-pill ${gradeName === selectedGrade ? 'students-grade-pill--active' : ''}`}
-                onClick={() => selectGrade(gradeName)}
-              >
-                {gradeName}
-              </button>
-
-              {hasSections && gradeName === selectedGrade && sections.map(({ section }) => (
-                <button
-                  key={section}
-                  className={`students-section-pill ${section === selectedSection ? 'students-section-pill--active' : ''}`}
-                  onClick={() => onSelectedSectionChange(section)}
-                  aria-pressed={section === selectedSection}
-                >
-                  {section}
-                </button>
+                  {hasSections && gradeName === selectedGrade && sections.map(({ section }) => (
+                    <button
+                      key={section}
+                      className={`students-section-pill ${section === selectedSection ? 'students-section-pill--active' : ''}`}
+                      onClick={() => onSelectedSectionChange(section)}
+                      aria-pressed={section === selectedSection}
+                    >
+                      {section}
+                    </button>
+                  ))}
+                </Fragment>
               ))}
-            </Fragment>
-          ))}
-        </div>
-        <StatusLegend />
-      </div>
+            </div>
+            <StatusLegend />
+          </div>
+        )}
+      />
 
       <div className="students-list-body">
         <div className="students-rows">

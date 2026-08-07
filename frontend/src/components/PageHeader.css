@@ -1,0 +1,79 @@
+/* Shared sticky page header — title row + optional filter row, both inside
+   one sticky block so they always move together. Padding matches
+   .leftnav's own padding (--panel-padding) and the gap between the title
+   row and the filter row matches the leftnav's logo→nav-items gap
+   (--pg-gap), so the filter row top-aligns with the leftnav's first nav
+   item and the back button top-aligns with the leftnav logo. */
+.page-header {
+  position: sticky;
+  top: 0;
+  z-index: 7;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--pg-gap);
+  padding: var(--panel-padding);
+  background: var(--color-dark);
+}
+
+.page-header-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.page-header-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* Same 40x40 footprint as .leftnav-logo-img so the two line up in size
+   across panels. */
+.page-header-back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.65);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.page-header-back-btn:hover,
+.page-header-back-btn:focus-visible {
+  background: rgba(255,255,255,0.16);
+  color: var(--color-white);
+}
+
+.page-header-title {
+  margin: 0;
+  min-width: 0;
+  font-family: var(--font-family);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-normal);
+  color: rgba(255,255,255,0.65);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .page-header {
+    padding: 20px 16px;
+  }
+}

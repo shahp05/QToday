@@ -5,6 +5,7 @@ import { resolveFileUrl } from '../../lib/api'
 import { uploadMyPhoto } from '../../services/photoService'
 import EditablePhoto from '../../components/EditablePhoto'
 import { Toast } from '../../components/ui/Toast'
+import PageHeader from '../../components/PageHeader'
 import './TeachersList.css'
 
 function IconTick() {
@@ -50,14 +51,14 @@ export default function TeachersList({ onUploadNew }) {
 
   return (
     <div className="teachers-list">
-      <div className="teachers-list-header">
-        <h2 className="teachers-list-title">Teachers</h2>
-        {isAdmin && (
+      <PageHeader
+        title="Teachers"
+        actions={isAdmin && (
           <button className="teachers-list-upload-btn" onClick={onUploadNew}>
             Upload new file
           </button>
         )}
-      </div>
+      />
 
       <div className="teachers-list-body">
         <div className="teachers-rows">

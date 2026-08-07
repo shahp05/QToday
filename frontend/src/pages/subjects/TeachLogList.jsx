@@ -3,6 +3,7 @@ import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
 import QaCard from './QaCard'
 import { getSubjectIcon } from './subjectIconMatch'
 import TeachLogCalendar from './TeachLogCalendar'
+import PageHeader from '../../components/PageHeader'
 import './TeachLogList.css'
 
 function IconChevron({ open }) {
@@ -249,30 +250,32 @@ export default function TeachLogList({
 
   return (
     <div className="teach-log-list">
-      <div className="teach-log-list-header">
-        <h2 className="teach-log-list-title">Subjects</h2>
-        <div className="teach-log-list-header-actions">
-          <button
-            className={`teach-log-list-history-btn ${!showCalendar ? 'teach-log-list-history-btn--active' : ''}`}
-            onClick={() => onShowCalendarChange?.(false)}
-            aria-label="View subject list"
-            title="View subject list"
-          >
-            <IconList />
-          </button>
-          <button
-            className={`teach-log-list-history-btn ${showCalendar ? 'teach-log-list-history-btn--active' : ''}`}
-            onClick={() => onShowCalendarChange?.(true)}
-            aria-label="View log history"
-            title="View log history"
-          >
-            <IconHistory />
-          </button>
-          <button className="teach-log-list-new-btn" onClick={onLogNew}>
-            New Subject
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Subjects"
+        actions={(
+          <>
+            <button
+              className={`teach-log-list-history-btn ${!showCalendar ? 'teach-log-list-history-btn--active' : ''}`}
+              onClick={() => onShowCalendarChange?.(false)}
+              aria-label="View subject list"
+              title="View subject list"
+            >
+              <IconList />
+            </button>
+            <button
+              className={`teach-log-list-history-btn ${showCalendar ? 'teach-log-list-history-btn--active' : ''}`}
+              onClick={() => onShowCalendarChange?.(true)}
+              aria-label="View log history"
+              title="View log history"
+            >
+              <IconHistory />
+            </button>
+            <button className="teach-log-list-new-btn" onClick={onLogNew}>
+              New Subject
+            </button>
+          </>
+        )}
+      />
 
       {showCalendar && (
         <TeachLogCalendar
