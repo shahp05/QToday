@@ -34,6 +34,16 @@ export const useTeachersStore = create((set, get) => ({
     })
   },
 
+  // Applies a single row's new photo_url directly instead of refetching the
+  // whole roster — same pattern as setSuperAdmin above.
+  updateTeacherPhoto: (userId, photoUrl) => {
+    set({
+      teachers: get().teachers.map(t =>
+        t.user_id === userId ? { ...t, photo_url: photoUrl } : t
+      ),
+    })
+  },
+
   clearTeachers: () => {
     set({ teachers: [], status: 'idle', error: null })
   },

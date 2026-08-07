@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
@@ -16,8 +17,9 @@ from db.seed_data import ensure_default_grades
 from errors.app_error import AppError
 from errors.error_codes import ErrorCode, ERROR_DEFAULTS
 from jobs.app import app as procrastinate_app
-from routers import auth, countries, error_logs, qa, quizzes, signup, students, teach_logs, teachers
+from routers import auth, countries, error_logs, photos, qa, quizzes, signup, students, teach_logs, teachers
 from services.error_log_service import log_error
+from services.photo_service import UPLOAD_ROOT
 
 
 @asynccontextmanager
@@ -64,6 +66,11 @@ app.include_router(students.router)
 app.include_router(teachers.router)
 app.include_router(teach_logs.router)
 app.include_router(quizzes.router)
+app.include_router(photos.router)
+
+# Serves uploaded photos back out at /static/photos/<file> — matches the
+# relative URL photo_service.py stores in users.file_url.
+app.mount("/static", StaticFiles(directory=str(UPLOAD_ROOT)), name="static")
 
 
 @app.exception_handler(Exception)

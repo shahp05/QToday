@@ -3,7 +3,7 @@ import { fetchMyStudents, uploadStudents } from '../services/studentsService'
 import { useStudentGradesStore } from './studentGradesStore'
 import { useStudentParentsStore } from './studentParentsStore'
 
-export const useStudentsStore = create((set) => ({
+export const useStudentsStore = create((set, get) => ({
   students: [],
   status: 'idle', // idle | loading | loaded | error
   error: null,
@@ -24,6 +24,16 @@ export const useStudentsStore = create((set) => ({
     const counts = await uploadStudents(rows) // throws on failure — caller handles the error
     await useStudentsStore.getState().fetchStudents()
     return counts
+  },
+
+  // Applies a single row's new photo_url directly instead of refetching the
+  // whole roster — same pattern as teachersStore's setSuperAdmin.
+  updateStudentPhoto: (studentId, photoUrl) => {
+    set({
+      students: get().students.map(s =>
+        s.student_id === studentId ? { ...s, photo_url: photoUrl } : s
+      ),
+    })
   },
 
   clearStudents: () => {

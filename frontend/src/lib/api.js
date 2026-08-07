@@ -2,6 +2,16 @@ import { useProfileStore } from '../store/profileStore'
 import { ErrorCode, ERROR_DEFAULTS } from '../errors/errorCodes'
 
 export const API_BASE = 'http://localhost:8001/api'
+export const API_ORIGIN = API_BASE.replace(/\/api$/, '')
+
+/** photo_url (and any future uploaded-file url) comes back from the backend
+ * as a path relative to its own origin (e.g. "/static/photos/xyz.jpg"), not
+ * a full URL — resolve it against API_ORIGIN so <img src> works. Returns
+ * the value unchanged if it's already absolute or falsy. */
+export function resolveFileUrl(url) {
+  if (!url || /^https?:\/\//.test(url)) return url
+  return `${API_ORIGIN}${url}`
+}
 
 /** fetch wrapper that attaches the JWT (when present), aborts a request that
  * hangs longer than timeoutMs (default 20s — bump this per-call for routes

@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { useProfileStore } from '../../store/profileStore'
 import { useTeachersStore } from '../../store/teachersStore'
+import { resolveFileUrl } from '../../lib/api'
+import { uploadMyPhoto } from '../../services/photoService'
+import EditablePhoto from '../../components/EditablePhoto'
 import { Toast } from '../../components/ui/Toast'
 import './TeachersList.css'
 
@@ -16,20 +19,12 @@ function IconBoxSpinner() {
   return <span className="teachers-superadmin-spinner" role="status" aria-label="Updating" />
 }
 
-function initials(name) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map(part => part[0].toUpperCase())
-    .join('')
-}
-
 export default function TeachersList({ onUploadNew }) {
   const isAdmin = useProfileStore(s => s.is_school_admin)
   const myOrgId = useProfileStore(s => s.org_id)
   const teachers = useTeachersStore(s => s.teachers)
   const setSuperAdmin = useTeachersStore(s => s.setSuperAdmin)
+  const updateTeacherPhoto = useTeachersStore(s => s.updateTeacherPhoto)
   const rows = [...teachers].sort((a, b) => a.name.localeCompare(b.name))
 
   const [pendingOrgId, setPendingOrgId] = useState(null)
@@ -45,6 +40,12 @@ export default function TeachersList({ onUploadNew }) {
     } finally {
       setPendingOrgId(null)
     }
+  }
+
+  // A teacher may only ever set their own photo here — not a colleague's.
+  async function handlePhotoUpload(row, file) {
+    const data = await uploadMyPhoto(file)
+    updateTeacherPhoto(row.user_id, data.photo_url)
   }
 
   return (
@@ -67,7 +68,15 @@ export default function TeachersList({ onUploadNew }) {
             return (
               <div className="teachers-row" key={row.org_id}>
                 <span className="teachers-row-photo">
-                  <span className="teachers-thumb teachers-thumb--placeholder">{initials(row.name)}</span>
+                  <EditablePhoto
+                    editable={isSelf}
+                    thumbClassName="teachers-thumb"
+                    placeholderClassName="teachers-thumb--placeholder"
+                    name={row.name}
+                    photoUrl={resolveFileUrl(row.photo_url)}
+                    onUpload={file => handlePhotoUpload(row, file)}
+                    onError={setError}
+                  />
                 </span>
                 <span className="teachers-row-namecell">
                   <span className="teachers-row-titlerow">

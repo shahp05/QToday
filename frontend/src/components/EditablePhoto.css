@@ -1,0 +1,50 @@
+/* Sized to match the 40x40 thumb classes both Students/Teachers lists use
+   (StudentsList.css/TeachersList.css) — this wrapper just adds the click
+   affordance and upload-in-progress overlay around whatever thumb markup
+   the caller renders inside it. */
+.editable-photo {
+  position: relative;
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+}
+
+.editable-photo:hover::after,
+.editable-photo:focus-visible::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.editable-photo:focus-visible {
+  outline: 2px solid var(--color-green-light, #8EEB65);
+  outline-offset: 1px;
+}
+
+.editable-photo-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: inherit;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.editable-photo-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: editable-photo-spin 0.8s linear infinite;
+}
+
+@keyframes editable-photo-spin {
+  to { transform: rotate(360deg); }
+}

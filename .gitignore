@@ -7,6 +7,9 @@ myenv/
 .env
 *.egg-info/
 
+# Uploaded user content (photos, etc.) — local disk storage, not source
+backend/uploads/
+
 # Node / frontend
 node_modules/
 dist/

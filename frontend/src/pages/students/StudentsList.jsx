@@ -6,6 +6,10 @@ import { useStudentParentsStore } from '../../store/studentParentsStore'
 import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
 import { useClassQuizProgressStore } from '../../store/classQuizProgressStore'
 import { topicSummaryStatus } from '../../lib/topicStatus'
+import { resolveFileUrl } from '../../lib/api'
+import { uploadMyPhoto, uploadStudentPhoto } from '../../services/photoService'
+import EditablePhoto from '../../components/EditablePhoto'
+import { Toast } from '../../components/ui/Toast'
 import './StudentsList.css'
 
 const NO_SECTION = '—'
@@ -31,25 +35,6 @@ function StatusLegend() {
       ))}
     </div>
   )
-}
-
-function initials(name) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map(part => part[0].toUpperCase())
-    .join('')
-}
-
-// Placeholder avatar until students can upload their own photo — shows
-// initials over the real <img> once photo_url is set, no separate component
-// needed since the table only ever needs this one thumbnail size.
-function StudentThumbnail({ name, photoUrl }) {
-  if (photoUrl) {
-    return <img className="students-thumb" src={photoUrl} alt={name} />
-  }
-  return <span className="students-thumb students-thumb--placeholder">{initials(name)}</span>
 }
 
 function IconContact() {
@@ -215,12 +200,28 @@ export default function StudentsList({
   selectedGrade, onSelectedGradeChange, selectedSection, onSelectedSectionChange,
 }) {
   const isAdmin = useProfileStore(s => s.is_school_admin)
+  const isSchoolTeacher = useProfileStore(s => s.is_school_teacher)
+  const isStudentViewer = useProfileStore(s => s.is_student)
   const grades = useGroupedStudents()
 
   const subjectsTaught = useSubjectsTaughtStore(s => s.subjects)
   const fetchSubjectsTaught = useSubjectsTaughtStore(s => s.fetchSubjectsTaught)
   const progressByStudent = useClassQuizProgressStore(s => s.progressByStudent)
   const fetchClassProgress = useClassQuizProgressStore(s => s.fetchClassProgress)
+  const updateStudentPhoto = useStudentsStore(s => s.updateStudentPhoto)
+
+  const [photoError, setPhotoError] = useState('')
+  // A teacher/admin may set any visible student's photo; a student viewer
+  // only ever sees their own single row (students_query_service.py scopes
+  // it that way server-side), so this one flag covers every row for them.
+  const canEditPhoto = isAdmin || isSchoolTeacher || isStudentViewer
+
+  async function handlePhotoUpload(studentId, file) {
+    const data = isStudentViewer
+      ? await uploadMyPhoto(file)
+      : await uploadStudentPhoto(studentId, file)
+    updateStudentPhoto(studentId, data.photo_url)
+  }
 
   // Default to the first grade/section once data is available, and re-pick
   // if the previously selected grade disappears (e.g. after a re-upload).
@@ -330,7 +331,15 @@ export default function StudentsList({
               <div className="students-row" key={row.org_id}>
                 <div className="students-row-top">
                   <span className="students-row-photo">
-                    <StudentThumbnail name={row.name} photoUrl={row.photo_url} />
+                    <EditablePhoto
+                      editable={canEditPhoto}
+                      thumbClassName="students-thumb"
+                      placeholderClassName="students-thumb--placeholder"
+                      name={row.name}
+                      photoUrl={resolveFileUrl(row.photo_url)}
+                      onUpload={file => handlePhotoUpload(row.student_id, file)}
+                      onError={setPhotoError}
+                    />
                   </span>
                   <span className="students-row-id">{row.org_id}</span>
                   <span className="students-row-name">{row.name}</span>
@@ -369,6 +378,8 @@ export default function StudentsList({
           })}
         </div>
       </div>
+
+      <Toast message={photoError} onDismiss={() => setPhotoError('')} />
     </div>
   )
 }
