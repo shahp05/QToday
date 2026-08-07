@@ -7,7 +7,7 @@ import { Toast } from '../../components/ui/Toast'
 import PageHeader from '../../components/PageHeader'
 import QuizPage from './QuizPage'
 import StudentQuizProgress from './StudentQuizProgress'
-import SubjectTopicGrid from './SubjectTopicGrid'
+import SubjectTopicGrid, { SubjectFilterBar } from './SubjectTopicGrid'
 import './StudentSubjectsHome.css'
 
 function IconProgress() {
@@ -220,6 +220,14 @@ export default function StudentSubjectsHome() {
             </button>
           )
         )}
+        filter={view === 'topics' && (
+          <SubjectFilterBar
+            subjects={subjects}
+            activeSubjectId={activeSubjectId}
+            onSelectSubject={setSelectedSubjectId}
+            topicStatsById={topicStatsById}
+          />
+        )}
       />
 
       <Toast message={quizError} onDismiss={() => setQuizError('')} />
@@ -239,7 +247,6 @@ export default function StudentSubjectsHome() {
         <SubjectTopicGrid
           subjects={subjects}
           activeSubjectId={activeSubjectId}
-          onSelectSubject={setSelectedSubjectId}
           topicStatsById={topicStatsById}
           onCardClick={topic => startQuiz(topic, 'card')}
           onPlayClick={topic => startQuiz(topic, 'play')}

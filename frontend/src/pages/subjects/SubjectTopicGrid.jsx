@@ -18,20 +18,15 @@ function formatDate(isoDate) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-// Subject dropdown + per-topic status strip + topic-card grid — the same
-// "topics" view StudentSubjectsHome shows a student, extracted so the
-// teacher-facing single-student view (StudentSubjectDetail) can render the
-// identical cards read-only instead of re-implementing them.
-export default function SubjectTopicGrid({
+// Subject dropdown + per-topic status strip — rendered into the page
+// header's filter slot (see StudentSubjectsHome/StudentSubjectDetail)
+// rather than inside the scrolling body, so it's part of the same sticky
+// block as the title row instead of independently sticky.
+export function SubjectFilterBar({
   subjects, // [{subject_id, subject_name, icon_key, topics}]
   activeSubjectId,
   onSelectSubject,
   topicStatsById, // topic_id -> {student_avg_pct, max_score_pct, last_score_pct, last_played, attempts}
-  readOnly = false, // teacher view: no quiz-start is possible for another student, so hide Play entirely
-  onCardClick,
-  onPlayClick,
-  loadingQuiz, // {topicId, source: 'play' | 'card'} | null
-  scoringTopics, // topic_id -> quiz_id
 }) {
   const activeSubject = subjects.find(s => s.subject_id === activeSubjectId)
   if (!activeSubject) return null
@@ -42,31 +37,50 @@ export default function SubjectTopicGrid({
   })
 
   return (
-    <>
-      <div className="student-subjects-bar">
-        <Dropdown
-          className="student-subjects-dropdown"
-          value={activeSubjectId}
-          options={subjectOptions}
-          onChange={onSelectSubject}
-        />
-        <div className="student-topic-status-strip" role="img" aria-label="Topic status overview">
-          {activeSubject.topics.map(topic => {
-            const stats = topicStatsById[topic.topic_id] ?? NOT_ATTEMPTED
-            return (
-              <span
-                key={topic.topic_id}
-                className={`student-topic-status-dot student-topic-status-dot--${topicSummaryStatus(stats)}`}
-                title={topic.topic_name}
-              />
-            )
-          })}
-        </div>
+    <div className="student-subjects-bar">
+      <Dropdown
+        className="student-subjects-dropdown"
+        value={activeSubjectId}
+        options={subjectOptions}
+        onChange={onSelectSubject}
+      />
+      <div className="student-topic-status-strip" role="img" aria-label="Topic status overview">
+        {activeSubject.topics.map(topic => {
+          const stats = topicStatsById[topic.topic_id] ?? NOT_ATTEMPTED
+          return (
+            <span
+              key={topic.topic_id}
+              className={`student-topic-status-dot student-topic-status-dot--${topicSummaryStatus(stats)}`}
+              title={topic.topic_name}
+            />
+          )
+        })}
       </div>
+    </div>
+  )
+}
 
-      <div className="student-subjects-body">
-        <div className="student-topic-grid">
-          {activeSubject.topics.map((topic, index) => {
+// Topic-card grid for the active subject — the same "topics" view
+// StudentSubjectsHome shows a student, extracted so the teacher-facing
+// single-student view (StudentSubjectDetail) can render the identical
+// cards read-only instead of re-implementing them.
+export default function SubjectTopicGrid({
+  subjects, // [{subject_id, subject_name, icon_key, topics}]
+  activeSubjectId,
+  topicStatsById, // topic_id -> {student_avg_pct, max_score_pct, last_score_pct, last_played, attempts}
+  readOnly = false, // teacher view: no quiz-start is possible for another student, so hide Play entirely
+  onCardClick,
+  onPlayClick,
+  loadingQuiz, // {topicId, source: 'play' | 'card'} | null
+  scoringTopics, // topic_id -> quiz_id
+}) {
+  const activeSubject = subjects.find(s => s.subject_id === activeSubjectId)
+  if (!activeSubject) return null
+
+  return (
+    <div className="student-subjects-body">
+      <div className="student-topic-grid">
+        {activeSubject.topics.map((topic, index) => {
             const stats = topicStatsById[topic.topic_id] ?? NOT_ATTEMPTED
             const isLoadingThis = !readOnly && loadingQuiz?.topicId === topic.topic_id
             const isScoringThis = !readOnly && !!scoringTopics?.[topic.topic_id]
@@ -150,7 +164,6 @@ export default function SubjectTopicGrid({
             )
           })}
         </div>
-      </div>
-    </>
+    </div>
   )
 }

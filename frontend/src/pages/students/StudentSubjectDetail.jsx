@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
 import { useStudentDetailProgressStore } from '../../store/studentDetailProgressStore'
-import SubjectTopicGrid from '../subjects/SubjectTopicGrid'
+import SubjectTopicGrid, { SubjectFilterBar } from '../subjects/SubjectTopicGrid'
 import StudentQuizProgress from '../subjects/StudentQuizProgress'
 import PageHeader from '../../components/PageHeader'
 import '../subjects/StudentSubjectsHome.css'
@@ -88,6 +88,14 @@ export default function StudentSubjectDetail({ student, initialSubjectId, onBack
             </button>
           )
         )}
+        filter={view === 'topics' && status !== 'error' && subjectsForGrade.length > 0 && activeSubjectId != null && (
+          <SubjectFilterBar
+            subjects={subjectsForGrade}
+            activeSubjectId={activeSubjectId}
+            onSelectSubject={setSelectedSubjectId}
+            topicStatsById={topicStatsById}
+          />
+        )}
       />
 
       {status === 'error' && <p className="student-subjects-error">{error}</p>}
@@ -113,7 +121,6 @@ export default function StudentSubjectDetail({ student, initialSubjectId, onBack
           <SubjectTopicGrid
             subjects={subjectsForGrade}
             activeSubjectId={activeSubjectId}
-            onSelectSubject={setSelectedSubjectId}
             topicStatsById={topicStatsById}
             readOnly
           />

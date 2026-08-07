@@ -69,11 +69,10 @@
   }
 }
 
+/* Lives inside PageHeader's filter slot now — no sticky/padding/background
+   of its own, that's all owned by .page-header so there's a single sticky
+   block instead of a second one guessing the first one's height. */
 .student-subjects-bar {
-  position: sticky;
-  top: 56px;
-  z-index: 6;
-  flex-shrink: 0;
   /* Same track sizing as .student-topic-grid below — not just the same
      min-width — so the dropdown's cell is exactly one card's width at
      every breakpoint, including when cards stretch past --topic-card-min
@@ -81,8 +80,6 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(var(--topic-card-min), 1fr));
   gap: 16px;
-  padding: 10px 24px;
-  background: var(--color-dark);
 }
 
 .student-subjects-dropdown {
@@ -127,7 +124,7 @@
 }
 
 .student-subjects-body {
-  padding: 8px 24px 24px;
+  padding: 0 24px 24px;
 }
 
 .student-topic-grid {
@@ -147,12 +144,8 @@
     --topic-card-min: 100%;
   }
 
-  .student-subjects-bar {
-    padding: 10px 16px;
-  }
-
   .student-subjects-body {
-    padding: 8px 16px 16px;
+    padding: 0 16px 16px;
   }
 
   .student-topic-grid,
