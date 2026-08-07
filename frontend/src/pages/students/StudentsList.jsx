@@ -210,7 +210,10 @@ function useGroupedStudents() {
   }, [students, studentGrades, parents])
 }
 
-export default function StudentsList({ onUploadNew, onSubjectClick, loadingChip }) {
+export default function StudentsList({
+  onUploadNew, onSubjectClick, loadingChip,
+  selectedGrade, onSelectedGradeChange, selectedSection, onSelectedSectionChange,
+}) {
   const isAdmin = useProfileStore(s => s.is_school_admin)
   const grades = useGroupedStudents()
 
@@ -219,17 +222,14 @@ export default function StudentsList({ onUploadNew, onSubjectClick, loadingChip 
   const progressByStudent = useClassQuizProgressStore(s => s.progressByStudent)
   const fetchClassProgress = useClassQuizProgressStore(s => s.fetchClassProgress)
 
-  const [selectedGrade, setSelectedGrade] = useState(null)
-  const [selectedSection, setSelectedSection] = useState(null)
-
   // Default to the first grade/section once data is available, and re-pick
   // if the previously selected grade disappears (e.g. after a re-upload).
   // Done directly during render (not in an effect) since the guard clauses
   // above already make repeated calls a no-op — a state adjustment, not a
   // sync with an external system.
   if (grades.length > 0 && !(selectedGrade != null && grades.some(g => g.gradeName === selectedGrade))) {
-    setSelectedGrade(grades[0].gradeName)
-    setSelectedSection(grades[0].sections[0]?.section ?? null)
+    onSelectedGradeChange(grades[0].gradeName)
+    onSelectedSectionChange(grades[0].sections[0]?.section ?? null)
   }
 
   const hasSections = grades.some(g => g.sections.some(s => s.section !== NO_SECTION))
@@ -278,9 +278,9 @@ export default function StudentsList({ onUploadNew, onSubjectClick, loadingChip 
   }
 
   function selectGrade(gradeName) {
-    setSelectedGrade(gradeName)
+    onSelectedGradeChange(gradeName)
     const grade = grades.find(g => g.gradeName === gradeName)
-    setSelectedSection(grade?.sections[0]?.section ?? null)
+    onSelectedSectionChange(grade?.sections[0]?.section ?? null)
   }
 
   return (
@@ -309,7 +309,7 @@ export default function StudentsList({ onUploadNew, onSubjectClick, loadingChip 
                 <button
                   key={section}
                   className={`students-section-pill ${section === selectedSection ? 'students-section-pill--active' : ''}`}
-                  onClick={() => setSelectedSection(section)}
+                  onClick={() => onSelectedSectionChange(section)}
                   aria-pressed={section === selectedSection}
                 >
                   {section}

@@ -11,6 +11,12 @@ export default function StudentsPage() {
   const [showUpload, setShowUpload] = useState(false)
   const [detail, setDetail] = useState(null) // { student, subjectId } | null
   const [loadingChip, setLoadingChip] = useState(null) // { studentId, subjectId } | null
+  // Lifted out of StudentsList so the teacher's grade/section filter survives
+  // a round trip through the student detail view — StudentsList unmounts
+  // while that's showing, which would otherwise reset its own local state
+  // back to the default grade/section on the way back.
+  const [selectedGrade, setSelectedGrade] = useState(null)
+  const [selectedSection, setSelectedSection] = useState(null)
   const scrollTopRef = useRef(0)
 
   // Shows a spinner on the clicked chip while the student's scores load
@@ -46,7 +52,17 @@ export default function StudentsPage() {
   }
 
   if (studentCount > 0 && !showUpload) {
-    return <StudentsList onUploadNew={() => setShowUpload(true)} onSubjectClick={openSubject} loadingChip={loadingChip} />
+    return (
+      <StudentsList
+        onUploadNew={() => setShowUpload(true)}
+        onSubjectClick={openSubject}
+        loadingChip={loadingChip}
+        selectedGrade={selectedGrade}
+        onSelectedGradeChange={setSelectedGrade}
+        selectedSection={selectedSection}
+        onSelectedSectionChange={setSelectedSection}
+      />
+    )
   }
   return (
     <StudentsEmpty
