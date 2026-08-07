@@ -69,9 +69,11 @@ export default function TeachersList({ onUploadNew }) {
                 <span className="teachers-row-photo">
                   <span className="teachers-thumb teachers-thumb--placeholder">{initials(row.name)}</span>
                 </span>
-                <span className="teachers-row-id">{row.org_id}</span>
                 <span className="teachers-row-namecell">
-                  <span className="teachers-row-name">{row.name}</span>
+                  <span className="teachers-row-titlerow">
+                    <span className="teachers-row-id">{row.org_id}</span>
+                    <span className="teachers-row-name">{row.name}</span>
+                  </span>
                   <span className="teachers-row-email">{row.email}</span>
                 </span>
                 <label className={`teachers-row-superadmin${locked ? ' teachers-row-superadmin--locked' : ''}`}>
