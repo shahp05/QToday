@@ -72,7 +72,7 @@ function IconClose() {
 }
 
 export default function TeachLogList({
-  onLogNew, onEmptyDayClick,
+  onBack, onLogNew, onEmptyDayClick,
   selection, onSelectionChange,
   showCalendar, onShowCalendarChange,
   calendarMonth, onCalendarMonthChange,
@@ -252,6 +252,7 @@ export default function TeachLogList({
     <div className="teach-log-list">
       <PageHeader
         title="Subjects"
+        onBack={onBack}
         actions={(
           <>
             <button

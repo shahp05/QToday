@@ -1,11 +1,11 @@
-import { useUI } from '../context/UIContext'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useProfileStore } from '../store/profileStore'
 import { useStudentsStore } from '../store/studentsStore'
 import { useTeachersStore } from '../store/teachersStore'
 import { useSubjectsTaughtStore } from '../store/subjectsTaughtStore'
 import { useQuizProgressStore } from '../store/quizProgressStore'
 import { useQuizHistoryStore } from '../store/quizHistoryStore'
+import { useStudentsListFilterStore } from '../store/studentsListFilterStore'
 import logo from '../assets/logo_48.webp'
 import './LeftNav.css'
 
@@ -70,8 +70,7 @@ function roleLabel(profile) {
   return '—'
 }
 
-export default function LeftNav({ onNavigate }) {
-  const { activePage, setActivePage, setActiveSubject } = useUI()
+export default function LeftNav() {
   const profile = useProfileStore()
   const clearProfile = useProfileStore(s => s.clearProfile)
   const clearStudents = useStudentsStore(s => s.clearStudents)
@@ -79,10 +78,12 @@ export default function LeftNav({ onNavigate }) {
   const clearSubjectsTaught = useSubjectsTaughtStore(s => s.clearSubjectsTaught)
   const clearQuizProgress = useQuizProgressStore(s => s.clearQuizProgress)
   const clearQuizHistory = useQuizHistoryStore(s => s.clearQuizHistory)
+  const clearStudentsListFilter = useStudentsListFilterStore(s => s.clear)
   const studentsStatus = useStudentsStore(s => s.status)
   const teachersStatus = useTeachersStore(s => s.status)
   const subjectsStatus = useSubjectsTaughtStore(s => s.status)
   const navigate = useNavigate()
+  const location = useLocation()
 
   const isLoadingById = {
     students: studentsStatus === 'idle' || studentsStatus === 'loading',
@@ -97,10 +98,16 @@ export default function LeftNav({ onNavigate }) {
     { label: 'Country', value: profile.country_name     || '—' },
   ]
 
+  // Active state (and the isActive() guard below) match on a path prefix,
+  // not exact equality, so Students stays highlighted while a student's
+  // detail route (/dashboard/students/:id) is open too.
+  function isActive(id) {
+    return location.pathname === `/dashboard/${id}` || location.pathname.startsWith(`/dashboard/${id}/`)
+  }
+
   function handleNav(id) {
-    onNavigate?.()
-    setActivePage(id)
-    if (id !== 'subjects') setActiveSubject(null)
+    if (isActive(id)) return
+    navigate(`/dashboard/${id}`)
   }
 
   function handleLogout() {
@@ -110,8 +117,7 @@ export default function LeftNav({ onNavigate }) {
     clearSubjectsTaught()
     clearQuizProgress()
     clearQuizHistory()
-    setActivePage(null)
-    setActiveSubject(null)
+    clearStudentsListFilter()
     navigate('/')
   }
 
@@ -126,10 +132,10 @@ export default function LeftNav({ onNavigate }) {
         {NAV_ITEMS.map(({ id, label, Icon }) => (
           <button
             key={id}
-            className={`leftnav-item ${activePage === id ? 'leftnav-item--active' : ''}`}
+            className={`leftnav-item ${isActive(id) ? 'leftnav-item--active' : ''}`}
             onClick={() => handleNav(id)}
             aria-label={label}
-            aria-current={activePage === id ? 'page' : undefined}
+            aria-current={isActive(id) ? 'page' : undefined}
           >
             {isLoadingById[id] ? <IconSpinner /> : <Icon />}
             <span className="leftnav-item-label">{label}</span>

@@ -20,7 +20,7 @@ function IconBoxSpinner() {
   return <span className="teachers-superadmin-spinner" role="status" aria-label="Updating" />
 }
 
-export default function TeachersList({ onUploadNew }) {
+export default function TeachersList({ onUploadNew, onBack }) {
   const isAdmin = useProfileStore(s => s.is_school_admin)
   const myOrgId = useProfileStore(s => s.org_id)
   const teachers = useTeachersStore(s => s.teachers)
@@ -53,6 +53,7 @@ export default function TeachersList({ onUploadNew }) {
     <div className="teachers-list">
       <PageHeader
         title="Teachers"
+        onBack={onBack}
         actions={isAdmin && (
           <button className="teachers-list-upload-btn" onClick={onUploadNew}>
             Upload new file

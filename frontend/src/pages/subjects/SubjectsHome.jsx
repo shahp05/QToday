@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import SubjectsPage from './SubjectsPage'
 import TeachLogList from './TeachLogList'
 
@@ -9,6 +10,7 @@ function initialCalendarMonth() {
 }
 
 export default function SubjectsHome({ defaultView }) {
+  const navigate = useNavigate()
   const [showList, setShowList] = useState(defaultView === 'teachLog')
   const [logDate, setLogDate] = useState(null)
 
@@ -24,6 +26,7 @@ export default function SubjectsHome({ defaultView }) {
   if (showList) {
     return (
       <TeachLogList
+        onBack={() => navigate(-1)}
         onLogNew={() => {
           setLogDate(null)
           setShowList(false)

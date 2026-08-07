@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
 import { useQuizProgressStore } from '../../store/quizProgressStore'
 import { useQuizHistoryStore } from '../../store/quizHistoryStore'
@@ -50,6 +51,7 @@ function waitForStatus(useStore) {
 }
 
 export default function StudentSubjectsHome() {
+  const navigate = useNavigate()
   // subjects (and each subject's topics) already arrive alphabetically
   // sorted from the backend — see teach_log_service.list_subjects_taught.
   const subjects = useSubjectsTaughtStore(s => s.subjects)
@@ -130,12 +132,12 @@ export default function StudentSubjectsHome() {
     )
   }
 
-  // Dashboard.jsx already holds this page off-screen until subjectsStatus
-  // settles (see its panel-swap gate), so 'loading'/'idle' shouldn't reach
-  // here in practice — rendering nothing rather than a placeholder is just
-  // a safety net against a stale render slipping through that gate.
   if (subjectsStatus === 'loading' || subjectsStatus === 'idle') {
-    return null
+    return (
+      <div className="content-card">
+        <p className="content-card-placeholder">Loading…</p>
+      </div>
+    )
   }
 
   if (subjectsStatus === 'error') {
@@ -202,6 +204,7 @@ export default function StudentSubjectsHome() {
     <div className="student-subjects">
       <PageHeader
         title="Play"
+        onBack={() => navigate(-1)}
         actions={(
           view === 'topics' ? (
             // Nothing to show progress on until at least one quiz has been

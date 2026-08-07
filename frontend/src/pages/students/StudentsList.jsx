@@ -197,7 +197,7 @@ function useGroupedStudents() {
 }
 
 export default function StudentsList({
-  onUploadNew, onSubjectClick, loadingChip,
+  onUploadNew, onBack, onSubjectClick, loadingChip,
   selectedGrade, onSelectedGradeChange, selectedSection, onSelectedSectionChange,
 }) {
   const isAdmin = useProfileStore(s => s.is_school_admin)
@@ -289,6 +289,7 @@ export default function StudentsList({
     <div className="students-list">
       <PageHeader
         title="Students"
+        onBack={onBack}
         actions={isAdmin && (
           <button className="students-list-upload-btn" onClick={onUploadNew}>
             Upload new file

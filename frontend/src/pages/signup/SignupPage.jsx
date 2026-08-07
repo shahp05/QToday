@@ -397,7 +397,7 @@ export default function SignupPage() {
           <SignupForm onCodeSent={data => { setFormData(data); setStep('verify') }} />
         )}
         {step === 'verify' && (
-          <VerifyForm formData={formData} onSuccess={() => navigate('/dashboard', { replace: true, state: { firstVisit: true } })} />
+          <VerifyForm formData={formData} onSuccess={() => navigate('/dashboard/students', { replace: true })} />
         )}
 
         <p className="su-login-link">
