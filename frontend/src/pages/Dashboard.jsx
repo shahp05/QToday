@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import LeftNav from '../components/LeftNav'
 import LoginQuote from '../components/LoginQuote'
@@ -56,6 +56,7 @@ export default function Dashboard() {
   const subjectsStatus                = useSubjectsTaughtStore(s => s.status)
   const [displayedPage, setDisplayedPage] = useState(null)
   const [showLoginQuote, setShowLoginQuote] = useState(!location.state?.firstVisit)
+  const quoteTimerRef = useRef(null)
 
   // Runs once, on arrival, not on every location.state change.
   useEffect(() => {
@@ -67,15 +68,27 @@ export default function Dashboard() {
     // showing — activePage can carry a stale value from a prior session
     // (UIProvider isn't remounted on login/logout) if we don't clear it here.
     setActivePage(null)
-    const timer = setTimeout(() => {
+    quoteTimerRef.current = setTimeout(() => {
       if (isStudent || isSchoolTeacher || isCustomerSysadmin) {
         setActivePage('subjects')
       }
       setShowLoginQuote(false)
     }, LOGIN_QUOTE_DURATION_MS)
-    return () => clearTimeout(timer)
+    return () => clearTimeout(quoteTimerRef.current)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Passed to LeftNav so a click during the quote cancels its timer and
+  // reveals the clicked page immediately, instead of waiting out the quote
+  // and then having the timer's own callback stomp activePage back to
+  // 'subjects'. A real event handler (fired from LeftNav's onClick), not an
+  // effect — nothing here needs to run on every render, only in response to
+  // the click itself.
+  function dismissLoginQuote() {
+    if (!showLoginQuote) return
+    clearTimeout(quoteTimerRef.current)
+    setShowLoginQuote(false)
+  }
 
   // Initial data load — intentionally mount-only.
   useEffect(() => {
@@ -107,7 +120,7 @@ export default function Dashboard() {
     <div className="dashboard">
 
       {/* ── Panel 1: icon nav ─────────────────────────────────────────────── */}
-      <LeftNav />
+      <LeftNav onNavigate={dismissLoginQuote} />
 
       {/* ── Panel 3: main content ─────────────────────────────────────────── */}
       <div className="dashboard-panel3">

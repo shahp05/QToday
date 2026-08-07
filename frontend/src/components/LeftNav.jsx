@@ -70,7 +70,7 @@ function roleLabel(profile) {
   return '—'
 }
 
-export default function LeftNav() {
+export default function LeftNav({ onNavigate }) {
   const { activePage, setActivePage, setActiveSubject } = useUI()
   const profile = useProfileStore()
   const clearProfile = useProfileStore(s => s.clearProfile)
@@ -98,6 +98,7 @@ export default function LeftNav() {
   ]
 
   function handleNav(id) {
+    onNavigate?.()
     setActivePage(id)
     if (id !== 'subjects') setActiveSubject(null)
   }
