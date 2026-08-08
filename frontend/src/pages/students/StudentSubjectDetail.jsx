@@ -4,6 +4,7 @@ import { useStudentDetailProgressStore } from '../../store/studentDetailProgress
 import SubjectTopicGrid, { SubjectFilterBar } from '../subjects/SubjectTopicGrid'
 import StudentQuizProgress from '../subjects/StudentQuizProgress'
 import PageHeader from '../../components/PageHeader'
+import { usePageView } from '../../hooks/usePageView'
 import '../subjects/StudentSubjectsHome.css'
 
 function IconProgress() {
@@ -43,7 +44,7 @@ export default function StudentSubjectDetail({ student, initialSubjectId, onBack
   const ensureLoaded = useStudentDetailProgressStore(s => s.ensureLoaded)
   const dismissError = useStudentDetailProgressStore(s => s.dismissError)
   const [selectedSubjectId, setSelectedSubjectId] = useState(initialSubjectId ?? null)
-  const [view, setView] = useState('topics') // 'topics' | 'progress'
+  const [view, setView] = usePageView('topics') // 'topics' | 'progress' — coexists with ?subject=
 
   useEffect(() => { ensureLoaded(student.student_id) }, [student.student_id, ensureLoaded])
 

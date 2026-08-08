@@ -6,6 +6,7 @@ import { useQuizHistoryStore } from '../../store/quizHistoryStore'
 import { fetchQuizStatus, startQuiz as fetchQuizQuestions } from '../../services/quizService'
 import { Toast } from '../../components/ui/Toast'
 import PageHeader from '../../components/PageHeader'
+import { usePageView } from '../../hooks/usePageView'
 import QuizPage from './QuizPage'
 import StudentQuizProgress from './StudentQuizProgress'
 import SubjectTopicGrid, { SubjectFilterBar } from './SubjectTopicGrid'
@@ -52,6 +53,7 @@ function waitForStatus(useStore) {
 
 export default function StudentSubjectsHome() {
   const navigate = useNavigate()
+  const [view, setView] = usePageView('topics') // 'topics' | 'progress'
   // subjects (and each subject's topics) already arrive alphabetically
   // sorted from the backend — see teach_log_service.list_subjects_taught.
   const subjects = useSubjectsTaughtStore(s => s.subjects)
@@ -72,7 +74,6 @@ export default function StudentSubjectsHome() {
   const [quizError, setQuizError] = useState('')
   // topic_id -> quiz_id, for topics whose LLM scoring pass hasn't finished yet
   const [scoringTopics, setScoringTopics] = useState({})
-  const [view, setView] = useState('topics') // 'topics' | 'progress'
 
   useEffect(() => { fetchQuizProgress() }, [fetchQuizProgress])
   // Fetched eagerly (not gated on the Progress click) so the button can show

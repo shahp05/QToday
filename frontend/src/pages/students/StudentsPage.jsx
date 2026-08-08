@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import { useStudentsStore } from '../../store/studentsStore'
 import { useStudentDetailProgressStore } from '../../store/studentDetailProgressStore'
 import { useStudentsListFilterStore } from '../../store/studentsListFilterStore'
+import { usePageView } from '../../hooks/usePageView'
 import StudentsEmpty from './StudentsEmpty'
 import StudentsList from './StudentsList'
 
 export default function StudentsPage() {
   const navigate = useNavigate()
+  usePageView('students') // every page-header page names itself in the URL
   const studentsStatus = useStudentsStore(s => s.status)
   const studentCount = useStudentsStore(s => s.students.length)
   const ensureStudentProgressLoaded = useStudentDetailProgressStore(s => s.ensureLoaded)

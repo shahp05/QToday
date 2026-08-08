@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { usePageView } from '../../hooks/usePageView'
 import SubjectsPage from './SubjectsPage'
 import TeachLogList from './TeachLogList'
 
@@ -11,15 +12,15 @@ function initialCalendarMonth() {
 
 export default function SubjectsHome({ defaultView }) {
   const navigate = useNavigate()
+  const [view, setView] = usePageView(defaultView === 'teachLog' ? 'log' : 'subjects')
+  const showCalendar = view === 'log'
   const [showList, setShowList] = useState(defaultView === 'teachLog')
   const [logDate, setLogDate] = useState(null)
-
   // Lifted up from TeachLogList/TeachLogCalendar so it survives the
   // "New Subject" round trip through SubjectsPage — TeachLogList unmounts
   // whenever showList flips to false, which would otherwise reset which
-  // view (list/calendar), which subject/topic/qa, and which calendar month
-  // were showing back to their defaults every time.
-  const [showCalendar, setShowCalendar] = useState(defaultView === 'teachLog')
+  // subject/topic/qa or calendar month were showing back to their defaults
+  // every time.
   const [selection, setSelection] = useState(null) // { subjectId, topicId, gradeId } | null
   const [calendarMonth, setCalendarMonth] = useState(initialCalendarMonth)
 
@@ -38,7 +39,7 @@ export default function SubjectsHome({ defaultView }) {
         selection={selection}
         onSelectionChange={setSelection}
         showCalendar={showCalendar}
-        onShowCalendarChange={setShowCalendar}
+        onShowCalendarChange={next => setView(next ? 'log' : 'subjects')}
         calendarMonth={calendarMonth}
         onCalendarMonthChange={setCalendarMonth}
       />

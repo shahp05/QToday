@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTeachersStore } from '../../store/teachersStore'
+import { usePageView } from '../../hooks/usePageView'
 import TeachersEmpty from './TeachersEmpty'
 import TeachersList from './TeachersList'
 
 export default function TeachersPage() {
   const navigate = useNavigate()
+  usePageView('teachers') // every page-header page names itself in the URL
   const teachersStatus = useTeachersStore(s => s.status)
   const teacherCount = useTeachersStore(s => s.teachers.length)
   const [showUpload, setShowUpload] = useState(false)
