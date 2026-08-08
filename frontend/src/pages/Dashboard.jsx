@@ -17,7 +17,10 @@ export default function Dashboard() {
   const fetchSubjectsTaught = useSubjectsTaughtStore(s => s.fetchSubjectsTaught)
   const fetchTopicCatalog   = useTopicCatalogStore(s => s.fetchTopicCatalog)
 
-  // Initial data load — intentionally mount-only.
+  // Initial data load — intentionally mount-only. Runs on every /dashboard
+  // mount, including a refresh — unlike the quote screen's auto-advance
+  // flag (see dashboardQuoteStore), which is deliberately NOT reset here,
+  // since a refresh must not re-arm it.
   useEffect(() => {
     fetchStudents()
     fetchTeachers()

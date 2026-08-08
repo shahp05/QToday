@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../lib/api'
 import { useProfileStore } from '../../store/profileStore'
+import { useDashboardQuoteStore } from '../../store/dashboardQuoteStore'
 import logo512 from '../../assets/logo_512.webp'
 import './LoginPage.css'
 
@@ -32,6 +33,7 @@ export default function LoginPage() {
   const shakeTimer                    = useRef(null)
   const navigate                      = useNavigate()
   const setProfile                    = useProfileStore(s => s.setProfile)
+  const resetQuoteAutoAdvance         = useDashboardQuoteStore(s => s.reset)
 
   useEffect(() => {
     firstRef.current?.focus()
@@ -68,6 +70,7 @@ export default function LoginPage() {
       }
       const j = await res.json()
       setProfile(j.profile, j.access_token)
+      resetQuoteAutoAdvance()
       navigate('/dashboard')
     } catch {
       shake(true)

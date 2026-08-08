@@ -5,6 +5,7 @@ import { useTeachersStore } from '../store/teachersStore'
 import { useSubjectsTaughtStore } from '../store/subjectsTaughtStore'
 import { useQuizProgressStore } from '../store/quizProgressStore'
 import { useQuizHistoryStore } from '../store/quizHistoryStore'
+import { useDashboardQuoteStore } from '../store/dashboardQuoteStore'
 import { useStudentsListFilterStore } from '../store/studentsListFilterStore'
 import logo from '../assets/logo_48.webp'
 import './LeftNav.css'
@@ -78,6 +79,7 @@ export default function LeftNav() {
   const clearSubjectsTaught = useSubjectsTaughtStore(s => s.clearSubjectsTaught)
   const clearQuizProgress = useQuizProgressStore(s => s.clearQuizProgress)
   const clearQuizHistory = useQuizHistoryStore(s => s.clearQuizHistory)
+  const resetQuoteAutoAdvance = useDashboardQuoteStore(s => s.reset)
   const clearStudentsListFilter = useStudentsListFilterStore(s => s.clear)
   const studentsStatus = useStudentsStore(s => s.status)
   const teachersStatus = useTeachersStore(s => s.status)
@@ -118,6 +120,7 @@ export default function LeftNav() {
     clearQuizProgress()
     clearQuizHistory()
     clearStudentsListFilter()
+    resetQuoteAutoAdvance()
     navigate('/')
   }
 
