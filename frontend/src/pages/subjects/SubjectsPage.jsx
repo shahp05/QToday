@@ -257,7 +257,7 @@ export default function SubjectsPage({ onShowList, onGenerated, logDate }) {
         section: (customerHasSections && gradeHasSections) ? parsed.section : null,
         logDate,
       })
-      await refetchSubjectsTaught()
+      await refetchSubjectsTaught(true) // force — this teach log just changed subjects-taught server-side
       // The teach_log itself is always written even if QA generation later
       // fails (see qa_service._finalize) — so this subject/topic identity
       // exists regardless of the items.length branch below.

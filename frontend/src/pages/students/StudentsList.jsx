@@ -205,8 +205,10 @@ export default function StudentsList({
   const isStudentViewer = useProfileStore(s => s.is_student)
   const grades = useGroupedStudents()
 
+  // Not fetched here — Dashboard.jsx already kicks this off once per
+  // session on /dashboard mount, and this component just reads whatever's
+  // in the store (loading/loaded/error handled there, not per-page).
   const subjectsTaught = useSubjectsTaughtStore(s => s.subjects)
-  const fetchSubjectsTaught = useSubjectsTaughtStore(s => s.fetchSubjectsTaught)
   const progressByStudent = useClassQuizProgressStore(s => s.progressByStudent)
   const fetchClassProgress = useClassQuizProgressStore(s => s.fetchClassProgress)
   const updateStudentPhoto = useStudentsStore(s => s.updateStudentPhoto)
@@ -238,8 +240,6 @@ export default function StudentsList({
   const currentGrade = grades.find(g => g.gradeName === selectedGrade)
   const currentSection = currentGrade?.sections.find(s => s.section === selectedSection)
   const rows = currentSection?.rows ?? []
-
-  useEffect(() => { fetchSubjectsTaught() }, [fetchSubjectsTaught])
 
   // Refetches whenever the visible grade/section (and therefore its student
   // roster) changes — keyed on the actual id list, not just selectedGrade/

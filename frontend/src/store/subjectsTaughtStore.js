@@ -15,7 +15,14 @@ export const useSubjectsTaughtStore = create((set, get) => ({
   loadingQaKeys: new Set(), // `${topicId}:${gradeId}` currently being fetched
   qaLoadErrors: {}, // `${topicId}:${gradeId}` -> resolved message, for the last failed fetch attempt
 
-  fetchSubjectsTaught: async () => {
+  // Skips the round-trip if already loaded/in flight — subjects/topics
+  // taught don't change from just looking at another page, so there's no
+  // reason a route remount (e.g. leaving and re-clicking Students) should
+  // refetch data that's already sitting in the store. Pass force:true right
+  // after a mutation that actually changes this data server-side (see
+  // SubjectsPage's post-log refetch).
+  fetchSubjectsTaught: async (force = false) => {
+    if (!force && (get().status === 'loaded' || get().status === 'loading')) return
     set({ status: 'loading', error: null })
     try {
       const data = await fetchSubjectsTaught()
