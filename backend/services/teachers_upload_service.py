@@ -13,7 +13,10 @@ def process_teachers_upload(db: Session, customer_id: int, rows: list[dict]) -> 
     in it. Teachers are users rows with is_adm=TRUE, is_sysadm=FALSE,
     customer_id set — there is no separate teachers table. Every upload
     is treated as the complete current roster for this customer. Runs as
-    one transaction — any error rolls back the whole upload."""
+    one transaction — any error rolls back the whole upload.
+
+    Set-based throughout (see students_upload_service for why) — a
+    handful of bulk queries total instead of one round trip per row."""
     customer = db.execute(
         text("SELECT customer_acronym, country_id FROM customers WHERE customer_id = :cid"),
         {"cid": customer_id},
@@ -21,94 +24,127 @@ def process_teachers_upload(db: Session, customer_id: int, rows: list[dict]) -> 
     acronym = customer.customer_acronym
 
     counts = {"teachers_created": 0, "teachers_updated": 0, "teachers_deactivated": 0}
-    seen_org_ids: set[str] = set()
+
+    for row in rows:
+        row["org_id"] = row["org_id"].strip()
+        row["name"] = row["name"].strip()
+        row["email"] = row["email"].strip().lower()
 
     seen_in_file: set[str] = set()
     for row in rows:
-        oid = row["org_id"].strip()
-        if oid in seen_in_file:
-            raise AppError(ErrorCode.DUPLICATE_ID, context={"id": oid})
-        seen_in_file.add(oid)
+        if row["org_id"] in seen_in_file:
+            raise AppError(ErrorCode.DUPLICATE_ID, context={"id": row["org_id"]})
+        seen_in_file.add(row["org_id"])
+
+    # Mirrors what the old per-row loop incidentally caught for free by
+    # re-querying the db mid-loop and seeing its own prior writes: two rows
+    # in the same file claiming the same email under different org_ids.
+    org_id_by_email_in_file: dict[str, str] = {}
+    for row in rows:
+        prior = org_id_by_email_in_file.get(row["email"])
+        if prior is not None and prior != row["org_id"]:
+            raise AppError(ErrorCode.EMAIL_ALREADY_USED, context={"email": row["email"]})
+        org_id_by_email_in_file[row["email"]] = row["org_id"]
+
+    seen_org_ids = {row["org_id"] for row in rows}
 
     try:
-        for row in rows:
-            org_id = row["org_id"].strip()
-            name = row["name"].strip()
-            email = row["email"].strip().lower()
-            seen_org_ids.add(org_id)
+        if rows:
+            org_ids = [row["org_id"] for row in rows]
 
-            email_conflict = db.execute(
-                text(
-                    "SELECT 1 FROM users WHERE customer_id = :cid AND is_adm = TRUE "
-                    "AND lower(email_id) = :e AND org_id != :oid"
-                ),
-                {"cid": customer_id, "e": email, "oid": org_id},
-            ).fetchone()
-            if email_conflict is not None:
-                raise AppError(ErrorCode.EMAIL_ALREADY_USED, context={"email": email})
+            org_id_by_email_in_db = {
+                r.email: r.org_id
+                for r in db.execute(
+                    text(
+                        "SELECT org_id, lower(email_id) AS email FROM users "
+                        "WHERE customer_id = :cid AND is_adm = TRUE AND email_id IS NOT NULL"
+                    ),
+                    {"cid": customer_id},
+                ).fetchall()
+            }
+            for row in rows:
+                conflict_org_id = org_id_by_email_in_db.get(row["email"])
+                if conflict_org_id is not None and conflict_org_id != row["org_id"]:
+                    raise AppError(ErrorCode.EMAIL_ALREADY_USED, context={"email": row["email"]})
 
-            existing = db.execute(
-                text(
-                    "SELECT user_id, user_name, email_id, is_active FROM users "
-                    "WHERE org_id = :oid AND customer_id = :cid AND is_adm = TRUE"
-                ),
-                {"oid": org_id, "cid": customer_id},
-            ).fetchone()
+            existing_by_org_id = {
+                r.org_id: r
+                for r in db.execute(
+                    text(
+                        "SELECT user_id, org_id, user_name, email_id, is_active, is_adm, is_sysadm "
+                        "FROM users WHERE customer_id = :cid AND org_id = ANY(:org_ids)"
+                    ),
+                    {"cid": customer_id, "org_ids": org_ids},
+                ).fetchall()
+            }
 
-            if existing is None:
-                # org_id@acronym is also how students build their login_key
-                # (globally unique on users) — an Id already claimed by a
-                # student (or any other user) at this school would otherwise
-                # surface as a raw DB constraint violation on INSERT.
-                id_conflict = db.execute(
-                    text("SELECT is_sysadm FROM users WHERE customer_id = :cid AND org_id = :oid"),
-                    {"cid": customer_id, "oid": org_id},
-                ).fetchone()
-                if id_conflict is not None:
-                    if id_conflict.is_sysadm:
-                        # The school owner's own id — already has full access
-                        # and isn't a separate teacher row; including them in
-                        # the roster is a no-op, not a conflict.
+            to_insert = []
+            to_update = []
+            for row in rows:
+                existing = existing_by_org_id.get(row["org_id"])
+                if existing is None:
+                    to_insert.append(row)
+                elif not existing.is_adm:
+                    # org_id already belongs to a non-teacher user at this
+                    # school (a student, or the school's own sysadmin).
+                    if existing.is_sysadm:
                         continue
-                    raise AppError(ErrorCode.DUPLICATE_ID, context={"id": org_id})
+                    raise AppError(ErrorCode.DUPLICATE_ID, context={"id": row["org_id"]})
+                else:
+                    to_update.append(row)
 
-                login_key = f"{org_id}@{acronym}"
+            if to_insert:
+                login_keys = [f"{row['org_id']}@{acronym}" for row in to_insert]
+                password_hashes = [hash_password(lk) for lk in login_keys]
                 db.execute(
                     text(
-                        "INSERT INTO users (login_key, password_hash, user_name, email_id, "
-                        "country_id, customer_id, org_id, is_adm, is_sysadm) "
-                        "VALUES (:lk, :ph, :un, :ei, :cy, :cid, :oid, TRUE, FALSE)"
+                        "INSERT INTO users (login_key, password_hash, user_name, email_id, country_id, "
+                        "customer_id, org_id, is_adm, is_sysadm) "
+                        "SELECT login_key, password_hash, user_name, email, :country_id, :customer_id, org_id, TRUE, FALSE "
+                        "FROM unnest((:login_keys)::text[], (:password_hashes)::text[], (:names)::text[], (:emails)::text[], (:org_ids)::text[]) "
+                        "AS t(login_key, password_hash, user_name, email, org_id)"
                     ),
                     {
-                        "lk": login_key, "ph": hash_password(login_key), "un": name, "ei": email,
-                        "cy": customer.country_id, "cid": customer_id, "oid": org_id,
+                        "country_id": customer.country_id, "customer_id": customer_id,
+                        "login_keys": login_keys, "password_hashes": password_hashes,
+                        "names": [row["name"] for row in to_insert],
+                        "emails": [row["email"] for row in to_insert],
+                        "org_ids": [row["org_id"] for row in to_insert],
                     },
                 )
-                counts["teachers_created"] += 1
-            else:
-                if existing.user_name != name or existing.email_id != email or not existing.is_active:
-                    db.execute(
-                        text(
-                            "UPDATE users SET user_name = :un, email_id = :ei, is_active = TRUE, "
-                            "date_modified = NOW() WHERE user_id = :uid"
-                        ),
-                        {"un": name, "ei": email, "uid": existing.user_id},
-                    )
-                    counts["teachers_updated"] += 1
+            counts["teachers_created"] = len(to_insert)
 
-        missing_teachers = db.execute(
+            users_to_touch = []  # (user_id, name, email)
+            for row in to_update:
+                existing = existing_by_org_id[row["org_id"]]
+                if existing.user_name != row["name"] or existing.email_id != row["email"] or not existing.is_active:
+                    users_to_touch.append((existing.user_id, row["name"], row["email"]))
+            if users_to_touch:
+                ids, names, emails = zip(*users_to_touch)
+                db.execute(
+                    text(
+                        "UPDATE users u SET user_name = t.user_name, email_id = t.email, "
+                        "is_active = TRUE, date_modified = NOW() "
+                        "FROM unnest((:ids)::int[], (:names)::text[], (:emails)::text[]) AS t(user_id, user_name, email) "
+                        "WHERE u.user_id = t.user_id"
+                    ),
+                    {"ids": list(ids), "names": list(names), "emails": list(emails)},
+                )
+            counts["teachers_updated"] = len(users_to_touch)
+
+        missing = db.execute(
             text(
                 "SELECT user_id FROM users WHERE customer_id = :cid AND is_adm = TRUE "
                 "AND is_active = TRUE AND NOT (org_id = ANY(:org_ids))"
             ),
             {"cid": customer_id, "org_ids": list(seen_org_ids)},
         ).fetchall()
-        for row in missing_teachers:
+        if missing:
             db.execute(
-                text("UPDATE users SET is_active = FALSE, date_modified = NOW() WHERE user_id = :uid"),
-                {"uid": row.user_id},
+                text("UPDATE users SET is_active = FALSE, date_modified = NOW() WHERE user_id = ANY(:ids)"),
+                {"ids": [r.user_id for r in missing]},
             )
-        counts["teachers_deactivated"] = len(missing_teachers)
+        counts["teachers_deactivated"] = len(missing)
 
         db.commit()
     except Exception:
