@@ -4,6 +4,8 @@ import QaCard from './QaCard'
 import { getSubjectIcon } from './subjectIconMatch'
 import TeachLogCalendar from './TeachLogCalendar'
 import PageHeader from '../../components/PageHeader'
+import PageLoading from '../../components/PageLoading'
+import { Toast } from '../../components/ui/Toast'
 import './TeachLogList.css'
 
 function IconChevron({ open }) {
@@ -81,6 +83,7 @@ export default function TeachLogList({
   const mostRecent = useSubjectsTaughtStore(s => s.mostRecent)
   const status = useSubjectsTaughtStore(s => s.status)
   const error = useSubjectsTaughtStore(s => s.error)
+  const clearSubjectsError = useSubjectsTaughtStore(s => s.clearError)
   const handleQaUpdated = useSubjectsTaughtStore(s => s.handleQaUpdated)
   const handleQaFlagged = useSubjectsTaughtStore(s => s.handleQaFlagged)
   const ensureQaLoaded = useSubjectsTaughtStore(s => s.ensureQaLoaded)
@@ -286,7 +289,14 @@ export default function TeachLogList({
         />
       )}
 
-      {!showCalendar && status === 'error' && <p className="teach-log-list-empty">{error}</p>}
+      {!showCalendar && (status === 'loading' || status === 'idle') && <PageLoading />}
+
+      {!showCalendar && status === 'error' && (
+        <>
+          <Toast message={error} onDismiss={clearSubjectsError} />
+          <p className="teach-log-list-empty">Couldn't load your subjects.</p>
+        </>
+      )}
 
       {!showCalendar && status === 'loaded' && subjects.length === 0 && (
         <p className="teach-log-list-empty">Nothing logged yet — log the first topic you taught today.</p>

@@ -4,6 +4,7 @@ import { useStudentDetailProgressStore } from '../../store/studentDetailProgress
 import SubjectTopicGrid, { SubjectFilterBar } from '../subjects/SubjectTopicGrid'
 import StudentQuizProgress from '../subjects/StudentQuizProgress'
 import PageHeader from '../../components/PageHeader'
+import { Toast } from '../../components/ui/Toast'
 import { usePageView } from '../../hooks/usePageView'
 import '../subjects/StudentSubjectsHome.css'
 
@@ -99,7 +100,7 @@ export default function StudentSubjectDetail({ student, initialSubjectId, onBack
         )}
       />
 
-      {status === 'error' && <p className="student-subjects-error">{error}</p>}
+      {status === 'error' && <Toast message={error} onDismiss={() => dismissError(student.student_id)} />}
 
       {status !== 'error' && subjectsForGrade.length === 0 && (
         <p className="content-card-placeholder" style={{ padding: '0 24px' }}>No subjects taught to this student's grade yet.</p>

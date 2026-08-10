@@ -1,5 +1,7 @@
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { useStudentsStore } from '../../store/studentsStore'
+import PageHeader from '../../components/PageHeader'
+import PageLoading from '../../components/PageLoading'
 import { useStudentRow } from './useStudentRow'
 import StudentSubjectDetail from './StudentSubjectDetail'
 
@@ -16,11 +18,20 @@ export default function StudentDetailRoute() {
   const student = useStudentRow(studentId)
 
   if (!student) {
+    // The student's name isn't known yet at this point (that's the whole
+    // reason we're loading), so the header shows a placeholder title —
+    // but the back button doesn't depend on that, so it still works.
+    if (studentsStatus === 'loading' || studentsStatus === 'idle') {
+      return (
+        <div className="student-subjects">
+          <PageHeader title="Student" onBack={() => navigate(-1)} />
+          <PageLoading />
+        </div>
+      )
+    }
     return (
       <div className="content-card">
-        <p className="content-card-placeholder">
-          {studentsStatus === 'loading' || studentsStatus === 'idle' ? 'Loading…' : 'Student not found.'}
-        </p>
+        <p className="content-card-placeholder">Student not found.</p>
       </div>
     )
   }

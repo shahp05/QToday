@@ -125,5 +125,9 @@ export const useSubjectsTaughtStore = create((set, get) => ({
     get().mutateQaItems(qaId, items => items.filter(item => item.qa_id !== qaId))
   },
 
+  // Dismisses the error Toast without touching status — mirrors
+  // studentDetailProgressStore's dismissError.
+  clearError: () => set({ error: null }),
+
   clearSubjectsTaught: () => set({ subjects: [], mostRecent: null, status: 'idle', error: null, loadingQaKeys: new Set(), qaLoadErrors: {} }),
 }))

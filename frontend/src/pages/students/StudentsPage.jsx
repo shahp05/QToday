@@ -4,6 +4,8 @@ import { useStudentsStore } from '../../store/studentsStore'
 import { useStudentDetailProgressStore } from '../../store/studentDetailProgressStore'
 import { useStudentsListFilterStore } from '../../store/studentsListFilterStore'
 import { usePageView } from '../../hooks/usePageView'
+import PageHeader from '../../components/PageHeader'
+import PageLoading from '../../components/PageLoading'
 import StudentsEmpty from './StudentsEmpty'
 import StudentsList from './StudentsList'
 
@@ -35,15 +37,34 @@ export default function StudentsPage() {
     navigate(`/dashboard/students/${student.student_id}${subjectId != null ? `?subject=${subjectId}` : ''}`)
   }
 
+  // Checked before the loading guard below — StudentsEmpty owns its own
+  // loading/spinner state (including while uploadAndRefresh briefly flips
+  // studentsStatus back to 'loading' mid-upload) and must not be swapped
+  // out for the generic placeholder while it's doing that.
+  if (showUpload) {
+    return (
+      <StudentsEmpty
+        onUploaded={() => setShowUpload(false)}
+        studentCount={studentCount}
+        onShowList={() => setShowUpload(false)}
+      />
+    )
+  }
+
+  // Header renders immediately, before the roster has loaded — its
+  // identity ("Students") doesn't depend on the data, so there's no
+  // reason to make the whole page (including the back button) disappear
+  // behind a spinner while just the body is still waiting.
   if (studentsStatus === 'idle' || studentsStatus === 'loading') {
     return (
-      <div className="content-card">
-        <p className="content-card-placeholder">Loading…</p>
+      <div className="students-list">
+        <PageHeader title="Students" onBack={() => navigate(-1)} />
+        <PageLoading />
       </div>
     )
   }
 
-  if (studentCount > 0 && !showUpload) {
+  if (studentCount > 0) {
     return (
       <StudentsList
         onUploadNew={() => setShowUpload(true)}

@@ -6,6 +6,7 @@ import { useQuizHistoryStore } from '../../store/quizHistoryStore'
 import { fetchQuizStatus, startQuiz as fetchQuizQuestions } from '../../services/quizService'
 import { Toast } from '../../components/ui/Toast'
 import PageHeader from '../../components/PageHeader'
+import PageLoading from '../../components/PageLoading'
 import { usePageView } from '../../hooks/usePageView'
 import QuizPage from './QuizPage'
 import StudentQuizProgress from './StudentQuizProgress'
@@ -59,6 +60,7 @@ export default function StudentSubjectsHome() {
   const subjects = useSubjectsTaughtStore(s => s.subjects)
   const subjectsStatus = useSubjectsTaughtStore(s => s.status)
   const subjectsError = useSubjectsTaughtStore(s => s.error)
+  const clearSubjectsError = useSubjectsTaughtStore(s => s.clearError)
   const topicStatsById = useQuizProgressStore(s => s.topicStatsById)
   const fetchQuizProgress = useQuizProgressStore(s => s.fetchQuizProgress)
   const quizHistory = useQuizHistoryStore(s => s.quizzes)
@@ -133,19 +135,25 @@ export default function StudentSubjectsHome() {
     )
   }
 
+  // Header renders immediately, before subjects have loaded — its
+  // identity ("Play") doesn't depend on the data, so there's no reason to
+  // make the whole page (including the back button) disappear behind a
+  // spinner while just the body is still waiting.
   if (subjectsStatus === 'loading' || subjectsStatus === 'idle') {
     return (
-      <div className="content-card">
-        <p className="content-card-placeholder">Loading…</p>
+      <div className="student-subjects">
+        <PageHeader title="Play" onBack={() => navigate(-1)} />
+        <PageLoading />
       </div>
     )
   }
 
   if (subjectsStatus === 'error') {
     return (
-      <div className="student-subjects content-card">
-        <h2 className="content-card-title">Subjects</h2>
-        <p className="student-subjects-error">{subjectsError}</p>
+      <div className="student-subjects">
+        <PageHeader title="Play" onBack={() => navigate(-1)} />
+        <Toast message={subjectsError} onDismiss={clearSubjectsError} />
+        <p className="content-card-placeholder" style={{ padding: '0 24px' }}>Couldn't load subjects.</p>
       </div>
     )
   }

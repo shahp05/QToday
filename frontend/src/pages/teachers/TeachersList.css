@@ -3,6 +3,7 @@
   flex-direction: column;
   width: 100%;
   flex: 1;
+  min-height: 0;
 }
 
 .teachers-list-upload-btn {

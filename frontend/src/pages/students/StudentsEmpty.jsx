@@ -4,6 +4,7 @@ import { useProfileStore } from '../../store/profileStore'
 import { useStudentsStore } from '../../store/studentsStore'
 import { resolveApiError } from '../../lib/api'
 import { ErrorCode } from '../../errors/errorCodes'
+import { Toast } from '../../components/ui/Toast'
 import './StudentsEmpty.css'
 
 
@@ -156,6 +157,40 @@ function IconSpinner() {
   return <span className="students-upload-spinner" role="status" aria-label="Uploading" />
 }
 
+function IconCheck() {
+  return (
+    <svg className="students-upload-success-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+
+// Builds the post-upload summary shown in the drop/browse box when the
+// list already had students before this upload (see handleFile below) —
+// staying on this screen instead of jumping straight to the list only
+// makes sense if it actually tells the teacher/admin what changed.
+function summarizeUpload(previousCount, newCount, counts) {
+  const created = counts.students_created
+  const updated = counts.students_updated
+  const deactivated = counts.students_deactivated
+  const countChanged = newCount !== previousCount
+  const churned = created > 0 || deactivated > 0
+
+  if (!countChanged && !churned && !updated) return 'No change in student list'
+
+  const parts = []
+  if (countChanged) {
+    parts.push(`You have ${newCount} student${newCount === 1 ? '' : 's'} now.`)
+  } else if (churned) {
+    if (created > 0) parts.push(`${created} new student${created === 1 ? '' : 's'} added.`)
+    if (deactivated > 0) parts.push(`${deactivated} student${deactivated === 1 ? '' : 's'} discontinued.`)
+  }
+  if (updated > 0) {
+    parts.push(`Data updated for ${updated} student${updated === 1 ? '' : 's'}.`)
+  }
+  return parts.join(' ')
+}
+
 export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) {
   const acronym = useProfileStore(s => s.customer_acronym)
   const uploadAndRefresh = useStudentsStore(s => s.uploadAndRefresh)
@@ -171,6 +206,12 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
   const [selectedFile, setSelectedFile] = useState(null)
   const [source, setSource] = useState(null) // 'drop' | 'browse'
   const [error, setError] = useState(null)
+  // Validation errors (file type, xlsx format/values) render inline next to
+  // the file card above — they're about *this file*. Network/server errors
+  // from the actual upload go through the shared Toast instead, same as
+  // every other system error in the app.
+  const [uploadError, setUploadError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
   const [shaking, setShaking] = useState(false)
   const [uploading, setUploading] = useState(false)
   const shakeTimer = useRef(null)
@@ -185,6 +226,7 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
     if (!file || uploading) return
     setSelectedFile(file)
     setSource(src)
+    setSuccessMessage('')
 
     if (!file.name.match(/\.xlsx$/i)) {
       setError(FILE_TYPE_ERROR)
@@ -203,12 +245,19 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
       }
 
       setUploading(true)
-      await uploadAndRefresh(result.rows)
       setError(null)
-      onUploaded?.()
+      const previousCount = studentCount
+      const counts = await uploadAndRefresh(result.rows)
+      if (previousCount === 0) {
+        onUploaded?.()
+      } else {
+        // Staying on this screen is the point here — jumping straight to
+        // the list wouldn't tell the teacher/admin what this upload
+        // actually changed for a roster that already existed.
+        setSuccessMessage(summarizeUpload(previousCount, useStudentsStore.getState().students.length, counts))
+      }
     } catch (err) {
-      setError(err.message || FORMAT_ERROR)
-      shake()
+      setUploadError(err.message || FORMAT_ERROR)
     } finally {
       setUploading(false)
     }
@@ -222,6 +271,8 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
 
   return (
     <div className="students-empty">
+
+      <Toast message={uploadError} onDismiss={() => setUploadError('')} />
 
       <div className="students-empty-header">
         <p className="students-empty-label">Upload students xlsx in the format below:</p>
@@ -265,6 +316,9 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
           {selectedFile && source === 'drop' && error && (
             <span className="students-upload-error">{error}</span>
           )}
+          {selectedFile && source === 'drop' && !error && successMessage && (
+            <span className="students-upload-success"><IconCheck />{successMessage}</span>
+          )}
         </div>
 
         <div
@@ -284,6 +338,9 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
           </span>
           {selectedFile && source === 'browse' && error && (
             <span className="students-upload-error">{error}</span>
+          )}
+          {selectedFile && source === 'browse' && !error && successMessage && (
+            <span className="students-upload-success"><IconCheck />{successMessage}</span>
           )}
         </div>
 

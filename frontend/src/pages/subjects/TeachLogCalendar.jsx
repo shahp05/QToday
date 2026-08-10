@@ -1,5 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
+import PageLoading from '../../components/PageLoading'
+import { Toast } from '../../components/ui/Toast'
 import './TeachLogCalendar.css'
 
 const MONTHS = [
@@ -155,6 +157,7 @@ export default function TeachLogCalendar({ onEmptyDayClick, viewDate, onViewDate
   const subjects = useSubjectsTaughtStore(s => s.subjects)
   const status = useSubjectsTaughtStore(s => s.status)
   const error = useSubjectsTaughtStore(s => s.error)
+  const clearSubjectsError = useSubjectsTaughtStore(s => s.clearError)
 
   const entries = useMemo(() => flattenEntries(subjects), [subjects])
 
@@ -273,7 +276,14 @@ export default function TeachLogCalendar({ onEmptyDayClick, viewDate, onViewDate
 
   return (
     <div className="teach-log-calendar">
-      {status === 'error' && <p className="teach-log-list-empty">{error}</p>}
+      {(status === 'loading' || status === 'idle') && <PageLoading />}
+
+      {status === 'error' && (
+        <>
+          <Toast message={error} onDismiss={clearSubjectsError} />
+          <p className="teach-log-list-empty">Couldn't load your subjects.</p>
+        </>
+      )}
 
       {status === 'loaded' && grades.length === 0 && (
         <p className="teach-log-list-empty">Nothing logged yet — log the first topic you taught today.</p>

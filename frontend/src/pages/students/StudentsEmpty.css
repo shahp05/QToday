@@ -166,6 +166,24 @@
   padding: 0 12px;
 }
 
+/* ─── Upload success — shown instead of jumping to the list when the
+   roster already had students, so the tick + dark text (not red) reads as
+   "here's what changed", not an error ──────────────────────────────────── */
+.students-upload-success {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--font-size-sm, 11px);
+  color: #1a1a1a;
+  text-align: center;
+  padding: 0 12px;
+}
+
+.students-upload-success-icon {
+  flex-shrink: 0;
+  color: var(--color-green-light, #8EEB65);
+}
+
 @keyframes ui-shake {
   0%,  100% { transform: translateX(0); }
   15%        { transform: translateX(-5px); }
