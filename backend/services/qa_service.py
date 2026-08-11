@@ -34,6 +34,7 @@ from llm.factory import LLMPurpose, get_llm_client
 from services.allocation_service import active_cells, compute_allocation
 from services.batch_job_service import close_job, fail_job, is_due, start_job
 from services.error_log_service import log_error
+from services.session_service import get_current_session_id
 from services.subject_icon_service import resolve_icon_key
 from services.matching_service import match_subject, match_subject_area, match_subject_area_globally, match_topic
 from services.text_utils import title_case
@@ -174,11 +175,21 @@ async def get_or_generate_qa(
 def _get_customer_grade_ids(db: Session, customer_id: int) -> set[int]:
     """Grades this customer actually offers — derived from its active student
     roster, not a separate config table, since a school's grade range is
-    whatever grades its uploaded students are actually in."""
+    whatever grades its uploaded students are actually in. Scoped to the
+    CURRENT session — a grade only present in a not-yet-live pre-staged
+    future roster shouldn't be loggable today."""
+    current_session_id = get_current_session_id(db, customer_id)
+    session_filter = (
+        StudentGrade.session_id.is_(None) if current_session_id is None
+        else StudentGrade.session_id == current_session_id
+    )
     rows = db.execute(
         select(StudentGrade.grade_id)
         .join(Student, Student.student_id == StudentGrade.student_id)
-        .where(Student.customer_id == customer_id, Student.is_active == True, StudentGrade.is_active == True)  # noqa: E712
+        .where(
+            Student.customer_id == customer_id, Student.is_active == True, StudentGrade.is_active == True,  # noqa: E712
+            session_filter,
+        )
         .distinct()
     ).scalars().all()
     return set(rows)
@@ -209,6 +220,7 @@ async def _finalize(
         topic_id=topic.topic_id,
         grade_id=grade_row.grade_id,
         section=section,
+        session_id=get_current_session_id(db, customer_id),
     )
     if log_date is not None:
         # date_created doubles as "the date this lesson was taught" (see

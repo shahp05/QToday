@@ -3,12 +3,15 @@ import { useProfileStore } from '../../store/profileStore'
 import { useStudentsStore } from '../../store/studentsStore'
 import { useStudentGradesStore } from '../../store/studentGradesStore'
 import { useStudentParentsStore } from '../../store/studentParentsStore'
+import { useFutureRosterStore } from '../../store/futureRosterStore'
+import { useSessionsStore } from '../../store/sessionsStore'
 import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
 import { useClassQuizProgressStore } from '../../store/classQuizProgressStore'
 import { topicSummaryStatus } from '../../lib/topicStatus'
 import { resolveFileUrl } from '../../lib/api'
 import { uploadMyPhoto, uploadStudentPhoto } from '../../services/photoService'
 import EditablePhoto from '../../components/EditablePhoto'
+import Dropdown from '../../components/Dropdown'
 import { Toast } from '../../components/ui/Toast'
 import PageHeader from '../../components/PageHeader'
 import './StudentsList.css'
@@ -146,11 +149,23 @@ function ParentsPopover({ emails }) {
 
 // Groups the flat students/grades/parents slices into grade -> section ->
 // rows, computed here rather than stored, since it's a pure projection of
-// the three stores and would otherwise need to be kept in sync by hand.
+// the source stores and would otherwise need to be kept in sync by hand.
+// Reads from the isolated futureRosterStore instead of the shared
+// students/grades/parents stores when browsing the pending future session
+// — see futureRosterStore.js for why this must never overwrite the
+// shared ones (SubjectsPage's grade autocomplete reads them too).
 function useGroupedStudents() {
-  const students = useStudentsStore(s => s.students)
-  const studentGrades = useStudentGradesStore(s => s.studentGrades)
-  const parents = useStudentParentsStore(s => s.parents)
+  const viewingFuture = useSessionsStore(s => s.studentsViewTarget === 'future' && s.futureSession != null)
+  const currentStudents = useStudentsStore(s => s.students)
+  const currentGrades = useStudentGradesStore(s => s.studentGrades)
+  const currentParents = useStudentParentsStore(s => s.parents)
+  const futureStudents = useFutureRosterStore(s => s.students)
+  const futureGrades = useFutureRosterStore(s => s.studentGrades)
+  const futureParents = useFutureRosterStore(s => s.parents)
+
+  const students = viewingFuture ? futureStudents : currentStudents
+  const studentGrades = viewingFuture ? futureGrades : currentGrades
+  const parents = viewingFuture ? futureParents : currentParents
 
   return useMemo(() => {
     const gradeByStudent = new Map(studentGrades.map(g => [g.student_id, g]))
@@ -197,13 +212,19 @@ function useGroupedStudents() {
 }
 
 export default function StudentsList({
-  onUploadNew, onBack, onSubjectClick, loadingChip,
+  onUploadNew, onStartNewSession, onBack, onSubjectClick, loadingChip,
   selectedGrade, onSelectedGradeChange, selectedSection, onSelectedSectionChange,
 }) {
   const isAdmin = useProfileStore(s => s.is_school_admin)
   const isSchoolTeacher = useProfileStore(s => s.is_school_teacher)
   const isStudentViewer = useProfileStore(s => s.is_student)
   const grades = useGroupedStudents()
+
+  const futureSession = useSessionsStore(s => s.futureSession)
+  const currentSessionLabel = useSessionsStore(s => s.sessions.find(sess => sess.is_current)?.label)
+  const studentsViewTarget = useSessionsStore(s => s.studentsViewTarget)
+  const setStudentsViewTarget = useSessionsStore(s => s.setStudentsViewTarget)
+  const viewingFuture = studentsViewTarget === 'future' && futureSession != null
 
   // Not fetched here — Dashboard.jsx already kicks this off once per
   // session on /dashboard mount, and this component just reads whatever's
@@ -212,6 +233,7 @@ export default function StudentsList({
   const progressByStudent = useClassQuizProgressStore(s => s.progressByStudent)
   const fetchClassProgress = useClassQuizProgressStore(s => s.fetchClassProgress)
   const updateStudentPhoto = useStudentsStore(s => s.updateStudentPhoto)
+  const updateFutureStudentPhoto = useFutureRosterStore(s => s.updateStudentPhoto)
 
   const [photoError, setPhotoError] = useState('')
   // A teacher/admin may set any visible student's photo; a student viewer
@@ -223,7 +245,8 @@ export default function StudentsList({
     const data = isStudentViewer
       ? await uploadMyPhoto(file)
       : await uploadStudentPhoto(studentId, file)
-    updateStudentPhoto(studentId, data.photo_url)
+    if (viewingFuture) updateFutureStudentPhoto(studentId, data.photo_url)
+    else updateStudentPhoto(studentId, data.photo_url)
   }
 
   // Default to the first grade/section once data is available, and re-pick
@@ -291,9 +314,25 @@ export default function StudentsList({
         title="Students"
         onBack={onBack}
         actions={isAdmin && (
-          <button className="students-list-upload-btn" onClick={onUploadNew}>
-            Upload new file
-          </button>
+          <>
+            {futureSession && (
+              <Dropdown
+                className="students-list-session-view-dropdown"
+                value={studentsViewTarget}
+                onChange={setStudentsViewTarget}
+                options={[
+                  { key: 'current', label: currentSessionLabel ? `Current — ${currentSessionLabel}` : 'Current session' },
+                  { key: 'future', label: `New session — starts ${futureSession.label}` },
+                ]}
+              />
+            )}
+            <button className="students-list-session-btn" onClick={onStartNewSession}>
+              Schedule Next Session
+            </button>
+            <button className="students-list-upload-btn" onClick={onUploadNew}>
+              Upload new file
+            </button>
+          </>
         )}
         filter={(
           <div className="students-filter-bar">

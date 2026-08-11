@@ -1,54 +1,93 @@
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from services.session_service import current_session_clause, get_current_session_id
+
+# Sentinel passed by the frontend to mean "the legacy/pre-session-tracking
+# data" (teach_logs/student_grades rows with session_id IS NULL) — real
+# academic_sessions ids are a Postgres serial starting at 1, so 0 can never
+# collide with a genuine session_id.
+LEGACY_SESSION_SENTINEL = 0
+
+
+def _session_clause(db: Session, *, customer_id: int, session_id: int | None) -> tuple[str, dict]:
+    """Returns a SQL fragment + params scoping teach_logs to one session.
+    session_id omitted (None) -> the customer's current session (which is
+    itself NULL for a customer that's never started one — reproducing
+    today's fully-unfiltered behavior, since all their rows are also NULL).
+    session_id == LEGACY_SESSION_SENTINEL -> explicitly the pre-tracking
+    (NULL) rows. Any other session_id -> that exact session."""
+    if session_id is None:
+        session_id = get_current_session_id(db, customer_id)
+    if session_id == LEGACY_SESSION_SENTINEL or session_id is None:
+        return "tl.session_id IS NULL", {}
+    return "tl.session_id = :sid", {"sid": session_id}
+
 
 def _scope_clause(db: Session, *, customer_id, user_id, is_school_admin, is_system_admin,
-                   is_student, is_parent) -> tuple[str, dict] | None:
+                   is_student, is_parent, session_id: int | None = None) -> tuple[str, dict] | None:
     """Returns (sql_clause, params) restricting which teach_logs rows are
     visible for this caller, or None if there's nothing to scope to (e.g. a
     student/parent with no active grade to match)."""
+    session_sql, session_params = _session_clause(db, customer_id=customer_id, session_id=session_id)
+
     if is_school_admin or is_system_admin:
         # Whole school, every teacher — admins browse everything taught.
-        return "tl.customer_id = :cid", {"cid": customer_id}
+        return f"tl.customer_id = :cid AND {session_sql}", {"cid": customer_id, **session_params}
 
     if is_student:
         # Doesn't matter which teacher taught it — only the student's own
-        # current grade(s)/section(s) matter.
+        # current grade(s)/section(s) matter. Scoped to the CURRENT session
+        # — a not-yet-live pre-staged future grade shouldn't affect what a
+        # student sees today.
+        sg_session_sql, sg_session_params = current_session_clause(db, customer_id, alias="sg")
         grade_ids = [r.grade_id for r in db.execute(
-            text("""
+            text(f"""
                 SELECT DISTINCT sg.grade_id
                 FROM student_grades sg
                 JOIN students st ON st.student_id = sg.student_id
-                WHERE st.user_id = :uid AND st.is_active = TRUE AND sg.is_active = TRUE
+                WHERE st.user_id = :uid AND st.is_active = TRUE AND sg.is_active = TRUE AND {sg_session_sql}
             """),
-            {"uid": user_id},
+            {"uid": user_id, **sg_session_params},
         ).fetchall()]
         if not grade_ids:
             return None
-        return "tl.customer_id = :cid AND tl.grade_id = ANY(:gids)", {"cid": customer_id, "gids": grade_ids}
+        return (
+            f"tl.customer_id = :cid AND tl.grade_id = ANY(:gids) AND {session_sql}",
+            {"cid": customer_id, "gids": grade_ids, **session_params},
+        )
 
     if is_parent:
         # Scoped to children active at THIS school for now — a parent whose
         # children span multiple schools/customers will need cross-customer
-        # aggregation as a later feature, not handled here.
+        # aggregation as a later feature, not handled here. Single customer
+        # here (unlike students_query_service's cross-school parent query),
+        # so current_session_clause's single-customer resolution applies.
+        sg_session_sql, sg_session_params = current_session_clause(db, customer_id, alias="sg")
         grade_ids = [r.grade_id for r in db.execute(
-            text("""
+            text(f"""
                 SELECT DISTINCT sg.grade_id
                 FROM student_grades sg
                 JOIN students st ON st.student_id = sg.student_id
                 JOIN parents p ON p.student_id = st.student_id
                 WHERE p.user_id = :uid AND p.is_active = TRUE
                   AND st.is_active = TRUE AND st.customer_id = :cid
-                  AND sg.is_active = TRUE
+                  AND sg.is_active = TRUE AND {sg_session_sql}
             """),
-            {"uid": user_id, "cid": customer_id},
+            {"uid": user_id, "cid": customer_id, **sg_session_params},
         ).fetchall()]
         if not grade_ids:
             return None
-        return "tl.customer_id = :cid AND tl.grade_id = ANY(:gids)", {"cid": customer_id, "gids": grade_ids}
+        return (
+            f"tl.customer_id = :cid AND tl.grade_id = ANY(:gids) AND {session_sql}",
+            {"cid": customer_id, "gids": grade_ids, **session_params},
+        )
 
     # Plain teacher — only what they personally logged.
-    return "tl.customer_id = :cid AND tl.user_id = :uid", {"cid": customer_id, "uid": user_id}
+    return (
+        f"tl.customer_id = :cid AND tl.user_id = :uid AND {session_sql}",
+        {"cid": customer_id, "uid": user_id, **session_params},
+    )
 
 
 def get_topic_catalog(db: Session, *, customer_id: int, user_id: int) -> list[dict]:
@@ -104,6 +143,7 @@ def list_subjects_taught(
     db: Session, *, customer_id: int, user_id: int,
     is_school_admin: bool = False, is_system_admin: bool = False,
     is_student: bool = False, is_parent: bool = False,
+    session_id: int | None = None,
 ) -> dict:
     """Every (subject, topic, grade) taught, nested subject -> topics ->
     grades, with a QA *count* per grade — not the full QA text, which would
@@ -118,7 +158,7 @@ def list_subjects_taught(
     scope = _scope_clause(
         db, customer_id=customer_id, user_id=user_id,
         is_school_admin=is_school_admin, is_system_admin=is_system_admin,
-        is_student=is_student, is_parent=is_parent,
+        is_student=is_student, is_parent=is_parent, session_id=session_id,
     )
     if scope is None:
         return {"subjects": [], "most_recent": None}
@@ -244,6 +284,7 @@ def get_topic_grade_qa(
     db: Session, *, customer_id: int, user_id: int, topic_id: int, grade_id: int,
     is_school_admin: bool = False, is_system_admin: bool = False,
     is_student: bool = False, is_parent: bool = False,
+    session_id: int | None = None,
 ) -> list[dict] | None:
     """QA items for one (topic, grade), fetched on demand when the user
     clicks a topic/grade that wasn't eagerly loaded by list_subjects_taught().
@@ -252,7 +293,7 @@ def get_topic_grade_qa(
     scope = _scope_clause(
         db, customer_id=customer_id, user_id=user_id,
         is_school_admin=is_school_admin, is_system_admin=is_system_admin,
-        is_student=is_student, is_parent=is_parent,
+        is_student=is_student, is_parent=is_parent, session_id=session_id,
     )
     if scope is None:
         return None

@@ -27,14 +27,16 @@ export async function fetchOrGenerateQA({ subjectName, topicName, grade, section
   return res.json() // { items, warning_code, subject_id, topic_id, grade_id }
 }
 
-export async function fetchSubjectsTaught() {
-  const res = await apiFetch('/teach-logs/subjects-taught')
+export async function fetchSubjectsTaught(sessionId) {
+  const qs = sessionId != null ? `?session_id=${sessionId}` : ''
+  const res = await apiFetch(`/teach-logs/subjects-taught${qs}`)
   if (!res.ok) throw new Error(await apiErrorMessage(res))
   return res.json() // { subjects, most_recent }
 }
 
-export async function fetchTopicGradeQA(topicId, gradeId) {
-  const res = await apiFetch(`/teach-logs/qa?topic_id=${topicId}&grade_id=${gradeId}`)
+export async function fetchTopicGradeQA(topicId, gradeId, sessionId) {
+  const qs = sessionId != null ? `&session_id=${sessionId}` : ''
+  const res = await apiFetch(`/teach-logs/qa?topic_id=${topicId}&grade_id=${gradeId}${qs}`)
   if (!res.ok) throw new Error(await apiErrorMessage(res))
   return res.json() // { qa_items }
 }

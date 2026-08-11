@@ -12,7 +12,7 @@ _STUDENT_JOINS = (
 )
 
 
-def get_my_students(db: Session, user_id: int) -> dict:
+def get_my_students(db: Session, user_id: int, session_id: int | None = None) -> dict:
     """Branches on the caller's role (re-checked fresh from the DB, not the
     JWT) to decide which students they may see:
       - parent: their active wards, regardless of which school each is at
@@ -21,7 +21,13 @@ def get_my_students(db: Session, user_id: int) -> dict:
       - anything else (teacher/is_adm, or a platform-level admin) -> none yet.
         The teacher case needs a subjects/topics-authored table that
         doesn't exist yet — deferred.
-    """
+
+    session_id, when given (routers/students.py only ever passes this for
+    an is_school_admin caller, pre-validated against that customer's real
+    current/future session), scopes the student_grades lookup to that
+    EXACT session instead of "whichever is current" — this is how an admin
+    browses a pre-staged future roster without it ever appearing in the
+    default (session_id=None) view everyone else uses."""
     user = db.execute(
         text("SELECT customer_id, is_student, is_parent, is_sysadm, is_adm FROM users WHERE user_id = :uid AND is_active = TRUE"),
         {"uid": user_id},
@@ -63,15 +69,40 @@ def get_my_students(db: Session, user_id: int) -> dict:
         return {"students": [], "student_grades": []}
 
     student_ids = [s["student_id"] for s in students]
-    grade_rows = db.execute(
-        text(
-            "SELECT sg.student_grade_id, sg.student_id, sg.grade_id, g.grade_name, sg.section, sg.is_active "
-            "FROM student_grades sg "
-            "JOIN grades g ON g.grade_id = sg.grade_id "
-            "WHERE sg.student_id = ANY(:ids) AND sg.is_active = TRUE"
-        ),
-        {"ids": student_ids},
-    ).fetchall()
+    if session_id is not None:
+        # Explicit session (admin browsing a specific — possibly future —
+        # session): strict equality. Both current and future session ids
+        # always carry a real, non-null session_id post-bootstrap, so no
+        # NULL fallback is needed here, unlike the default branch below.
+        grade_rows = db.execute(
+            text(
+                "SELECT sg.student_grade_id, sg.student_id, sg.grade_id, g.grade_name, sg.section, sg.is_active "
+                "FROM student_grades sg "
+                "JOIN grades g ON g.grade_id = sg.grade_id "
+                "WHERE sg.student_id = ANY(:ids) AND sg.is_active = TRUE AND sg.session_id = :sid"
+            ),
+            {"ids": student_ids, "sid": session_id},
+        ).fetchall()
+    else:
+        # A parent's wards can span multiple schools (see docstring), each
+        # with its own current session — so this can't use session_service's
+        # current_session_clause (a single customer_id's current session); it
+        # joins each student's OWN customer's current session_id instead. The
+        # OR branch matches a customer that's never bootstrapped session
+        # tracking at all (no academic_sessions row yet), mirroring
+        # session_service.current_session_clause's None-vs-real-id resolution.
+        grade_rows = db.execute(
+            text(
+                "SELECT sg.student_grade_id, sg.student_id, sg.grade_id, g.grade_name, sg.section, sg.is_active "
+                "FROM student_grades sg "
+                "JOIN grades g ON g.grade_id = sg.grade_id "
+                "JOIN students st ON st.student_id = sg.student_id "
+                "LEFT JOIN academic_sessions cur ON cur.customer_id = st.customer_id AND cur.is_current = TRUE "
+                "WHERE sg.student_id = ANY(:ids) AND sg.is_active = TRUE "
+                "AND (sg.session_id = cur.session_id OR (cur.session_id IS NULL AND sg.session_id IS NULL))"
+            ),
+            {"ids": student_ids},
+        ).fetchall()
     student_grades = [dict(row._mapping) for row in grade_rows]
 
     parent_rows = db.execute(

@@ -15,6 +15,7 @@ from services.country_service import fetch_and_sync_countries
 from services.error_log_service import mark_old_error_logs_for_purge, physically_delete_purged_error_logs
 from services.qa_service import poll_and_finalize_qa_batch, should_top_up_qa, submit_qa_top_up_batch, verify_pending_qa
 from services.quiz_scoring_service import score_pending_quiz
+from services.session_service import run_due_cutovers
 
 REQUEST_TYPE_COUNTRY_LIST = "country_list"
 REQUEST_TYPE_ERROR_LOG_PURGE_MARK = "error_log_purge_mark"
@@ -22,6 +23,7 @@ REQUEST_TYPE_ERROR_LOG_PURGE_DELETE = "error_log_purge_delete"
 REQUEST_TYPE_QUIZ_SCORING = "qa_scoring"
 REQUEST_TYPE_QA_TOP_UP = "qa_generation"
 REQUEST_TYPE_QA_VERIFICATION = "qa_verification"
+REQUEST_TYPE_SESSION_CUTOVER = "session_cutover"
 
 
 @app.periodic(cron="0 3 * * *", periodic_id="refresh_countries")  # checked daily; only acts when actually due
@@ -158,6 +160,34 @@ async def poll_qa_generation_batches(timestamp: int) -> dict:
                 db.rollback()
                 fail_job(db, job)
         return {"checked": len(pending), "results": results}
+    finally:
+        db.close()
+
+
+# Flips any customer whose scheduled future academic session's start_date
+# has arrived (session_service.run_due_cutovers) — a same-day-scheduled
+# session cuts over synchronously inside schedule_next_session itself, so
+# this sweep is only a safety net for dates scheduled days ahead. No
+# interval configured in batch_request_types, so is_due is always True —
+# this is meant to run (and check) every single day, not on a staleness
+# cadence like the QA verification sweep below.
+@app.periodic(cron="0 0 * * *", periodic_id="session_cutover_sweep")
+@app.task(queue="maintenance")
+async def session_cutover_sweep_task(timestamp: int) -> dict:
+    db = SessionLocal()
+    try:
+        if not is_due(db, REQUEST_TYPE_SESSION_CUTOVER):
+            return {"skipped": True, "reason": "not due yet"}
+
+        job = start_job(db, REQUEST_TYPE_SESSION_CUTOVER)
+        try:
+            flipped = run_due_cutovers(db)
+            close_job(db, job)
+            return {"skipped": False, "flipped": flipped}
+        except Exception:
+            db.rollback()
+            fail_job(db, job)
+            raise
     finally:
         db.close()
 

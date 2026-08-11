@@ -4,15 +4,43 @@ from sqlalchemy.orm import Session
 from errors.app_error import AppError
 from errors.error_codes import ErrorCode
 from services.password_service import hash_password
+from services.session_service import ensure_session_bootstrapped, get_current_session_id, validate_session_target
 
 
-def process_students_upload(db: Session, customer_id: int, rows: list[dict]) -> dict:
+def _resolve_target_session(db: Session, customer_id: int, requested_session_id: int | None) -> tuple[int, bool]:
+    """Resolves which session this upload writes into, and whether that's
+    the pending future session (as opposed to the live current one).
+    requested_session_id is None for the common case (upload the current
+    roster) or an explicit choice from the dual-session upload selector
+    (only ever shown when a future session exists). Bootstraps session #1
+    if this customer has never written anything session-tracked yet — the
+    first upload for a brand new or pre-feature customer."""
+    current_session_id = get_current_session_id(db, customer_id)
+    if current_session_id is None:
+        current_session_id = ensure_session_bootstrapped(db, customer_id)
+
+    if requested_session_id is None:
+        return current_session_id, False
+
+    validate_session_target(db, customer_id, requested_session_id)
+    return requested_session_id, requested_session_id != current_session_id
+
+
+def process_students_upload(db: Session, customer_id: int, rows: list[dict], target_session_id: int | None = None) -> dict:
     """Reconciles the uploaded roster against the db for this customer:
     creates/updates/reactivates students and parents present in the upload,
     and deactivates students/parents that exist for this customer but are
-    no longer in it. Every upload is treated as the complete current
-    roster for this customer. Runs as one transaction — any error rolls
+    no longer in it. Every upload is treated as the complete roster for
+    its TARGET session (current, or the pending future one — see
+    _resolve_target_session). Runs as one transaction — any error rolls
     back the whole upload.
+
+    A future-session upload pre-stages next year's roster without
+    disturbing the still-live current one: it writes student_grades rows
+    tagged with the future session_id, and — critically — never touches
+    users.is_active/students.is_active, since those accounts are still
+    fully enrolled under the CURRENT session right up to cutover. See
+    _deactivate_missing_students_future vs _deactivate_missing_students_current.
 
     Set-based throughout (a handful of bulk queries total, each covering
     every row via unnest()/ANY()) instead of one round trip per row per
@@ -43,6 +71,7 @@ def process_students_upload(db: Session, customer_id: int, rows: list[dict]) -> 
     seen_parent_emails: set[str] = set()
 
     try:
+        session_id, is_future_target = _resolve_target_session(db, customer_id, target_session_id)
         grade_id_by_name = _resolve_grades(db, rows)
 
         org_ids = [row["org_id"] for row in rows]
@@ -75,10 +104,10 @@ def process_students_upload(db: Session, customer_id: int, rows: list[dict]) -> 
             else:
                 to_update.append(row)
 
-        student_id_by_org_id = _insert_new_students(db, customer_id, customer, to_insert, grade_id_by_name)
+        student_id_by_org_id = _insert_new_students(db, customer_id, customer, to_insert, grade_id_by_name, session_id)
         counts["students_created"] = len(to_insert)
 
-        updated_org_ids = _update_existing_students(db, existing_by_org_id, to_update, grade_id_by_name)
+        updated_org_ids = _update_existing_students(db, existing_by_org_id, to_update, grade_id_by_name, session_id)
         for row in to_update:
             student_id_by_org_id[row["org_id"]] = existing_by_org_id[row["org_id"]].student_id
 
@@ -87,7 +116,10 @@ def process_students_upload(db: Session, customer_id: int, rows: list[dict]) -> 
         )
         counts["parents_created"] = parents_created
 
-        counts["students_deactivated"] = _deactivate_missing_students(db, customer_id, seen_org_ids)
+        if is_future_target:
+            counts["students_deactivated"] = _deactivate_missing_students_future(db, customer_id, session_id, seen_org_ids)
+        else:
+            counts["students_deactivated"] = _deactivate_missing_students_current(db, customer_id, seen_org_ids)
         parents_deactivated, parent_deactivated_student_ids = _deactivate_missing_parents(
             db, customer_id, seen_parent_emails
         )
@@ -159,7 +191,7 @@ def _resolve_grades(db: Session, rows: list[dict]) -> dict[int, int]:
     return grade_id_by_name
 
 
-def _insert_new_students(db: Session, customer_id: int, customer, to_insert: list[dict], grade_id_by_name: dict[int, int]) -> dict[str, int]:
+def _insert_new_students(db: Session, customer_id: int, customer, to_insert: list[dict], grade_id_by_name: dict[int, int], session_id: int | None) -> dict[str, int]:
     """Bulk-inserts users+students+student_grades for brand new org_ids.
     Returns {org_id: student_id} for the rows just inserted."""
     if not to_insert:
@@ -203,20 +235,33 @@ def _insert_new_students(db: Session, customer_id: int, customer, to_insert: lis
     student_ids = [student_id_by_org_id[row["org_id"]] for row in to_insert]
     grade_ids = [grade_id_by_name[row["grade"]] for row in to_insert]
     sections = [row.get("section") for row in to_insert]
+    session_ids = [session_id] * len(student_ids)
     db.execute(
         text(
-            "INSERT INTO student_grades (student_id, grade_id, section) "
-            "SELECT * FROM unnest((:sids)::int[], (:gids)::int[], (:secs)::text[]) AS t(student_id, grade_id, section)"
+            "INSERT INTO student_grades (student_id, grade_id, section, session_id) "
+            "SELECT * FROM unnest((:sids)::int[], (:gids)::int[], (:secs)::text[], (:ssid)::int[]) "
+            "AS t(student_id, grade_id, section, session_id)"
         ),
-        {"sids": student_ids, "gids": grade_ids, "secs": sections},
+        {"sids": student_ids, "gids": grade_ids, "secs": sections, "ssid": session_ids},
     )
 
     return student_id_by_org_id
 
 
-def _update_existing_students(db: Session, existing_by_org_id: dict, to_update: list[dict], grade_id_by_name: dict[int, int]) -> set[str]:
+def _update_existing_students(db: Session, existing_by_org_id: dict, to_update: list[dict], grade_id_by_name: dict[int, int], session_id: int) -> set[str]:
     """Reconciles name/active/grade/section for rows that already have a
-    student. Returns the org_ids of rows that actually changed something."""
+    student. Returns the org_ids of rows that actually changed something.
+
+    The "current grade" lookup is scoped to THIS upload's target session_id
+    — for a current-session upload this matches the live active row
+    (every active row is guaranteed to carry a real session_id once a
+    customer has bootstrapped, see session_service.ensure_session_bootstrapped,
+    so a strict equality filter is exact, no NULL fallback needed). For a
+    future-session upload this naturally matches nothing on its first
+    upload (everyone is "new" to that session — correct, a fresh staged
+    row gets created for each) and matches previously-staged rows on later
+    revisions (correct reconciliation against what's already been staged,
+    not against the still-live current roster)."""
     if not to_update:
         return set()
 
@@ -226,9 +271,9 @@ def _update_existing_students(db: Session, existing_by_org_id: dict, to_update: 
         for g in db.execute(
             text(
                 "SELECT student_grade_id, student_id, grade_id, section "
-                "FROM student_grades WHERE student_id = ANY(:ids) AND is_active = TRUE"
+                "FROM student_grades WHERE student_id = ANY(:ids) AND is_active = TRUE AND session_id = :sid"
             ),
-            {"ids": student_ids},
+            {"ids": student_ids, "sid": session_id},
         ).fetchall()
     }
 
@@ -287,10 +332,11 @@ def _update_existing_students(db: Session, existing_by_org_id: dict, to_update: 
         sids, gids, secs = zip(*grades_to_insert)
         db.execute(
             text(
-                "INSERT INTO student_grades (student_id, grade_id, section) "
-                "SELECT * FROM unnest((:sids)::int[], (:gids)::int[], (:secs)::text[]) AS t(student_id, grade_id, section)"
+                "INSERT INTO student_grades (student_id, grade_id, section, session_id) "
+                "SELECT * FROM unnest((:sids)::int[], (:gids)::int[], (:secs)::text[], (:ssid)::int[]) "
+                "AS t(student_id, grade_id, section, session_id)"
             ),
-            {"sids": list(sids), "gids": list(gids), "secs": list(secs)},
+            {"sids": list(sids), "gids": list(gids), "secs": list(secs), "ssid": [session_id] * len(sids)},
         )
     if sections_to_update:
         ids, secs = zip(*sections_to_update)
@@ -405,7 +451,11 @@ def _upsert_parents(
     return len(missing_emails), changed_student_ids
 
 
-def _deactivate_missing_students(db: Session, customer_id: int, seen_org_ids: set[str]) -> int:
+def _deactivate_missing_students_current(db: Session, customer_id: int, seen_org_ids: set[str]) -> int:
+    """Current-session upload (the ordinary case, unaffected by future-
+    session staging): a missing org_id deactivates the whole account —
+    they're gone from the school entirely as of today, exactly as before
+    this feature existed."""
     missing = db.execute(
         text(
             "SELECT s.student_id, u.user_id FROM students s "
@@ -423,6 +473,31 @@ def _deactivate_missing_students(db: Session, customer_id: int, seen_org_ids: se
         db.execute(
             text("UPDATE student_grades SET is_active = FALSE, date_modified = NOW() WHERE student_id = ANY(:ids) AND is_active = TRUE"),
             {"ids": student_ids},
+        )
+    return len(missing)
+
+
+def _deactivate_missing_students_future(db: Session, customer_id: int, session_id: int, seen_org_ids: set[str]) -> int:
+    """Future-session upload: a student dropped from a later revision of
+    the staged roster is NOT deactivated at the account level — they're
+    still fully enrolled and using the app under the current session right
+    up to cutover. Only their student_grades row staged under this future
+    session_id gets deactivated, so they simply won't have an active row
+    in the new session once cutover happens."""
+    missing = db.execute(
+        text(
+            "SELECT sg.student_grade_id FROM student_grades sg "
+            "JOIN students st ON st.student_id = sg.student_id "
+            "JOIN users u ON u.user_id = st.user_id "
+            "WHERE u.customer_id = :cid AND sg.session_id = :sid AND sg.is_active = TRUE "
+            "AND NOT (u.org_id = ANY(:org_ids))"
+        ),
+        {"cid": customer_id, "sid": session_id, "org_ids": list(seen_org_ids)},
+    ).fetchall()
+    if missing:
+        db.execute(
+            text("UPDATE student_grades SET is_active = FALSE, date_modified = NOW() WHERE student_grade_id = ANY(:ids)"),
+            {"ids": [r.student_grade_id for r in missing]},
         )
     return len(missing)
 

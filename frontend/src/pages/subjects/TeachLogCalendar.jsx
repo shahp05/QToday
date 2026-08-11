@@ -285,11 +285,7 @@ export default function TeachLogCalendar({ onEmptyDayClick, viewDate, onViewDate
         </>
       )}
 
-      {status === 'loaded' && grades.length === 0 && (
-        <p className="teach-log-list-empty">Nothing logged yet — log the first topic you taught today.</p>
-      )}
-
-      {status === 'loaded' && grades.length > 0 && (
+      {status === 'loaded' && (
         <>
           <div className="teach-log-filter-row">
             {grades.map(g => (

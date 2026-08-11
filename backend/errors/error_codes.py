@@ -36,6 +36,7 @@ class ErrorCode(str, Enum):
     XLSX_VALUE_MISSING = "XLSX_VALUE_MISSING"
     XLSX_FILE_TYPE_INVALID = "XLSX_FILE_TYPE_INVALID"
     EMAIL_ALREADY_USED = "EMAIL_ALREADY_USED"
+    SESSION_TARGET_INVALID = "SESSION_TARGET_INVALID"
     EXTERNAL_SERVICE_FAILED = "EXTERNAL_SERVICE_FAILED"
     BATCH_JOB_FAILED = "BATCH_JOB_FAILED"
     FRONTEND_RUNTIME_ERROR = "FRONTEND_RUNTIME_ERROR"
@@ -77,6 +78,7 @@ ERROR_DEFAULTS = {
     ErrorCode.XLSX_VALUE_MISSING: {"message": "Id, name and {field} must be entered.", "http_status": 400},
     ErrorCode.XLSX_FILE_TYPE_INVALID: {"message": "Please upload an .xlsx file.", "http_status": 400},
     ErrorCode.EMAIL_ALREADY_USED: {"message": "{email} is already used by another teacher.", "http_status": 400},
+    ErrorCode.SESSION_TARGET_INVALID: {"message": "This upload's target session is not valid for this school.", "http_status": 400},
     ErrorCode.EXTERNAL_SERVICE_FAILED: {"message": "An external service failed to respond correctly.", "http_status": 502},
     ErrorCode.BATCH_JOB_FAILED: {"message": "A background job failed to complete.", "http_status": 500},
     ErrorCode.FRONTEND_RUNTIME_ERROR: {"message": "Something went wrong on the page. Please refresh and try again.", "http_status": 500},

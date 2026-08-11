@@ -20,12 +20,13 @@ export const useSubjectsTaughtStore = create((set, get) => ({
   // reason a route remount (e.g. leaving and re-clicking Students) should
   // refetch data that's already sitting in the store. Pass force:true right
   // after a mutation that actually changes this data server-side (see
-  // SubjectsPage's post-log refetch).
-  fetchSubjectsTaught: async (force = false) => {
+  // SubjectsPage's post-log refetch), or when switching sessionId (a
+  // different session means genuinely different data, not a stale cache).
+  fetchSubjectsTaught: async (force = false, sessionId = null) => {
     if (!force && (get().status === 'loaded' || get().status === 'loading')) return
     set({ status: 'loading', error: null })
     try {
-      const data = await fetchSubjectsTaught()
+      const data = await fetchSubjectsTaught(sessionId)
       set({ subjects: data.subjects, mostRecent: data.most_recent, status: 'loaded' })
     } catch (err) {
       set({ status: 'error', error: err.message })
@@ -34,7 +35,7 @@ export const useSubjectsTaughtStore = create((set, get) => ({
 
   // Fetch a grade's qa_items the first time it's needed and cache them in
   // the tree; a no-op if already loaded or already in flight.
-  ensureQaLoaded: async (topicId, gradeId) => {
+  ensureQaLoaded: async (topicId, gradeId, sessionId = null) => {
     const key = `${topicId}:${gradeId}`
     const subject = get().subjects.find(s => s.topics.some(t => t.topic_id === topicId))
     const topic = subject?.topics.find(t => t.topic_id === topicId)
@@ -50,7 +51,7 @@ export const useSubjectsTaughtStore = create((set, get) => ({
       })(),
     }))
     try {
-      const data = await fetchTopicGradeQA(topicId, gradeId)
+      const data = await fetchTopicGradeQA(topicId, gradeId, sessionId)
       set(state => ({
         subjects: state.subjects.map(s => ({
           ...s,

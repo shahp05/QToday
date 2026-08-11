@@ -298,11 +298,7 @@ export default function TeachLogList({
         </>
       )}
 
-      {!showCalendar && status === 'loaded' && subjects.length === 0 && (
-        <p className="teach-log-list-empty">Nothing logged yet — log the first topic you taught today.</p>
-      )}
-
-      {!showCalendar && status === 'loaded' && subjects.length > 0 && (
+      {!showCalendar && status === 'loaded' && (
         <div className="teach-log-columns">
           <div className="teach-log-subjects">
             {subjects.map(subject => {

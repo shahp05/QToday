@@ -1,9 +1,13 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { useProfileStore } from '../../store/profileStore'
 import { useStudentsStore } from '../../store/studentsStore'
+import { useStudentGradesStore } from '../../store/studentGradesStore'
+import { useFutureRosterStore } from '../../store/futureRosterStore'
+import { useSessionsStore } from '../../store/sessionsStore'
 import { resolveApiError } from '../../lib/api'
 import { ErrorCode } from '../../errors/errorCodes'
+import Dropdown from '../../components/Dropdown'
 import { Toast } from '../../components/ui/Toast'
 import './StudentsEmpty.css'
 
@@ -194,6 +198,23 @@ function summarizeUpload(previousCount, newCount, counts) {
 export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) {
   const acronym = useProfileStore(s => s.customer_acronym)
   const uploadAndRefresh = useStudentsStore(s => s.uploadAndRefresh)
+  const futureSession = useSessionsStore(s => s.futureSession)
+  const fetchSessions = useSessionsStore(s => s.fetchSessions)
+  const currentSession = useSessionsStore(s => s.sessions.find(sess => sess.is_current))
+  // 'current' | 'future' — the dropdown below only renders (and only ever
+  // becomes 'future') once a future session exists; shared with StudentsList
+  // so the two stay in sync, and doubles as the upload target — uploading
+  // always writes into whichever session is currently being viewed.
+  const uploadTarget = useSessionsStore(s => s.studentsViewTarget)
+  const setUploadTarget = useSessionsStore(s => s.setStudentsViewTarget)
+  // studentGrades.length, not students.length — the latter is every active
+  // account at the school regardless of session (see StudentsPage.jsx's
+  // studentCount comment); studentGrades is the future session's actual
+  // strictly-scoped roster.
+  const futureRosterCount = useFutureRosterStore(s => s.studentGrades.length)
+  const viewedCount = uploadTarget === 'future' && futureSession ? futureRosterCount : studentCount
+
+  useEffect(() => { fetchSessions() }, [fetchSessions])
   const studentLogin = acronym ? `${SAMPLE[0]}@${acronym}` : ''
   const [parent1Email, parent2Email] = [SAMPLE[4], SAMPLE[5]]
   const loginRows = [
@@ -246,15 +267,25 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
 
       setUploading(true)
       setError(null)
-      const previousCount = studentCount
-      const counts = await uploadAndRefresh(result.rows)
-      if (previousCount === 0) {
+      const previousCount = viewedCount
+      const targetSessionId = uploadTarget === 'future' && futureSession ? futureSession.session_id : null
+      const counts = await uploadAndRefresh(result.rows, targetSessionId)
+      if (targetSessionId) {
+        // Refresh the isolated future-roster view too — the upload just
+        // changed it, and it's never touched by uploadAndRefresh (which
+        // only refetches the shared "current roster" store).
+        await useFutureRosterStore.getState().fetchFutureRoster(targetSessionId, true)
+      }
+      const newCount = targetSessionId
+        ? useFutureRosterStore.getState().studentGrades.length
+        : useStudentGradesStore.getState().studentGrades.length
+      if (previousCount === 0 && !targetSessionId) {
         onUploaded?.()
       } else {
         // Staying on this screen is the point here — jumping straight to
         // the list wouldn't tell the teacher/admin what this upload
         // actually changed for a roster that already existed.
-        setSuccessMessage(summarizeUpload(previousCount, useStudentsStore.getState().students.length, counts))
+        setSuccessMessage(summarizeUpload(previousCount, newCount, counts))
       }
     } catch (err) {
       setUploadError(err.message || FORMAT_ERROR)
@@ -269,6 +300,12 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
     handleFile(e.dataTransfer.files[0], 'drop')
   }
 
+  const sessionTargetLabel = uploadTarget === 'future' && futureSession
+    ? `New Academic Session ${futureSession.label}`
+    : currentSession
+      ? `Current Academic Session ${currentSession.label}`
+      : null
+
   return (
     <div className="students-empty">
 
@@ -276,11 +313,20 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
 
       <div className="students-empty-header">
         <p className="students-empty-label">Upload students xlsx in the format below:</p>
-        {studentCount > 0 && (
-          <button className="students-empty-list-btn" onClick={onShowList}>
-            Students {studentCount}
-          </button>
+        {futureSession && (
+          <Dropdown
+            className="students-empty-session-dropdown"
+            value={uploadTarget}
+            onChange={setUploadTarget}
+            options={[
+              { key: 'current', label: currentSession ? `Current — ${currentSession.label}` : 'Current session' },
+              { key: 'future', label: `New session — starts ${futureSession.label}` },
+            ]}
+          />
         )}
+        <button className="students-empty-list-btn" onClick={onShowList}>
+          Students {viewedCount}
+        </button>
       </div>
 
       <div className="students-format-table">
@@ -313,9 +359,11 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
               ? 'Uploading…'
               : selectedFile && source === 'drop' ? selectedFile.name : 'Drop file here'}
           </span>
-          {selectedFile && source === 'drop' && error && (
+          {selectedFile && source === 'drop' && error ? (
             <span className="students-upload-error">{error}</span>
-          )}
+          ) : sessionTargetLabel ? (
+            <span className="students-upload-error">{sessionTargetLabel}</span>
+          ) : null}
           {selectedFile && source === 'drop' && !error && successMessage && (
             <span className="students-upload-success"><IconCheck />{successMessage}</span>
           )}
@@ -336,9 +384,11 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
               ? 'Uploading…'
               : selectedFile && source === 'browse' ? selectedFile.name : 'Browse file'}
           </span>
-          {selectedFile && source === 'browse' && error && (
+          {selectedFile && source === 'browse' && error ? (
             <span className="students-upload-error">{error}</span>
-          )}
+          ) : sessionTargetLabel ? (
+            <span className="students-upload-error">{sessionTargetLabel}</span>
+          ) : null}
           {selectedFile && source === 'browse' && !error && successMessage && (
             <span className="students-upload-success"><IconCheck />{successMessage}</span>
           )}

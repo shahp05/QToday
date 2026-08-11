@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import date, datetime
 from sqlalchemy import (
-    Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer,
+    Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer,
     Numeric, SmallInteger, String, Text, UniqueConstraint, func
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -116,6 +116,41 @@ class Customer(Base):
     parents:           Mapped[list["Parent"]]        = relationship(back_populates="customer")
 
 
+class AcademicSession(Base):
+    """One row per academic term (yearly, or 6-monthly/quarterly for tuition
+    groups) for a customer. is_current marks the term new teach_logs and
+    student_grades rows get stamped with — enforced to exactly one per
+    customer by uq_academic_sessions_current_per_customer. is_future marks
+    a term scheduled for a future start_date, not yet live — enforced to
+    at most one per customer by uq_academic_sessions_future_per_customer.
+    session_service.run_due_cutovers / schedule_next_session's immediate-
+    cutover path both flip is_future=False, is_current=True atomically when
+    a future term's start_date arrives — no data migration happens at that
+    moment, since every session-scoped read already resolves "current" via
+    is_current."""
+
+    __tablename__ = "academic_sessions"
+    __table_args__ = (
+        Index("uq_academic_sessions_current_per_customer", "customer_id",
+              postgresql_where=expression.text("is_current = true"), unique=True),
+        Index("uq_academic_sessions_future_per_customer", "customer_id",
+              postgresql_where=expression.text("is_future = true"), unique=True),
+    )
+
+    session_id:    Mapped[int]           = mapped_column(Integer, primary_key=True)
+    customer_id:   Mapped[int]           = mapped_column(ForeignKey("customers.customer_id"), nullable=False)
+    label:         Mapped[str]           = mapped_column(String(100), nullable=False)
+    start_date:    Mapped[date]          = mapped_column(Date, nullable=False, server_default=func.current_date())
+    is_current:    Mapped[bool]          = mapped_column(Boolean, nullable=False, default=True)
+    is_future:     Mapped[bool]          = mapped_column(Boolean, nullable=False, default=False)
+    date_created:  Mapped[datetime]      = mapped_column(DateTime, nullable=False, server_default=func.now())
+    date_modified: Mapped[datetime]      = mapped_column(DateTime, nullable=False, server_default=func.now())
+    date_deleted:  Mapped[datetime|None] = mapped_column(DateTime, nullable=True)
+    is_active:     Mapped[bool]          = mapped_column(Boolean, nullable=False, default=True)
+
+    customer: Mapped["Customer"] = relationship(foreign_keys=[customer_id])
+
+
 class User(Base):
     """password_date_created == date_created means the password set at
     account creation has never been changed (both default to NOW() in the
@@ -193,6 +228,7 @@ class StudentGrade(Base):
     student_id:       Mapped[int]          = mapped_column(ForeignKey("students.student_id"), nullable=False)
     grade_id:         Mapped[int]          = mapped_column(ForeignKey("grades.grade_id"), nullable=False)
     section:          Mapped[str | None]   = mapped_column(String(5))
+    session_id:       Mapped[int | None]   = mapped_column(ForeignKey("academic_sessions.session_id"), nullable=True)
     is_active:        Mapped[bool]         = mapped_column(Boolean, nullable=False, default=True)
     date_created:     Mapped[datetime]     = mapped_column(DateTime, nullable=False, server_default=func.now())
     date_modified:    Mapped[datetime]     = mapped_column(DateTime, nullable=False, server_default=func.now())
@@ -200,6 +236,7 @@ class StudentGrade(Base):
 
     student: Mapped["Student"] = relationship(back_populates="student_grades")
     grade:   Mapped["Grade"]   = relationship(back_populates="student_grades")
+    session: Mapped["AcademicSession | None"] = relationship(foreign_keys=[session_id])
 
 
 class Parent(Base):
@@ -437,6 +474,7 @@ class TeachLog(Base):
     topic_id:      Mapped[int]           = mapped_column(ForeignKey("topics.topic_id"), nullable=False)
     grade_id:      Mapped[int]           = mapped_column(ForeignKey("grades.grade_id"), nullable=False)
     section:       Mapped[str|None]      = mapped_column(String(5))
+    session_id:    Mapped[int|None]      = mapped_column(ForeignKey("academic_sessions.session_id"), nullable=True)
     date_created:  Mapped[datetime]      = mapped_column(DateTime, nullable=False, server_default=func.now())
     date_modified: Mapped[datetime]      = mapped_column(DateTime, nullable=False, server_default=func.now())
     date_deleted:  Mapped[datetime|None] = mapped_column(DateTime, nullable=True)
@@ -447,6 +485,7 @@ class TeachLog(Base):
     subject:  Mapped["Subject"] = relationship(foreign_keys=[subject_id])
     topic:    Mapped["Topic"]   = relationship(foreign_keys=[topic_id])
     grade:    Mapped["Grade"]   = relationship(foreign_keys=[grade_id])
+    session:  Mapped["AcademicSession|None"] = relationship(foreign_keys=[session_id])
 
 
 class BatchJob(Base):
@@ -556,3 +595,6 @@ Index("idx_teach_logs_user",        TeachLog.user_id)
 Index("idx_teach_logs_user_date",   TeachLog.user_id, TeachLog.date_created)
 Index("idx_teach_logs_grade",       TeachLog.customer_id, TeachLog.grade_id, TeachLog.section)
 Index("idx_teach_logs_topic",       TeachLog.customer_id, TeachLog.subject_id, TeachLog.topic_id)
+Index("idx_teach_logs_session",     TeachLog.customer_id, TeachLog.session_id)
+Index("idx_student_grades_session", StudentGrade.session_id, StudentGrade.student_id)
+Index("idx_academic_sessions_customer", AcademicSession.customer_id)

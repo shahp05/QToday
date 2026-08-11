@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from db.database import get_db
@@ -12,6 +12,7 @@ router = APIRouter(prefix="/api/teach-logs", tags=["teach-logs"])
 
 @router.get("/subjects-taught")
 def get_subjects_taught(
+    session_id: int | None = Query(None),
     claims: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -23,6 +24,7 @@ def get_subjects_taught(
         is_system_admin=claims.get("is_system_admin", False),
         is_student=claims.get("is_student", False),
         is_parent=claims.get("is_parent", False),
+        session_id=session_id,
     )
 
 
@@ -30,6 +32,7 @@ def get_subjects_taught(
 def get_qa_for_topic_grade(
     topic_id: int,
     grade_id: int,
+    session_id: int | None = Query(None),
     claims: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -43,6 +46,7 @@ def get_qa_for_topic_grade(
         is_system_admin=claims.get("is_system_admin", False),
         is_student=claims.get("is_student", False),
         is_parent=claims.get("is_parent", False),
+        session_id=session_id,
     )
     if qa_items is None:
         raise AppError(ErrorCode.TEACH_LOG_NOT_FOUND)

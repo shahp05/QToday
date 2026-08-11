@@ -1,0 +1,92 @@
+.confirm-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+}
+
+.confirm-dialog {
+  position: relative;
+  background: #2a2a2a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm, 6px);
+  padding: 22px;
+  width: min(420px, calc(100vw - 32px));
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  font-family: var(--font-family);
+}
+
+/* Covers the whole dialog (including both buttons) while busy — blocks
+   repeat clicks without changing button labels. Same look as
+   TeachLogList.css's .teach-log-qa-overlay/.teach-log-spinner. */
+.confirm-dialog-busy-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(42, 42, 42, 0.75);
+  border-radius: var(--radius-sm, 6px);
+}
+
+.confirm-dialog-spinner {
+  width: 28px;
+  height: 28px;
+  color: rgba(255, 255, 255, 0.75);
+  animation: confirm-dialog-spin 0.7s linear infinite;
+}
+
+@keyframes confirm-dialog-spin {
+  to { transform: rotate(360deg); }
+}
+
+.confirm-dialog-title {
+  margin: 0 0 12px;
+  font-size: var(--font-size-lg, 16px);
+  font-weight: 600;
+  color: var(--color-white, #ffffff);
+}
+
+.confirm-dialog-body {
+  color: var(--color-white, #ffffff);
+  font-size: var(--font-size-sm, 13px);
+  line-height: 1.5;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.confirm-dialog-cancel-btn,
+.confirm-dialog-confirm-btn {
+  border-radius: var(--radius-sm, 6px);
+  font-size: var(--font-size-sm, 13px);
+  font-weight: 500;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.confirm-dialog-cancel-btn {
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: none;
+  color: var(--color-white, #ffffff);
+}
+
+.confirm-dialog-confirm-btn {
+  border: 1px solid var(--color-green-light, #8EEB65);
+  background: var(--color-green-light, #8EEB65);
+  color: var(--color-dark, #343434);
+}
+
+.confirm-dialog-confirm-btn:disabled,
+.confirm-dialog-cancel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

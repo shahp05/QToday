@@ -1,6 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useProfileStore } from '../store/profileStore'
 import { useStudentsStore } from '../store/studentsStore'
+import { useFutureRosterStore } from '../store/futureRosterStore'
 import { useTeachersStore } from '../store/teachersStore'
 import { useSubjectsTaughtStore } from '../store/subjectsTaughtStore'
 import { useQuizProgressStore } from '../store/quizProgressStore'
@@ -76,6 +77,7 @@ export default function LeftNav() {
   const profile = useProfileStore()
   const clearProfile = useProfileStore(s => s.clearProfile)
   const clearStudents = useStudentsStore(s => s.clearStudents)
+  const clearFutureRoster = useFutureRosterStore(s => s.clearFutureRoster)
   const clearTeachers = useTeachersStore(s => s.clearTeachers)
   const clearSubjectsTaught = useSubjectsTaughtStore(s => s.clearSubjectsTaught)
   const clearQuizProgress = useQuizProgressStore(s => s.clearQuizProgress)
@@ -117,6 +119,7 @@ export default function LeftNav() {
   function handleLogout() {
     clearProfile()
     clearStudents()
+    clearFutureRoster()
     clearTeachers()
     clearSubjectsTaught()
     clearQuizProgress()

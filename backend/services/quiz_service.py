@@ -11,6 +11,7 @@ from db.models import QA, Quiz, QuizChallenge, QuizScore
 from errors.app_error import AppError
 from errors.error_codes import ErrorCode
 from services.quiz_scoring_service import evaluate_challenge, resolve_grading_context
+from services.session_service import get_current_session_id
 
 
 def resolve_authorized_student_id(
@@ -230,17 +231,27 @@ def _resolve_own_student_id(db: Session, claims: dict) -> int:
     return own.student_id
 
 
-def _assert_topic_taught(db: Session, *, student_id: int, topic_id: int, grade_id: int) -> None:
+def _assert_topic_taught(db: Session, *, student_id: int, topic_id: int, grade_id: int, customer_id: int) -> None:
+    """sg.session_id is scoped to the student's own school's CURRENT
+    session — a topic only taught against a not-yet-live pre-staged future
+    roster's grade shouldn't be quizzable today."""
+    current_session_id = get_current_session_id(db, customer_id)
+    session_clause = "sg.session_id IS NULL" if current_session_id is None else "sg.session_id = :current_sid"
+    params = {"sid": student_id, "topic_id": topic_id, "grade_id": grade_id}
+    if current_session_id is not None:
+        params["current_sid"] = current_session_id
+
     visible = db.execute(
-        text("""
+        text(f"""
             SELECT 1
             FROM teach_logs tl
             JOIN student_grades sg ON sg.grade_id = tl.grade_id AND sg.is_active = TRUE
             WHERE sg.student_id = :sid AND tl.is_active = TRUE
               AND tl.topic_id = :topic_id AND tl.grade_id = :grade_id
+              AND {session_clause}
             LIMIT 1
         """),
-        {"sid": student_id, "topic_id": topic_id, "grade_id": grade_id},
+        params,
     ).first()
     if not visible:
         raise AppError(ErrorCode.TEACH_LOG_NOT_FOUND)
@@ -255,7 +266,7 @@ def get_quiz_questions(db: Session, *, claims: dict, topic_id: int, grade_id: in
     proven the same way as elsewhere: a teach_logs row showing this topic was
     actually taught to the student's own grade."""
     student_id = _resolve_own_student_id(db, claims)
-    _assert_topic_taught(db, student_id=student_id, topic_id=topic_id, grade_id=grade_id)
+    _assert_topic_taught(db, student_id=student_id, topic_id=topic_id, grade_id=grade_id, customer_id=claims["customer_id"])
 
     qa_rows = db.execute(
         text("""
@@ -303,7 +314,7 @@ def submit_quiz(db: Session, *, claims: dict, payload) -> dict:
     the caller (router) is responsible for deferring that job when
     pending_count > 0, since deferring is async and this function isn't."""
     student_id = _resolve_own_student_id(db, claims)
-    _assert_topic_taught(db, student_id=student_id, topic_id=payload.topic_id, grade_id=payload.grade_id)
+    _assert_topic_taught(db, student_id=student_id, topic_id=payload.topic_id, grade_id=payload.grade_id, customer_id=claims["customer_id"])
 
     if not payload.answers:
         raise AppError(ErrorCode.VALIDATION_ERROR)

@@ -1,0 +1,11 @@
+.schedule-session-warning {
+  margin: 0 0 16px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.schedule-session-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: var(--font-size-sm, 13px);
+  color: var(--color-white, #ffffff);
+}

@@ -49,6 +49,16 @@
   color: var(--color-white, #ffffff);
 }
 
+.students-empty-session-dropdown {
+  width: 210px;
+  flex-shrink: 0;
+}
+
+.students-empty-session-dropdown .dropdown-trigger {
+  height: 34px;
+  box-sizing: border-box;
+}
+
 /* ─── Format table (header + sample row) ─────────────────────────────────── */
 .students-format-table {
   display: flex;
