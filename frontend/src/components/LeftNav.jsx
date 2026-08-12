@@ -59,7 +59,10 @@ function IconLogout() {
 
 const NAV_ITEMS = [
   { id: 'subjects',  label: 'Subjects',  Icon: IconSubjects },
-  { id: 'students',  label: 'Students',  Icon: IconStudents },
+  // Only the customer's sys admin (uploads/manages the roster) and its
+  // teachers (view it) have any use for this page — a student only has
+  // their own row, and a parent's equivalent is their child(ren), not this.
+  { id: 'students',  label: 'Students',  Icon: IconStudents, visible: p => p.is_school_admin || p.is_school_teacher },
   { id: 'teachers',  label: 'Teachers',  Icon: IconTeachers },
   { id: 'account',   label: 'Account',   Icon: IconAccount  },
 ]
@@ -138,7 +141,7 @@ export default function LeftNav() {
       </div>
 
       <nav className="leftnav-items">
-        {NAV_ITEMS.map(({ id, label, Icon }) => (
+        {NAV_ITEMS.filter(item => !item.visible || item.visible(profile)).map(({ id, label, Icon }) => (
           <button
             key={id}
             className={`leftnav-item ${isActive(id) ? 'leftnav-item--active' : ''}`}

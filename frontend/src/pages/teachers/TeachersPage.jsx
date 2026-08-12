@@ -17,6 +17,7 @@ export default function TeachersPage() {
   // and the upload screen would never show automatically. Excluding self is
   // what makes "no teachers" mean what it visually looks like.
   const selfUserId = useProfileStore(s => s.user_id)
+  const isSchoolAdmin = useProfileStore(s => s.is_school_admin)
   const teacherCount = useTeachersStore(s => s.teachers.filter(t => t.user_id !== selfUserId).length)
   const [showUpload, setShowUpload] = useState(false)
 
@@ -42,19 +43,23 @@ export default function TeachersPage() {
     return <PageLoading />
   }
 
-  if (teacherCount > 0) {
+  // Only the sys admin can actually upload (the backend rejects anyone
+  // else's POST /teachers/upload), so they're the only one who ever gets
+  // the upload screen as a default — everyone else always sees the list,
+  // even when it's just the admin's own row.
+  if (isSchoolAdmin && teacherCount === 0) {
     return (
-      <TeachersList
-        onUploadNew={() => setShowUpload(true)}
-        onBack={() => navigate(-1)}
+      <TeachersEmpty
+        onUploaded={() => setShowUpload(false)}
+        teacherCount={teacherCount}
+        onShowList={() => setShowUpload(false)}
       />
     )
   }
   return (
-    <TeachersEmpty
-      onUploaded={() => setShowUpload(false)}
-      teacherCount={teacherCount}
-      onShowList={() => setShowUpload(false)}
+    <TeachersList
+      onUploadNew={() => setShowUpload(true)}
+      onBack={() => navigate(-1)}
     />
   )
 }

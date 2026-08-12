@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useProfileStore } from '../../store/profileStore'
 import { useStudentsStore } from '../../store/studentsStore'
 import { useStudentGradesStore } from '../../store/studentGradesStore'
 import { useStudentDetailProgressStore } from '../../store/studentDetailProgressStore'
@@ -9,12 +10,14 @@ import { useFutureRosterStore } from '../../store/futureRosterStore'
 import { usePageView } from '../../hooks/usePageView'
 import PageLoading from '../../components/PageLoading'
 import ScheduleSessionDialog from '../../components/ScheduleSessionDialog'
+import StudentsAwaitingUpload from './StudentsAwaitingUpload'
 import StudentsEmpty from './StudentsEmpty'
 import StudentsList from './StudentsList'
 
 export default function StudentsPage() {
   const navigate = useNavigate()
   usePageView('students') // every page-header page names itself in the URL
+  const isSchoolAdmin = useProfileStore(s => s.is_school_admin)
   const studentsStatus = useStudentsStore(s => s.status)
   // NOT useStudentsStore's raw students.length — that's every active
   // account at the school regardless of session, so it stays non-zero
@@ -108,6 +111,13 @@ export default function StudentsPage() {
         />
       </>
     )
+  }
+  // Only the sys admin can actually upload (the backend rejects anyone
+  // else's POST /students/upload) — everyone else (a teacher/admin) sees a
+  // read-only "not uploaded yet" message instead of a form they can't
+  // submit.
+  if (!isSchoolAdmin) {
+    return <StudentsAwaitingUpload />
   }
   return (
     <StudentsEmpty
