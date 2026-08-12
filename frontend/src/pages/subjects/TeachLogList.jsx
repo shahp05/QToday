@@ -73,14 +73,6 @@ function IconClose() {
   )
 }
 
-function IconNoSubjects() {
-  return (
-    <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M12 2l-5.5 9h11L12 2zm0 3.84L13.93 9h-3.87L12 5.84zM17.5 13c-2.49 0-4.5 2.01-4.5 4.5s2.01 4.5 4.5 4.5 4.5-2.01 4.5-4.5-2.01-4.5-4.5-4.5zm0 7c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5zM3 21.5h8v-8H3v8zm2-6h4v4H5v-4z"/>
-    </svg>
-  )
-}
-
 export default function TeachLogList({
   onBack, onLogNew, onEmptyDayClick,
   selection, onSelectionChange,
@@ -260,23 +252,11 @@ export default function TeachLogList({
   const isSwitchingQa = selectedTopicId !== displayedTopicId || selectedGradeId !== displayedGradeId
 
   // No header yet — whether this page ends up as the header+calendar/list
-  // layout or the headerless "nothing logged" message isn't known until the
-  // subjects-taught status settles, so showing the header here would just
-  // flash and then disappear the moment subjects turns out to be empty.
+  // layout isn't known until the subjects-taught status settles (SubjectsHome
+  // redirects to the logging form instead of ever mounting this component
+  // when subjects turns out to be empty, so that case never reaches here).
   if (status === 'loading' || status === 'idle') {
     return <PageLoading />
-  }
-
-  // Nothing logged yet, anywhere — hide the header/buttons/body entirely
-  // (there's no list, calendar, or "New Subject" flow worth showing chrome
-  // around) and show a single centered icon + message instead.
-  if (status === 'loaded' && subjects.length === 0) {
-    return (
-      <div className="teach-log-empty">
-        <IconNoSubjects />
-        <span className="teach-log-empty-text">When teachers log the subjects they teach, the list of subjects and their topics will appear here. Currently there are none logged.</span>
-      </div>
-    )
   }
 
   return (
