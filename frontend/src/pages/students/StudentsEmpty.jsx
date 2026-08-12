@@ -279,7 +279,13 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
       const newCount = targetSessionId
         ? useFutureRosterStore.getState().studentGrades.length
         : useStudentGradesStore.getState().studentGrades.length
-      if (previousCount === 0 && !targetSessionId) {
+      if (previousCount === 0) {
+        // Covers both a brand new customer's current-session upload AND a
+        // future session's very first roster upload — either way, the
+        // viewed target had nothing in it before this upload, so jumping
+        // to the list is the right move. StudentsList reads the same
+        // studentsViewTarget this screen does, so it lands on whichever
+        // session (current or future) was actually just uploaded.
         onUploaded?.()
       } else {
         // Staying on this screen is the point here — jumping straight to
