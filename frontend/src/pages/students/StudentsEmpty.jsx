@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { useProfileStore } from '../../store/profileStore'
 import { useStudentsStore } from '../../store/studentsStore'
@@ -199,14 +199,13 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
   const acronym = useProfileStore(s => s.customer_acronym)
   const uploadAndRefresh = useStudentsStore(s => s.uploadAndRefresh)
   const futureSession = useSessionsStore(s => s.futureSession)
-  const fetchSessions = useSessionsStore(s => s.fetchSessions)
   const currentSession = useSessionsStore(s => s.sessions.find(sess => sess.is_current))
   // 'current' | 'future' — the dropdown below only renders (and only ever
   // becomes 'future') once a future session exists; shared with StudentsList
   // so the two stay in sync, and doubles as the upload target — uploading
   // always writes into whichever session is currently being viewed.
-  const uploadTarget = useSessionsStore(s => s.studentsViewTarget)
-  const setUploadTarget = useSessionsStore(s => s.setStudentsViewTarget)
+  const uploadTarget = useSessionsStore(s => s.activeSessionTarget)
+  const setUploadTarget = useSessionsStore(s => s.setActiveSessionTarget)
   // studentGrades.length, not students.length — the latter is every active
   // account at the school regardless of session (see StudentsPage.jsx's
   // studentCount comment); studentGrades is the future session's actual
@@ -214,7 +213,6 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
   const futureRosterCount = useFutureRosterStore(s => s.studentGrades.length)
   const viewedCount = uploadTarget === 'future' && futureSession ? futureRosterCount : studentCount
 
-  useEffect(() => { fetchSessions() }, [fetchSessions])
   const studentLogin = acronym ? `${SAMPLE[0]}@${acronym}` : ''
   const [parent1Email, parent2Email] = [SAMPLE[4], SAMPLE[5]]
   const loginRows = [
@@ -284,7 +282,7 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
         // future session's very first roster upload — either way, the
         // viewed target had nothing in it before this upload, so jumping
         // to the list is the right move. StudentsList reads the same
-        // studentsViewTarget this screen does, so it lands on whichever
+        // activeSessionTarget this screen does, so it lands on whichever
         // session (current or future) was actually just uploaded.
         onUploaded?.()
       } else {

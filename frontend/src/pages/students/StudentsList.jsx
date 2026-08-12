@@ -11,7 +11,6 @@ import { topicSummaryStatus } from '../../lib/topicStatus'
 import { resolveFileUrl } from '../../lib/api'
 import { uploadMyPhoto, uploadStudentPhoto } from '../../services/photoService'
 import EditablePhoto from '../../components/EditablePhoto'
-import Dropdown from '../../components/Dropdown'
 import { Toast } from '../../components/ui/Toast'
 import PageHeader from '../../components/PageHeader'
 import './StudentsList.css'
@@ -155,7 +154,7 @@ function ParentsPopover({ emails }) {
 // — see futureRosterStore.js for why this must never overwrite the
 // shared ones (SubjectsPage's grade autocomplete reads them too).
 function useGroupedStudents() {
-  const viewingFuture = useSessionsStore(s => s.studentsViewTarget === 'future' && s.futureSession != null)
+  const viewingFuture = useSessionsStore(s => s.activeSessionTarget === 'future' && s.futureSession != null)
   const currentStudents = useStudentsStore(s => s.students)
   const currentGrades = useStudentGradesStore(s => s.studentGrades)
   const currentParents = useStudentParentsStore(s => s.parents)
@@ -212,7 +211,7 @@ function useGroupedStudents() {
 }
 
 export default function StudentsList({
-  onUploadNew, onStartNewSession, onBack, onSubjectClick, loadingChip,
+  onUploadNew, onBack, onSubjectClick, loadingChip,
   selectedGrade, onSelectedGradeChange, selectedSection, onSelectedSectionChange,
 }) {
   const isAdmin = useProfileStore(s => s.is_school_admin)
@@ -220,11 +219,12 @@ export default function StudentsList({
   const isStudentViewer = useProfileStore(s => s.is_student)
   const grades = useGroupedStudents()
 
+  // Which session (current vs. the pending future one) is now chosen
+  // site-wide from the left nav, not a page-local toggle — this just reads
+  // it to decide which roster to render.
   const futureSession = useSessionsStore(s => s.futureSession)
-  const currentSessionLabel = useSessionsStore(s => s.sessions.find(sess => sess.is_current)?.label)
-  const studentsViewTarget = useSessionsStore(s => s.studentsViewTarget)
-  const setStudentsViewTarget = useSessionsStore(s => s.setStudentsViewTarget)
-  const viewingFuture = studentsViewTarget === 'future' && futureSession != null
+  const activeSessionTarget = useSessionsStore(s => s.activeSessionTarget)
+  const viewingFuture = activeSessionTarget === 'future' && futureSession != null
 
   // Not fetched here — Dashboard.jsx already kicks this off once per
   // session on /dashboard mount, and this component just reads whatever's
@@ -314,25 +314,9 @@ export default function StudentsList({
         title="Students"
         onBack={onBack}
         actions={isAdmin && (
-          <>
-            {futureSession && (
-              <Dropdown
-                className="students-list-session-view-dropdown"
-                value={studentsViewTarget}
-                onChange={setStudentsViewTarget}
-                options={[
-                  { key: 'current', label: currentSessionLabel ? `Current — ${currentSessionLabel}` : 'Current session' },
-                  { key: 'future', label: `New session — starts ${futureSession.label}` },
-                ]}
-              />
-            )}
-            <button className="students-list-session-btn" onClick={onStartNewSession}>
-              Schedule Next Session
-            </button>
-            <button className="students-list-upload-btn" onClick={onUploadNew}>
-              Upload new file
-            </button>
-          </>
+          <button className="students-list-upload-btn" onClick={onUploadNew}>
+            Upload new file
+          </button>
         )}
         filter={(
           <div className="students-filter-bar">

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
 import LeftNav from '../components/LeftNav'
+import { useSessionsStore } from '../store/sessionsStore'
 import { useStudentsStore } from '../store/studentsStore'
 import { useTeachersStore } from '../store/teachersStore'
 import { useSubjectsTaughtStore } from '../store/subjectsTaughtStore'
@@ -16,6 +17,11 @@ export default function Dashboard() {
   const fetchTeachers       = useTeachersStore(s => s.fetchTeachers)
   const fetchSubjectsTaught = useSubjectsTaughtStore(s => s.fetchSubjectsTaught)
   const fetchTopicCatalog   = useTopicCatalogStore(s => s.fetchTopicCatalog)
+  // LeftNav's session dropdown needs this regardless of which page the user
+  // lands on first — fetched here (not lazily inside whichever page used
+  // to trigger it) so it's never missing just because Students wasn't the
+  // first page visited this session.
+  const fetchSessions       = useSessionsStore(s => s.fetchSessions)
 
   // Initial data load — intentionally mount-only. Runs on every /dashboard
   // mount, including a refresh — unlike the quote screen's auto-advance
@@ -26,6 +32,7 @@ export default function Dashboard() {
     fetchTeachers()
     fetchSubjectsTaught()
     fetchTopicCatalog()
+    fetchSessions()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

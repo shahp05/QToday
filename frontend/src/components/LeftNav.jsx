@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useProfileStore } from '../store/profileStore'
+import { useSessionsStore } from '../store/sessionsStore'
 import { useStudentsStore } from '../store/studentsStore'
 import { useFutureRosterStore } from '../store/futureRosterStore'
 import { useTeachersStore } from '../store/teachersStore'
@@ -9,6 +11,8 @@ import { useQuizHistoryStore } from '../store/quizHistoryStore'
 import { useClassQuizProgressStore } from '../store/classQuizProgressStore'
 import { useDashboardQuoteStore } from '../store/dashboardQuoteStore'
 import { useStudentsListFilterStore } from '../store/studentsListFilterStore'
+import Dropdown from './Dropdown'
+import ScheduleSessionDialog from './ScheduleSessionDialog'
 import logo from '../assets/logo_48.webp'
 import './LeftNav.css'
 
@@ -67,15 +71,6 @@ const NAV_ITEMS = [
   { id: 'account',   label: 'Account',   Icon: IconAccount  },
 ]
 
-function roleLabel(profile) {
-  if (profile.is_student)      return 'Student'
-  if (profile.is_parent)       return 'Parent'
-  if (profile.is_school_admin) return 'School Admin'
-  if (profile.is_school_teacher) return 'Teacher'
-  if (profile.is_system_admin) return 'Admin'
-  return '—'
-}
-
 export default function LeftNav() {
   const profile = useProfileStore()
   const clearProfile = useProfileStore(s => s.clearProfile)
@@ -86,6 +81,7 @@ export default function LeftNav() {
   const clearQuizProgress = useQuizProgressStore(s => s.clearQuizProgress)
   const clearQuizHistory = useQuizHistoryStore(s => s.clearQuizHistory)
   const clearClassProgress = useClassQuizProgressStore(s => s.clearClassProgress)
+  const clearSessions = useSessionsStore(s => s.clearSessions)
   const resetQuoteAutoAdvance = useDashboardQuoteStore(s => s.reset)
   const clearStudentsListFilter = useStudentsListFilterStore(s => s.clear)
   const studentsStatus = useStudentsStore(s => s.status)
@@ -94,6 +90,32 @@ export default function LeftNav() {
   const navigate = useNavigate()
   const location = useLocation()
 
+  // Single site-wide session picker — replaces the old per-page "Schedule
+  // Next Session" button and Students' own current/future toggle, both of
+  // which only ever affected that one page. Every session-aware page reads
+  // sessionsStore.activeSessionTarget directly, so switching here is what
+  // makes "was this upload meant for the current or the new session?"
+  // unambiguous everywhere at once, not just wherever the control happened
+  // to live. Sys-admin only for now — they're the only role who can
+  // schedule/upload into a session; read-only browsing of past sessions
+  // for every role is a later step.
+  const futureSession = useSessionsStore(s => s.futureSession)
+  const currentSessionLabel = useSessionsStore(s => s.sessions.find(sess => sess.is_current)?.label)
+  const activeSessionTarget = useSessionsStore(s => s.activeSessionTarget)
+  const setActiveSessionTarget = useSessionsStore(s => s.setActiveSessionTarget)
+  const [showSessionDialog, setShowSessionDialog] = useState(false)
+
+  // Picking "future" before one has ever been scheduled opens the dialog
+  // instead of switching to nothing — there's no future session yet to
+  // switch the view to.
+  function handleSessionChange(target) {
+    if (target === 'future' && !futureSession) {
+      setShowSessionDialog(true)
+      return
+    }
+    setActiveSessionTarget(target)
+  }
+
   const isLoadingById = {
     students: studentsStatus === 'idle' || studentsStatus === 'loading',
     teachers: teachersStatus === 'idle' || teachersStatus === 'loading',
@@ -101,7 +123,6 @@ export default function LeftNav() {
   }
 
   const infoItems = [
-    { label: 'Role',    value: roleLabel(profile) },
     { label: 'School',  value: profile.customer_acronym || '—' },
     { label: 'Board',   value: profile.board_code       || '—' },
     { label: 'Country', value: profile.country_name     || '—' },
@@ -128,6 +149,7 @@ export default function LeftNav() {
     clearQuizProgress()
     clearQuizHistory()
     clearClassProgress()
+    clearSessions()
     clearStudentsListFilter()
     resetQuoteAutoAdvance()
     navigate('/')
@@ -158,6 +180,20 @@ export default function LeftNav() {
       <div className="leftnav-spacer" />
 
       <div className="leftnav-info">
+        {profile.is_school_admin && (
+          <div className="leftnav-session-block">
+            <span className="leftnav-info-label">Session</span>
+            <Dropdown
+              className="leftnav-session-dropdown"
+              value={activeSessionTarget}
+              onChange={handleSessionChange}
+              options={[
+                { key: 'current', label: currentSessionLabel || 'Current' },
+                { key: 'future', label: futureSession ? futureSession.label : 'New session' },
+              ]}
+            />
+          </div>
+        )}
         {infoItems.map(({ label, value }) => (
           <div key={label} className="leftnav-info-block">
             <span className="leftnav-info-label">{label}</span>
@@ -165,6 +201,12 @@ export default function LeftNav() {
           </div>
         ))}
       </div>
+
+      <ScheduleSessionDialog
+        open={showSessionDialog}
+        onClose={() => setShowSessionDialog(false)}
+        onScheduled={() => setActiveSessionTarget('future')}
+      />
 
       <button
         className="leftnav-item leftnav-item--logout"

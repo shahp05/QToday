@@ -9,7 +9,6 @@ import { useSessionsStore } from '../../store/sessionsStore'
 import { useFutureRosterStore } from '../../store/futureRosterStore'
 import { usePageView } from '../../hooks/usePageView'
 import PageLoading from '../../components/PageLoading'
-import ScheduleSessionDialog from '../../components/ScheduleSessionDialog'
 import StudentsAwaitingUpload from './StudentsAwaitingUpload'
 import StudentsEmpty from './StudentsEmpty'
 import StudentsList from './StudentsList'
@@ -30,9 +29,7 @@ export default function StudentsPage() {
   const studentCount = useStudentGradesStore(s => s.studentGrades.length)
   const ensureStudentProgressLoaded = useStudentDetailProgressStore(s => s.ensureLoaded)
   const [showUpload, setShowUpload] = useState(false)
-  const [showSessionDialog, setShowSessionDialog] = useState(false)
   const futureSession = useSessionsStore(s => s.futureSession)
-  const setStudentsViewTarget = useSessionsStore(s => s.setStudentsViewTarget)
   const fetchFutureRoster = useFutureRosterStore(s => s.fetchFutureRoster)
 
   // Kept fetched here, not inside StudentsEmpty — StudentsEmpty doesn't
@@ -89,27 +86,16 @@ export default function StudentsPage() {
 
   if (studentCount > 0) {
     return (
-      <>
-        <StudentsList
-          onUploadNew={() => setShowUpload(true)}
-          onStartNewSession={() => setShowSessionDialog(true)}
-          onBack={() => navigate(-1)}
-          onSubjectClick={openSubject}
-          loadingChip={loadingChip}
-          selectedGrade={selectedGrade}
-          onSelectedGradeChange={setSelectedGrade}
-          selectedSection={selectedSection}
-          onSelectedSectionChange={setSelectedSection}
-        />
-        <ScheduleSessionDialog
-          open={showSessionDialog}
-          onClose={() => setShowSessionDialog(false)}
-          onScheduled={() => {
-            setStudentsViewTarget('future')
-            setShowUpload(true)
-          }}
-        />
-      </>
+      <StudentsList
+        onUploadNew={() => setShowUpload(true)}
+        onBack={() => navigate(-1)}
+        onSubjectClick={openSubject}
+        loadingChip={loadingChip}
+        selectedGrade={selectedGrade}
+        onSelectedGradeChange={setSelectedGrade}
+        selectedSection={selectedSection}
+        onSelectedSectionChange={setSelectedSection}
+      />
     )
   }
   // Only the sys admin can actually upload (the backend rejects anyone

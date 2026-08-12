@@ -143,6 +143,66 @@
   white-space: normal;
 }
 
+/* ─── Session picker — grouped with Role/School/etc (same 4px-gapped
+   stack, first so it reads as "above Role"), but NOT wrapped in
+   .leftnav-info-block's padded/backgrounded box — a real bordered dropdown
+   trigger instead, at the rail's full width, so it unmistakably reads as
+   a control rather than another static value ─────────────────────────── */
+.leftnav-session-block {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+}
+
+.leftnav-session-block .leftnav-info-label {
+  text-align: center;
+}
+
+.leftnav-session-dropdown {
+  width: 100%;
+}
+
+.leftnav-session-dropdown .dropdown-trigger {
+  height: 28px;
+  padding: 0 8px;
+  border-color: rgba(0,0,0,0.2);
+  background: rgba(0,0,0,0.08);
+  color: rgba(255,255,255,0.95);
+}
+
+.leftnav-session-dropdown .dropdown-trigger:hover,
+.leftnav-session-dropdown .dropdown-trigger--open {
+  background: rgba(0,0,0,0.15);
+  border-color: rgba(0,0,0,0.3);
+}
+
+.leftnav-session-dropdown .dropdown-trigger-value {
+  font-size: 10px;
+  font-weight: var(--font-weight-medium);
+}
+
+.leftnav-session-dropdown .dropdown-caret {
+  width: 11px;
+  height: 11px;
+}
+
+/* Left at the trigger's own width (not widened) — .leftnav has
+   overflow:hidden, so a popover wider than the rail would get clipped
+   rather than actually appear wider. Long labels ellipsis-truncate instead;
+   option labels are kept short for exactly this reason. */
+.leftnav-session-dropdown .dropdown-option {
+  font-size: 11px;
+}
+
+/* Opens upward, not downward — this block sits near the bottom of the
+   rail, so Dropdown's default below-the-trigger placement would get
+   clipped by both the viewport edge and .leftnav's own overflow:hidden. */
+.leftnav-session-dropdown .dropdown-list {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
 /* ─── Mobile: hidden ──────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .leftnav {
