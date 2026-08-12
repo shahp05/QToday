@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useValidation } from '../../hooks/useValidation'
+import { useProfileStore } from '../../store/profileStore'
 import { Toast }         from '../../components/ui/Toast'
 import logo512      from '../../assets/logo_512.webp'
 import { API_BASE as API, resolveApiError } from '../../lib/api'
@@ -389,6 +390,7 @@ export default function SignupPage() {
   const [step, setStep]         = useState('form')
   const [formData, setFormData] = useState(null)
   const navigate                = useNavigate()
+  const setProfile              = useProfileStore(s => s.setProfile)
 
   return (
     <div className="su-page">
@@ -397,7 +399,13 @@ export default function SignupPage() {
           <SignupForm onCodeSent={data => { setFormData(data); setStep('verify') }} />
         )}
         {step === 'verify' && (
-          <VerifyForm formData={formData} onSuccess={() => navigate('/dashboard/students', { replace: true })} />
+          <VerifyForm
+            formData={formData}
+            onSuccess={j => {
+              setProfile(j.profile, j.access_token)
+              navigate('/dashboard/students', { replace: true })
+            }}
+          />
         )}
 
         <p className="su-login-link">

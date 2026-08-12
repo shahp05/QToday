@@ -9,6 +9,8 @@ from errors.error_codes import ErrorCode
 from schemas.signup import SignupRequest, VerifyRequest
 from services.signup_service import request_verification, verify_and_create
 from services.error_log_service import log_error
+from services.jwt_service import create_access_token
+from services.profile_service import get_profile
 
 router = APIRouter(prefix="/api/signup", tags=["signup"])
 
@@ -36,5 +38,18 @@ async def signup_request(payload: SignupRequest, db: Session = Depends(get_db)):
 
 @router.post("/verify")
 def signup_verify(payload: VerifyRequest, db: Session = Depends(get_db)):
-    """Verify the code and, on success, create the customer account."""
-    return verify_and_create(db, payload.email_id, payload.code)
+    """Verify the code and, on success, create the customer account, then
+    log the new admin straight in — same token/profile shape as /auth/login,
+    since the frontend navigates straight to the dashboard afterward."""
+    result = verify_and_create(db, payload.email_id, payload.code)
+    profile = get_profile(db, result["user_id"])
+    token = create_access_token({
+        "user_id":           profile["user_id"],
+        "customer_id":       profile["customer_id"],
+        "is_school_admin":   profile["is_school_admin"],
+        "is_school_teacher": profile["is_school_teacher"],
+        "is_system_admin":   profile["is_system_admin"],
+        "is_student":        profile["is_student"],
+        "is_parent":         profile["is_parent"],
+    })
+    return {"access_token": token, "token_type": "bearer", "profile": profile}

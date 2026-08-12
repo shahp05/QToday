@@ -259,6 +259,14 @@ export default function TeachLogList({
   const currentGrade = currentTopic?.grades.find(g => g.grade_id === displayedGradeId)
   const isSwitchingQa = selectedTopicId !== displayedTopicId || selectedGradeId !== displayedGradeId
 
+  // No header yet — whether this page ends up as the header+calendar/list
+  // layout or the headerless "nothing logged" message isn't known until the
+  // subjects-taught status settles, so showing the header here would just
+  // flash and then disappear the moment subjects turns out to be empty.
+  if (status === 'loading' || status === 'idle') {
+    return <PageLoading />
+  }
+
   // Nothing logged yet, anywhere — hide the header/buttons/body entirely
   // (there's no list, calendar, or "New Subject" flow worth showing chrome
   // around) and show a single centered icon + message instead.
@@ -308,8 +316,6 @@ export default function TeachLogList({
           onViewDateChange={onCalendarMonthChange}
         />
       )}
-
-      {!showCalendar && (status === 'loading' || status === 'idle') && <PageLoading />}
 
       {!showCalendar && status === 'error' && (
         <>

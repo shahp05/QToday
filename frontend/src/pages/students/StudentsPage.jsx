@@ -7,7 +7,6 @@ import { useStudentsListFilterStore } from '../../store/studentsListFilterStore'
 import { useSessionsStore } from '../../store/sessionsStore'
 import { useFutureRosterStore } from '../../store/futureRosterStore'
 import { usePageView } from '../../hooks/usePageView'
-import PageHeader from '../../components/PageHeader'
 import PageLoading from '../../components/PageLoading'
 import ScheduleSessionDialog from '../../components/ScheduleSessionDialog'
 import StudentsEmpty from './StudentsEmpty'
@@ -77,17 +76,12 @@ export default function StudentsPage() {
     )
   }
 
-  // Header renders immediately, before the roster has loaded — its
-  // identity ("Students") doesn't depend on the data, so there's no
-  // reason to make the whole page (including the back button) disappear
-  // behind a spinner while just the body is still waiting.
+  // No header yet — whether this page ends up as the list or the xlsx
+  // upload screen (which has no header at all) isn't known until the
+  // roster status settles, so showing "Students" + a back button here would
+  // just flash and then disappear the moment studentCount turns out to be 0.
   if (studentsStatus === 'idle' || studentsStatus === 'loading') {
-    return (
-      <div className="students-list">
-        <PageHeader title="Students" onBack={() => navigate(-1)} />
-        <PageLoading />
-      </div>
-    )
+    return <PageLoading />
   }
 
   if (studentCount > 0) {

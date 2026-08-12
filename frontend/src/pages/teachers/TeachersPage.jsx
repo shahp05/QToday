@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTeachersStore } from '../../store/teachersStore'
 import { usePageView } from '../../hooks/usePageView'
-import PageHeader from '../../components/PageHeader'
 import PageLoading from '../../components/PageLoading'
 import TeachersEmpty from './TeachersEmpty'
 import TeachersList from './TeachersList'
@@ -28,17 +27,12 @@ export default function TeachersPage() {
     )
   }
 
-  // Header renders immediately, before the roster has loaded — its
-  // identity ("Teachers") doesn't depend on the data, so there's no
-  // reason to make the whole page (including the back button) disappear
-  // behind a spinner while just the body is still waiting.
+  // No header yet — whether this page ends up as the list or the xlsx
+  // upload screen (which has no header at all) isn't known until the
+  // roster status settles, so showing "Teachers" + a back button here would
+  // just flash and then disappear the moment teacherCount turns out to be 0.
   if (teachersStatus === 'idle' || teachersStatus === 'loading') {
-    return (
-      <div className="teachers-list">
-        <PageHeader title="Teachers" onBack={() => navigate(-1)} />
-        <PageLoading />
-      </div>
-    )
+    return <PageLoading />
   }
 
   if (teacherCount > 0) {
