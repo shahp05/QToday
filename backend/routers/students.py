@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from db.database import get_db
 from errors.app_error import AppError
 from errors.error_codes import ErrorCode
+from jobs.tasks import hash_new_account_passwords_task
 from schemas.students import StudentsUploadRequest
 from services.auth_service import get_current_user
 from services.session_service import validate_session_target
@@ -33,7 +34,7 @@ def list_my_students(
 
 
 @router.post("/upload")
-def upload_students(
+async def upload_students(
     payload: StudentsUploadRequest,
     claims: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -45,4 +46,7 @@ def upload_students(
         raise AppError(ErrorCode.SCHOOL_NOT_ASSOCIATED)
 
     rows = [r.model_dump() for r in payload.students]
-    return process_students_upload(db, customer_id, rows, target_session_id=payload.session_id)
+    counts, new_user_ids = process_students_upload(db, customer_id, rows, target_session_id=payload.session_id)
+    if new_user_ids:
+        await hash_new_account_passwords_task.defer_async(user_ids=new_user_ids)
+    return counts

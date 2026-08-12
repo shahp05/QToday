@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from db.database import get_db
 from errors.app_error import AppError
 from errors.error_codes import ErrorCode
+from jobs.tasks import hash_new_account_passwords_task
 from schemas.teachers import SetSuperAdminRequest, TeachersUploadRequest
 from services.auth_service import get_current_user
 from services.teachers_query_service import get_my_teachers
@@ -22,7 +23,7 @@ def list_my_teachers(
 
 
 @router.post("/upload")
-def upload_teachers(
+async def upload_teachers(
     payload: TeachersUploadRequest,
     claims: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -34,7 +35,10 @@ def upload_teachers(
         raise AppError(ErrorCode.SCHOOL_NOT_ASSOCIATED)
 
     rows = [r.model_dump() for r in payload.teachers]
-    return process_teachers_upload(db, customer_id, rows)
+    counts, new_user_ids = process_teachers_upload(db, customer_id, rows)
+    if new_user_ids:
+        await hash_new_account_passwords_task.defer_async(user_ids=new_user_ids)
+    return counts
 
 
 @router.patch("/{org_id}/super-admin")

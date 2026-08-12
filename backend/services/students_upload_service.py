@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from errors.app_error import AppError
 from errors.error_codes import ErrorCode
-from services.password_service import hash_password
+from services.password_service import placeholder_password_hash
 from services.session_service import ensure_session_bootstrapped, get_current_session_id, validate_session_target
 
 
@@ -26,7 +26,9 @@ def _resolve_target_session(db: Session, customer_id: int, requested_session_id:
     return requested_session_id, requested_session_id != current_session_id
 
 
-def process_students_upload(db: Session, customer_id: int, rows: list[dict], target_session_id: int | None = None) -> dict:
+def process_students_upload(
+    db: Session, customer_id: int, rows: list[dict], target_session_id: int | None = None
+) -> tuple[dict, list[int]]:
     """Reconciles the uploaded roster against the db for this customer:
     creates/updates/reactivates students and parents present in the upload,
     and deactivates students/parents that exist for this customer but are
@@ -46,7 +48,14 @@ def process_students_upload(db: Session, customer_id: int, rows: list[dict], tar
     every row via unnest()/ANY()) instead of one round trip per row per
     field — a few hundred students used to mean a few thousand sequential
     round trips to the db, which is what made this endpoint slow enough to
-    time out, especially against a remote/pooled db."""
+    time out, especially against a remote/pooled db.
+
+    Returns (counts, new_user_ids) — new_user_ids is every brand-new
+    student/parent account just inserted, each still holding a placeholder
+    password_hash (see password_service.placeholder_password_hash). The
+    caller defers jobs.tasks.hash_new_account_passwords_task with this list
+    right after commit — hashing hundreds of real default passwords
+    synchronously was the actual cause of upload timeouts, not the SQL."""
     customer = db.execute(
         text("SELECT customer_acronym, board_id, country_id FROM customers WHERE customer_id = :cid"),
         {"cid": customer_id},
@@ -104,17 +113,18 @@ def process_students_upload(db: Session, customer_id: int, rows: list[dict], tar
             else:
                 to_update.append(row)
 
-        student_id_by_org_id = _insert_new_students(db, customer_id, customer, to_insert, grade_id_by_name, session_id)
+        student_id_by_org_id, new_user_ids = _insert_new_students(db, customer_id, customer, to_insert, grade_id_by_name, session_id)
         counts["students_created"] = len(to_insert)
 
         updated_org_ids = _update_existing_students(db, existing_by_org_id, to_update, grade_id_by_name, session_id)
         for row in to_update:
             student_id_by_org_id[row["org_id"]] = existing_by_org_id[row["org_id"]].student_id
 
-        parents_created, parent_changed_student_ids = _upsert_parents(
+        parents_created, parent_changed_student_ids, new_parent_user_ids = _upsert_parents(
             db, customer_id, to_insert + to_update, student_id_by_org_id, seen_parent_emails
         )
         counts["parents_created"] = parents_created
+        new_user_ids += new_parent_user_ids
 
         if is_future_target:
             counts["students_deactivated"] = _deactivate_missing_students_future(db, customer_id, session_id, seen_org_ids)
@@ -144,7 +154,7 @@ def process_students_upload(db: Session, customer_id: int, rows: list[dict], tar
         db.rollback()
         raise
 
-    return counts
+    return counts, new_user_ids
 
 
 def _resolve_grades(db: Session, rows: list[dict]) -> dict[int, int]:
@@ -191,14 +201,19 @@ def _resolve_grades(db: Session, rows: list[dict]) -> dict[int, int]:
     return grade_id_by_name
 
 
-def _insert_new_students(db: Session, customer_id: int, customer, to_insert: list[dict], grade_id_by_name: dict[int, int], session_id: int | None) -> dict[str, int]:
+def _insert_new_students(db: Session, customer_id: int, customer, to_insert: list[dict], grade_id_by_name: dict[int, int], session_id: int | None) -> tuple[dict[str, int], list[int]]:
     """Bulk-inserts users+students+student_grades for brand new org_ids.
-    Returns {org_id: student_id} for the rows just inserted."""
+    Returns ({org_id: student_id}, new_user_ids) for the rows just inserted.
+    Every row gets the same placeholder password_hash (see
+    password_service.placeholder_password_hash) — the caller defers a
+    background job to set each account's real default-password hash, so
+    hundreds of individual PBKDF2 calls never happen on the request path."""
     if not to_insert:
-        return {}
+        return {}, []
 
     login_keys = [f"{row['org_id']}@{customer.customer_acronym}" for row in to_insert]
-    password_hashes = [hash_password(lk) for lk in login_keys]
+    placeholder = placeholder_password_hash()
+    password_hashes = [placeholder] * len(to_insert)
     names = [row["name"] for row in to_insert]
     org_ids = [row["org_id"] for row in to_insert]
 
@@ -245,7 +260,7 @@ def _insert_new_students(db: Session, customer_id: int, customer, to_insert: lis
         {"sids": student_ids, "gids": grade_ids, "secs": sections, "ssid": session_ids},
     )
 
-    return student_id_by_org_id
+    return student_id_by_org_id, list(user_id_by_org_id.values())
 
 
 def _update_existing_students(db: Session, existing_by_org_id: dict, to_update: list[dict], grade_id_by_name: dict[int, int], session_id: int) -> set[str]:
@@ -354,14 +369,15 @@ def _update_existing_students(db: Session, existing_by_org_id: dict, to_update: 
 
 def _upsert_parents(
     db: Session, customer_id: int, rows: list[dict], student_id_by_org_id: dict[str, int], seen_parent_emails: set[str]
-) -> tuple[int, set[int]]:
+) -> tuple[int, set[int], list[int]]:
     """Find-or-creates every parent user account referenced in this upload
     (matched globally by email, among parent-flagged rows only), then
     find-or-creates/reactivates their parents row for each student they're
     linked to. Returns (new parent user accounts created, student_ids whose
-    parent links actually changed) — a parent gaining a link to an
-    additional child isn't a new *account*, but it is a data change for
-    that student."""
+    parent links actually changed, new parent user_ids) — a parent gaining a
+    link to an additional child isn't a new *account*, but it is a data
+    change for that student. New accounts get a shared placeholder
+    password_hash, same as new students — see _insert_new_students."""
     needed: list[tuple[str, int]] = []  # (email, student_id), one per row+slot
     for row in rows:
         student_id = student_id_by_org_id[row["org_id"]]
@@ -374,7 +390,7 @@ def _upsert_parents(
             needed.append((email, student_id))
 
     if not needed:
-        return 0, set()
+        return 0, set(), []
 
     distinct_emails = sorted({email for email, _ in needed})
     existing_parent_by_email = {
@@ -387,8 +403,10 @@ def _upsert_parents(
 
     missing_emails = [e for e in distinct_emails if e not in existing_parent_by_email]
     parent_user_id_by_email = {email: r.user_id for email, r in existing_parent_by_email.items()}
+    new_parent_user_ids: list[int] = []
     if missing_emails:
-        password_hashes = [hash_password(e) for e in missing_emails]
+        placeholder = placeholder_password_hash()
+        password_hashes = [placeholder] * len(missing_emails)
         inserted = db.execute(
             text(
                 "INSERT INTO users (login_key, password_hash, user_name, email_id, is_parent) "
@@ -400,6 +418,7 @@ def _upsert_parents(
         ).fetchall()
         for r in inserted:
             parent_user_id_by_email[r.email_id] = r.user_id
+            new_parent_user_ids.append(r.user_id)
 
     to_reactivate_users = [
         r.user_id for email, r in existing_parent_by_email.items() if not r.is_active
@@ -448,7 +467,7 @@ def _upsert_parents(
         )
 
     changed_student_ids = {sid for _, sid in links_to_insert} | {sid for _, sid in links_to_reactivate}
-    return len(missing_emails), changed_student_ids
+    return len(missing_emails), changed_student_ids, new_parent_user_ids
 
 
 def _deactivate_missing_students_current(db: Session, customer_id: int, seen_org_ids: set[str]) -> int:

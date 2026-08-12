@@ -3,10 +3,10 @@ from sqlalchemy.orm import Session
 
 from errors.app_error import AppError
 from errors.error_codes import ErrorCode
-from services.password_service import hash_password
+from services.password_service import placeholder_password_hash
 
 
-def process_teachers_upload(db: Session, customer_id: int, rows: list[dict]) -> dict:
+def process_teachers_upload(db: Session, customer_id: int, rows: list[dict]) -> tuple[dict, list[int]]:
     """Reconciles the uploaded roster against the db for this customer:
     creates/updates/reactivates teachers present in the upload, and
     deactivates teachers that exist for this customer but are no longer
@@ -16,7 +16,13 @@ def process_teachers_upload(db: Session, customer_id: int, rows: list[dict]) -> 
     one transaction — any error rolls back the whole upload.
 
     Set-based throughout (see students_upload_service for why) — a
-    handful of bulk queries total instead of one round trip per row."""
+    handful of bulk queries total instead of one round trip per row.
+
+    Returns (counts, new_user_ids) — new_user_ids is every brand-new
+    teacher account just inserted, each still holding a placeholder
+    password_hash (see password_service.placeholder_password_hash). The
+    caller defers jobs.tasks.hash_new_account_passwords_task with this list
+    right after commit, same as students_upload_service."""
     customer = db.execute(
         text("SELECT customer_acronym, country_id FROM customers WHERE customer_id = :cid"),
         {"cid": customer_id},
@@ -47,6 +53,7 @@ def process_teachers_upload(db: Session, customer_id: int, rows: list[dict]) -> 
         org_id_by_email_in_file[row["email"]] = row["org_id"]
 
     seen_org_ids = {row["org_id"] for row in rows}
+    new_user_ids: list[int] = []
 
     try:
         if rows:
@@ -95,14 +102,16 @@ def process_teachers_upload(db: Session, customer_id: int, rows: list[dict]) -> 
 
             if to_insert:
                 login_keys = [f"{row['org_id']}@{acronym}" for row in to_insert]
-                password_hashes = [hash_password(lk) for lk in login_keys]
-                db.execute(
+                placeholder = placeholder_password_hash()
+                password_hashes = [placeholder] * len(to_insert)
+                inserted = db.execute(
                     text(
                         "INSERT INTO users (login_key, password_hash, user_name, email_id, country_id, "
                         "customer_id, org_id, is_adm, is_sysadm) "
                         "SELECT login_key, password_hash, user_name, email, :country_id, :customer_id, org_id, TRUE, FALSE "
                         "FROM unnest((:login_keys)::text[], (:password_hashes)::text[], (:names)::text[], (:emails)::text[], (:org_ids)::text[]) "
-                        "AS t(login_key, password_hash, user_name, email, org_id)"
+                        "AS t(login_key, password_hash, user_name, email, org_id) "
+                        "RETURNING user_id"
                     ),
                     {
                         "country_id": customer.country_id, "customer_id": customer_id,
@@ -111,7 +120,8 @@ def process_teachers_upload(db: Session, customer_id: int, rows: list[dict]) -> 
                         "emails": [row["email"] for row in to_insert],
                         "org_ids": [row["org_id"] for row in to_insert],
                     },
-                )
+                ).fetchall()
+                new_user_ids = [r.user_id for r in inserted]
             counts["teachers_created"] = len(to_insert)
 
             users_to_touch = []  # (user_id, name, email)
@@ -151,4 +161,4 @@ def process_teachers_upload(db: Session, customer_id: int, rows: list[dict]) -> 
         db.rollback()
         raise
 
-    return counts
+    return counts, new_user_ids

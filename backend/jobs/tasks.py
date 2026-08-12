@@ -5,7 +5,7 @@ its job — registered once with @app.task(), it can be triggered either:
   - from the scheduler:   automatically, via @app.periodic's cron
 Both paths execute this exact function. No duplicate logic anywhere else.
 """
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from db.database import SessionLocal
 from db.models import BatchJob
@@ -13,6 +13,7 @@ from jobs.app import app
 from services.batch_job_service import close_job, fail_job, is_due, start_job
 from services.country_service import fetch_and_sync_countries
 from services.error_log_service import mark_old_error_logs_for_purge, physically_delete_purged_error_logs
+from services.password_service import hash_password
 from services.qa_service import poll_and_finalize_qa_batch, should_top_up_qa, submit_qa_top_up_batch, verify_pending_qa
 from services.quiz_scoring_service import score_pending_quiz
 from services.session_service import run_due_cutovers
@@ -24,6 +25,51 @@ REQUEST_TYPE_QUIZ_SCORING = "qa_scoring"
 REQUEST_TYPE_QA_TOP_UP = "qa_generation"
 REQUEST_TYPE_QA_VERIFICATION = "qa_verification"
 REQUEST_TYPE_SESSION_CUTOVER = "session_cutover"
+REQUEST_TYPE_ACCOUNT_PASSWORD_HASH = "account_password_hash"
+
+
+# Not periodic — deferred once per students/teachers xlsx upload (see
+# routers/students.py, routers/teachers.py) right after commit, with the
+# user_ids of every brand-new account. Each of those rows was inserted with
+# a shared, unmatched placeholder password_hash (see
+# password_service.placeholder_password_hash) purely so the row could exist
+# without paying ~150ms of PBKDF2 per row on the request path — a few
+# hundred new accounts in one upload was slow enough to time out. This is
+# what makes each account's real default password (login_key itself —
+# org_id@acronym for students/teachers, email for parents) actually usable
+# to log in, off the request path.
+@app.task(queue="maintenance")
+async def hash_new_account_passwords_task(user_ids: list[int]) -> dict:
+    if not user_ids:
+        return {"hashed": 0}
+    db = SessionLocal()
+    try:
+        job = start_job(db, REQUEST_TYPE_ACCOUNT_PASSWORD_HASH)
+        try:
+            rows = db.execute(
+                text("SELECT user_id, login_key FROM users WHERE user_id = ANY(:ids)"),
+                {"ids": user_ids},
+            ).fetchall()
+            ids = [r.user_id for r in rows]
+            hashes = [hash_password(r.login_key) for r in rows]
+            if ids:
+                db.execute(
+                    text(
+                        "UPDATE users u SET password_hash = t.password_hash "
+                        "FROM unnest((:ids)::int[], (:hashes)::text[]) AS t(user_id, password_hash) "
+                        "WHERE u.user_id = t.user_id"
+                    ),
+                    {"ids": ids, "hashes": hashes},
+                )
+            db.commit()
+            close_job(db, job)
+            return {"hashed": len(ids)}
+        except Exception:
+            db.rollback()
+            fail_job(db, job)
+            raise
+    finally:
+        db.close()
 
 
 @app.periodic(cron="0 3 * * *", periodic_id="refresh_countries")  # checked daily; only acts when actually due
