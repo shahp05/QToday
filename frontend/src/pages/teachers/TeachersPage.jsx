@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useProfileStore } from '../../store/profileStore'
 import { useTeachersStore } from '../../store/teachersStore'
 import { usePageView } from '../../hooks/usePageView'
 import PageLoading from '../../components/PageLoading'
@@ -10,7 +11,13 @@ export default function TeachersPage() {
   const navigate = useNavigate()
   usePageView('teachers') // every page-header page names itself in the URL
   const teachersStatus = useTeachersStore(s => s.status)
-  const teacherCount = useTeachersStore(s => s.teachers.length)
+  // /teachers/mine includes the signed-in admin's own row (is_sysadm counts
+  // as a "teacher" server-side — see get_my_teachers) — so on a customer
+  // that's never uploaded a real teacher, this would otherwise be 1, not 0,
+  // and the upload screen would never show automatically. Excluding self is
+  // what makes "no teachers" mean what it visually looks like.
+  const selfUserId = useProfileStore(s => s.user_id)
+  const teacherCount = useTeachersStore(s => s.teachers.filter(t => t.user_id !== selfUserId).length)
   const [showUpload, setShowUpload] = useState(false)
 
   // Checked before the loading guard below — TeachersEmpty owns its own

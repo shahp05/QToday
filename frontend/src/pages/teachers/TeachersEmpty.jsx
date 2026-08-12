@@ -187,6 +187,11 @@ function summarizeUpload(previousCount, newCount, counts) {
 
 export default function TeachersEmpty({ onUploaded, teacherCount, onShowList }) {
   const acronym = useProfileStore(s => s.customer_acronym)
+  // Matches the exclusion TeachersPage already applies to the teacherCount
+  // prop — needed again here so the post-upload count in summarizeUpload
+  // stays consistent with it (self is never in the uploaded rows, but is
+  // always in the raw refetched count).
+  const selfUserId = useProfileStore(s => s.user_id)
   const uploadAndRefresh = useTeachersStore(s => s.uploadAndRefresh)
   const teacherLogin = acronym ? `${SAMPLE[0]}@${acronym}` : ''
   const loginRows = [
@@ -245,7 +250,8 @@ export default function TeachersEmpty({ onUploaded, teacherCount, onShowList }) 
         // Staying on this screen is the point here — jumping straight to
         // the list wouldn't tell the admin what this upload actually
         // changed for a roster that already existed.
-        setSuccessMessage(summarizeUpload(previousCount, useTeachersStore.getState().teachers.length, counts))
+        const newCount = useTeachersStore.getState().teachers.filter(t => t.user_id !== selfUserId).length
+        setSuccessMessage(summarizeUpload(previousCount, newCount, counts))
       }
     } catch (err) {
       setUploadError(err.message || FORMAT_ERROR)
