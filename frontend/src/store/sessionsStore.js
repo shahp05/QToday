@@ -3,50 +3,68 @@ import { persist } from 'zustand/middleware'
 import { fetchSessions, scheduleNextSession } from '../services/sessionsService'
 import { useSubjectsTaughtStore } from './subjectsTaughtStore'
 
+// Cache key every session-cached store (students, and eventually teachers/
+// subjects — see getActiveSessionKey below) uses for "the customer's live
+// current session". Stable across a cutover — when a new session becomes
+// current, this key's meaning shifts with it — rather than tied to
+// whichever session_id happens to be current at any given moment. Lets
+// every store share one cache slot for "current" regardless of how a
+// caller asked for it (omitted sessionId, explicit null, or the current
+// session's own literal id all resolve here).
+export const CURRENT_SESSION_KEY = 'current'
+
 export const useSessionsStore = create(
   persist(
     (set, get) => ({
-      sessions: [], // [{session_id, label, start_date, is_current}], most recent first — past + current only
-      futureSession: null, // {session_id, label, start_date} | null — a pending, not-yet-live session
+      // Every one of this customer's sessions — past, current, and the one
+      // allowed future session — merged into a single list, most recent
+      // start_date first (current sorts wherever its date puts it; future
+      // is always the newest by definition). Each row carries is_current/
+      // is_future (a row is "past" iff neither is true) plus start_date/
+      // label, so the dropdown can render and order correctly without a
+      // second lookup.
+      sessions: [],
       hasLegacyData: false,
       status: 'idle', // idle | loading | loaded | error
       error: null,
       scheduling: false,
       scheduleError: null,
 
-      // Which session every session-aware page (Students, and eventually
-      // Teachers/Subjects) is browsing/uploading/logging against — 'current'
-      // | 'future' for now (past-session browsing is a later step: it needs
-      // a relaxed, read-only session validator on the backend before any
-      // page can safely accept a past session_id here). Site-wide on
-      // purpose, not Students-page-local — a single selection is what makes
-      // "was this upload meant for the current or the new session?"
-      // unambiguous across every page. Persisted (see the persist() config
-      // below) so a refresh doesn't silently drop the user back onto the
-      // current session without telling them.
-      activeSessionTarget: 'current',
+      // The real session_id every session-aware page is browsing/
+      // uploading/logging against, site-wide — null only before sessions
+      // have ever loaded. Persisted (see the persist() config below) so a
+      // refresh doesn't silently drop the user back onto the current
+      // session without telling them.
+      activeSessionId: null,
 
       fetchSessions: async (force = false) => {
         if (!force && (get().status === 'loaded' || get().status === 'loading')) return
         set({ status: 'loading', error: null })
         try {
           const data = await fetchSessions()
+          const sessions = [
+            ...data.sessions.map(s => ({ ...s, is_future: false })),
+            ...(data.future_session ? [{ ...data.future_session, is_current: false, is_future: true }] : []),
+          ]
+          const persisted = get().activeSessionId
+          const stillValid = persisted != null && sessions.some(s => s.session_id === persisted)
+          const current = sessions.find(s => s.is_current)
           set({
-            sessions: data.sessions,
-            futureSession: data.future_session,
+            sessions,
             hasLegacyData: data.has_legacy_data,
             status: 'loaded',
-            // A persisted 'future' selection can't linger once there's
-            // nothing to view under it (cutover happened, or nothing was
-            // ever scheduled) — falls back to 'current' only in that case.
-            activeSessionTarget: data.future_session ? get().activeSessionTarget : 'current',
+            // A persisted selection can't linger once there's nothing left
+            // for it to point at (cutover happened, nothing was ever
+            // scheduled, or a past session no longer exists) — falls back
+            // to current, the documented default on login, only then.
+            activeSessionId: stillValid ? persisted : (current?.session_id ?? null),
           })
         } catch (err) {
           set({ status: 'error', error: err.message })
         }
       },
 
-      setActiveSessionTarget: (target) => set({ activeSessionTarget: target }),
+      setActiveSessionId: (sessionId) => set({ activeSessionId: sessionId }),
 
       // Schedules (or reschedules) the one allowed future session. If the date
       // given is today or earlier, the backend cuts over immediately in the
@@ -72,10 +90,9 @@ export const useSessionsStore = create(
 
       // Called on logout — a different customer signing in on the same
       // browser must never inherit a stale fetched session list, or a
-      // stale 'future' selection, from whoever was signed in before.
+      // stale selection, from whoever was signed in before.
       clearSessions: () => set({
-        sessions: [], futureSession: null, hasLegacyData: false,
-        status: 'idle', error: null, activeSessionTarget: 'current',
+        sessions: [], hasLegacyData: false, status: 'idle', error: null, activeSessionId: null,
       }),
     }),
     {
@@ -83,7 +100,25 @@ export const useSessionsStore = create(
       // Only the user's own selection needs to survive a refresh — the
       // fetched session list/status should always come fresh from the
       // server, never stale localStorage data.
-      partialize: (state) => ({ activeSessionTarget: state.activeSessionTarget }),
+      partialize: (state) => ({ activeSessionId: state.activeSessionId }),
     }
   )
 )
+
+// The currently active session's own record (is_current/is_future/
+// start_date/label), or null before sessions have loaded or once a
+// persisted selection has gone stale.
+export function getActiveSession(state) {
+  return state.sessions.find(s => s.session_id === state.activeSessionId) ?? null
+}
+
+// The cache key every session-cached store should read/write for
+// whatever's currently active — CURRENT_SESSION_KEY for the live session,
+// the real session_id for a past or future one. This is the one place
+// that knows how to translate "which session is selected" into "which
+// cache slot that means" — every store built on this pattern imports it
+// instead of re-deriving is_current itself.
+export function getActiveSessionKey(state) {
+  const active = getActiveSession(state)
+  return active?.is_current ? CURRENT_SESSION_KEY : state.activeSessionId
+}

@@ -5,8 +5,7 @@ import { useStudentsStore } from '../../store/studentsStore'
 import { useStudentGradesStore } from '../../store/studentGradesStore'
 import { useStudentDetailProgressStore } from '../../store/studentDetailProgressStore'
 import { useStudentsListFilterStore } from '../../store/studentsListFilterStore'
-import { useSessionsStore } from '../../store/sessionsStore'
-import { useFutureRosterStore } from '../../store/futureRosterStore'
+import { CURRENT_SESSION_KEY, getActiveSession, useSessionsStore } from '../../store/sessionsStore'
 import { usePageView } from '../../hooks/usePageView'
 import PageLoading from '../../components/PageLoading'
 import StudentsAwaitingUpload from './StudentsAwaitingUpload'
@@ -17,30 +16,42 @@ export default function StudentsPage() {
   const navigate = useNavigate()
   usePageView('students') // every page-header page names itself in the URL
   const isSchoolAdmin = useProfileStore(s => s.is_school_admin)
-  const studentsStatus = useStudentsStore(s => s.status)
-  // NOT useStudentsStore's raw students.length — that's every active
-  // account at the school regardless of session, so it stays non-zero
-  // across a cutover even when nobody's been uploaded into the new
-  // session yet. studentGrades is already scoped to the current session
-  // (get_my_students' default, session-filtered branch), and every active
-  // student has at most one row in it — so its length is exactly "how many
-  // students actually have a place in the current session," matching what
-  // StudentsList would show.
-  const studentCount = useStudentGradesStore(s => s.studentGrades.length)
+  // The top-level "does this school have any current students at all" gate
+  // is always about the LIVE current session, regardless of what the left
+  // nav's session picker happens to be browsing — that's a separate,
+  // page-internal concern handled below via StudentsList.
+  const studentsStatus = useStudentsStore(s => s.bySession[CURRENT_SESSION_KEY]?.status ?? 'idle')
+  // NOT the raw students list length — that's every active account at the
+  // school regardless of session, so it stays non-zero across a cutover
+  // even when nobody's been uploaded into the new session yet. studentGrades
+  // is already scoped to the current session (get_my_students' default,
+  // session-filtered branch), and every active student has at most one row
+  // in it — so its length is exactly "how many students actually have a
+  // place in the current session," matching what StudentsList would show.
+  const studentCount = useStudentGradesStore(s => (s.bySession[CURRENT_SESSION_KEY] ?? []).length)
   const ensureStudentProgressLoaded = useStudentDetailProgressStore(s => s.ensureLoaded)
   const [showUpload, setShowUpload] = useState(false)
-  const futureSession = useSessionsStore(s => s.futureSession)
-  const fetchFutureRoster = useFutureRosterStore(s => s.fetchFutureRoster)
+  const fetchStudents = useStudentsStore(s => s.fetchStudents)
+  const activeSessionId = useSessionsStore(s => s.activeSessionId)
+  const activeSession = useSessionsStore(getActiveSession)
+  // A past session is always read-only — uploading must never target
+  // history, per the session picker's whole point (see LeftNav). The
+  // upload flow only ever gets offered for current/future below.
+  const isViewingPastSession = activeSession != null && !activeSession.is_current && !activeSession.is_future
 
   // Kept fetched here, not inside StudentsEmpty — StudentsEmpty doesn't
   // mount at all when the current roster is non-empty, so an eager fetch
   // there would miss that (common) path. This is the one component always
   // mounted regardless of which sub-view renders, so the "Students N"
-  // count for the future session is ready before the admin ever opens
-  // the dropdown.
+  // count for whichever non-current session is selected is ready before
+  // the admin ever opens the dropdown. fetchStudents itself resolves
+  // whether activeSessionId is actually current (normalizing to the same
+  // cache slot Dashboard's eager fetch already populated, so this is a
+  // no-op there) and whether the signed-in role is even allowed to browse
+  // a different one.
   useEffect(() => {
-    if (futureSession) fetchFutureRoster(futureSession.session_id)
-  }, [futureSession, fetchFutureRoster])
+    fetchStudents(activeSessionId)
+  }, [activeSessionId, fetchStudents])
   const [loadingChip, setLoadingChip] = useState(null) // { studentId, subjectId } | null
   // Lifted to a store (not local state) so the teacher's grade/section
   // filter survives navigating to a student's detail (a real route now,
@@ -87,7 +98,7 @@ export default function StudentsPage() {
   if (studentCount > 0) {
     return (
       <StudentsList
-        onUploadNew={() => setShowUpload(true)}
+        onUploadNew={isViewingPastSession ? undefined : () => setShowUpload(true)}
         onBack={() => navigate(-1)}
         onSubjectClick={openSubject}
         loadingChip={loadingChip}

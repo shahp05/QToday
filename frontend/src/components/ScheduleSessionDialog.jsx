@@ -14,7 +14,7 @@ function today() {
 
 export default function ScheduleSessionDialog({ open, onClose, onScheduled }) {
   const [date, setDate] = useState(today)
-  const futureSession = useSessionsStore(s => s.futureSession)
+  const futureSession = useSessionsStore(s => s.sessions.find(sess => sess.is_future))
   const scheduling = useSessionsStore(s => s.scheduling)
   const scheduleError = useSessionsStore(s => s.scheduleError)
   const clearScheduleError = useSessionsStore(s => s.clearScheduleError)

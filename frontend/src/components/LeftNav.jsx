@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useProfileStore } from '../store/profileStore'
-import { useSessionsStore } from '../store/sessionsStore'
+import { CURRENT_SESSION_KEY, useSessionsStore } from '../store/sessionsStore'
 import { useStudentsStore } from '../store/studentsStore'
-import { useFutureRosterStore } from '../store/futureRosterStore'
 import { useTeachersStore } from '../store/teachersStore'
 import { useSubjectsTaughtStore } from '../store/subjectsTaughtStore'
 import { useQuizProgressStore } from '../store/quizProgressStore'
@@ -75,7 +74,6 @@ export default function LeftNav() {
   const profile = useProfileStore()
   const clearProfile = useProfileStore(s => s.clearProfile)
   const clearStudents = useStudentsStore(s => s.clearStudents)
-  const clearFutureRoster = useFutureRosterStore(s => s.clearFutureRoster)
   const clearTeachers = useTeachersStore(s => s.clearTeachers)
   const clearSubjectsTaught = useSubjectsTaughtStore(s => s.clearSubjectsTaught)
   const clearQuizProgress = useQuizProgressStore(s => s.clearQuizProgress)
@@ -84,7 +82,7 @@ export default function LeftNav() {
   const clearSessions = useSessionsStore(s => s.clearSessions)
   const resetQuoteAutoAdvance = useDashboardQuoteStore(s => s.reset)
   const clearStudentsListFilter = useStudentsListFilterStore(s => s.clear)
-  const studentsStatus = useStudentsStore(s => s.status)
+  const studentsStatus = useStudentsStore(s => s.bySession[CURRENT_SESSION_KEY]?.status ?? 'idle')
   const teachersStatus = useTeachersStore(s => s.status)
   const subjectsStatus = useSubjectsTaughtStore(s => s.status)
   const navigate = useNavigate()
@@ -93,27 +91,31 @@ export default function LeftNav() {
   // Single site-wide session picker — replaces the old per-page "Schedule
   // Next Session" button and Students' own current/future toggle, both of
   // which only ever affected that one page. Every session-aware page reads
-  // sessionsStore.activeSessionTarget directly, so switching here is what
-  // makes "was this upload meant for the current or the new session?"
-  // unambiguous everywhere at once, not just wherever the control happened
-  // to live. Sys-admin only for now — they're the only role who can
-  // schedule/upload into a session; read-only browsing of past sessions
-  // for every role is a later step.
-  const futureSession = useSessionsStore(s => s.futureSession)
-  const currentSessionLabel = useSessionsStore(s => s.sessions.find(sess => sess.is_current)?.label)
-  const activeSessionTarget = useSessionsStore(s => s.activeSessionTarget)
-  const setActiveSessionTarget = useSessionsStore(s => s.setActiveSessionTarget)
+  // sessionsStore.activeSessionId directly, so switching here is what makes
+  // "was this upload meant for the current or the new session?" unambiguous
+  // everywhere at once, not just wherever the control happened to live.
+  // Includes past sessions (read-only browsing) once they exist — sys-admin
+  // only for now, though; opening this up to every role is a separate,
+  // later decision, not just a matter of removing this gate.
+  const sessions = useSessionsStore(s => s.sessions)
+  const currentSession = sessions.find(sess => sess.is_current)
+  const futureSession = sessions.find(sess => sess.is_future)
+  // Already most-recent-first from the backend — reverse chronology is
+  // exactly the order the dropdown wants past sessions in.
+  const pastSessions = sessions.filter(sess => !sess.is_current && !sess.is_future)
+  const activeSessionId = useSessionsStore(s => s.activeSessionId)
+  const setActiveSessionId = useSessionsStore(s => s.setActiveSessionId)
   const [showSessionDialog, setShowSessionDialog] = useState(false)
 
-  // Picking "future" before one has ever been scheduled opens the dialog
-  // instead of switching to nothing — there's no future session yet to
-  // switch the view to.
-  function handleSessionChange(target) {
-    if (target === 'future' && !futureSession) {
+  // Picking "New session" before one has ever been scheduled opens the
+  // dialog instead of switching to nothing — there's no future session yet
+  // to switch the view to.
+  function handleSessionChange(sessionId) {
+    if (sessionId === 'schedule-new') {
       setShowSessionDialog(true)
       return
     }
-    setActiveSessionTarget(target)
+    setActiveSessionId(sessionId)
   }
 
   const isLoadingById = {
@@ -143,7 +145,6 @@ export default function LeftNav() {
   function handleLogout() {
     clearProfile()
     clearStudents()
-    clearFutureRoster()
     clearTeachers()
     clearSubjectsTaught()
     clearQuizProgress()
@@ -185,11 +186,15 @@ export default function LeftNav() {
             <span className="leftnav-info-label">Session</span>
             <Dropdown
               className="leftnav-session-dropdown"
-              value={activeSessionTarget}
+              value={activeSessionId}
               onChange={handleSessionChange}
+              // Current always the default/first, then the pending future
+              // session (or the "New session" placeholder to schedule
+              // one), then past sessions in reverse chronology.
               options={[
-                { key: 'current', label: currentSessionLabel || 'Current' },
-                { key: 'future', label: futureSession ? futureSession.label : 'New session' },
+                { key: currentSession?.session_id ?? 'current', label: currentSession?.label || 'Current' },
+                { key: futureSession ? futureSession.session_id : 'schedule-new', label: futureSession ? futureSession.label : 'New session' },
+                ...pastSessions.map(sess => ({ key: sess.session_id, label: sess.label })),
               ]}
             />
           </div>
@@ -205,7 +210,10 @@ export default function LeftNav() {
       <ScheduleSessionDialog
         open={showSessionDialog}
         onClose={() => setShowSessionDialog(false)}
-        onScheduled={() => setActiveSessionTarget('future')}
+        onScheduled={() => {
+          const fut = useSessionsStore.getState().sessions.find(sess => sess.is_future)
+          if (fut) setActiveSessionId(fut.session_id)
+        }}
       />
 
       <button

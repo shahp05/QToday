@@ -3,8 +3,7 @@ import { useProfileStore } from '../../store/profileStore'
 import { useStudentsStore } from '../../store/studentsStore'
 import { useStudentGradesStore } from '../../store/studentGradesStore'
 import { useStudentParentsStore } from '../../store/studentParentsStore'
-import { useFutureRosterStore } from '../../store/futureRosterStore'
-import { useSessionsStore } from '../../store/sessionsStore'
+import { getActiveSessionKey, useSessionsStore } from '../../store/sessionsStore'
 import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
 import { useClassQuizProgressStore } from '../../store/classQuizProgressStore'
 import { topicSummaryStatus } from '../../lib/topicStatus'
@@ -16,6 +15,12 @@ import PageHeader from '../../components/PageHeader'
 import './StudentsList.css'
 
 const NO_SECTION = '—'
+
+// A stable reference for "no cached data for this session yet" — returning
+// a fresh [] from a zustand selector instead would make React think the
+// store keeps changing on every read (it never sees the same value twice),
+// causing an infinite re-render loop.
+const EMPTY_ARRAY = []
 
 // Same bands/wording as StudentProgressChart's legend (subjects page), plus
 // a 4th 'not played' band that chart doesn't need — kept local rather than
@@ -149,22 +154,15 @@ function ParentsPopover({ emails }) {
 // Groups the flat students/grades/parents slices into grade -> section ->
 // rows, computed here rather than stored, since it's a pure projection of
 // the source stores and would otherwise need to be kept in sync by hand.
-// Reads from the isolated futureRosterStore instead of the shared
-// students/grades/parents stores when browsing the pending future session
-// — see futureRosterStore.js for why this must never overwrite the
-// shared ones (SubjectsPage's grade autocomplete reads them too).
+// Reads whichever session is active from each store's session-keyed cache
+// (see studentsStore.js) — never overwrites the "current" cache slot other
+// pages depend on (SubjectsPage's grade autocomplete reads that slice too),
+// since a non-current session lives under its own key.
 function useGroupedStudents() {
-  const viewingFuture = useSessionsStore(s => s.activeSessionTarget === 'future' && s.futureSession != null)
-  const currentStudents = useStudentsStore(s => s.students)
-  const currentGrades = useStudentGradesStore(s => s.studentGrades)
-  const currentParents = useStudentParentsStore(s => s.parents)
-  const futureStudents = useFutureRosterStore(s => s.students)
-  const futureGrades = useFutureRosterStore(s => s.studentGrades)
-  const futureParents = useFutureRosterStore(s => s.parents)
-
-  const students = viewingFuture ? futureStudents : currentStudents
-  const studentGrades = viewingFuture ? futureGrades : currentGrades
-  const parents = viewingFuture ? futureParents : currentParents
+  const activeKey = useSessionsStore(getActiveSessionKey)
+  const students = useStudentsStore(s => s.bySession[activeKey]?.students ?? EMPTY_ARRAY)
+  const studentGrades = useStudentGradesStore(s => s.bySession[activeKey] ?? EMPTY_ARRAY)
+  const parents = useStudentParentsStore(s => s.bySession[activeKey] ?? EMPTY_ARRAY)
 
   return useMemo(() => {
     const gradeByStudent = new Map(studentGrades.map(g => [g.student_id, g]))
@@ -219,34 +217,31 @@ export default function StudentsList({
   const isStudentViewer = useProfileStore(s => s.is_student)
   const grades = useGroupedStudents()
 
-  // Which session (current vs. the pending future one) is now chosen
-  // site-wide from the left nav, not a page-local toggle — this just reads
-  // it to decide which roster to render.
-  const futureSession = useSessionsStore(s => s.futureSession)
-  const activeSessionTarget = useSessionsStore(s => s.activeSessionTarget)
-  const viewingFuture = activeSessionTarget === 'future' && futureSession != null
-
   // Not fetched here — Dashboard.jsx already kicks this off once per
   // session on /dashboard mount, and this component just reads whatever's
   // in the store (loading/loaded/error handled there, not per-page).
   const subjectsTaught = useSubjectsTaughtStore(s => s.subjects)
   const progressByStudent = useClassQuizProgressStore(s => s.progressByStudent)
   const fetchClassProgress = useClassQuizProgressStore(s => s.fetchClassProgress)
+  // Patches every cached session slice that has this student, so it's
+  // correct no matter which session is currently active — no branching
+  // needed here (see studentsStore.updateStudentPhoto).
   const updateStudentPhoto = useStudentsStore(s => s.updateStudentPhoto)
-  const updateFutureStudentPhoto = useFutureRosterStore(s => s.updateStudentPhoto)
 
   const [photoError, setPhotoError] = useState('')
   // A teacher/admin may set any visible student's photo; a student viewer
   // only ever sees their own single row (students_query_service.py scopes
   // it that way server-side), so this one flag covers every row for them.
+  // Photo upload isn't session data (a person's photo, not a record tied to
+  // one academic year) — it stays enabled even while browsing a past
+  // session, unlike upload/quiz-play, which do write session data.
   const canEditPhoto = isAdmin || isSchoolTeacher || isStudentViewer
 
   async function handlePhotoUpload(studentId, file) {
     const data = isStudentViewer
       ? await uploadMyPhoto(file)
       : await uploadStudentPhoto(studentId, file)
-    if (viewingFuture) updateFutureStudentPhoto(studentId, data.photo_url)
-    else updateStudentPhoto(studentId, data.photo_url)
+    updateStudentPhoto(studentId, data.photo_url)
   }
 
   // Default to the first grade/section once data is available, and re-pick
@@ -313,7 +308,7 @@ export default function StudentsList({
       <PageHeader
         title="Students"
         onBack={onBack}
-        actions={isAdmin && (
+        actions={isAdmin && onUploadNew && (
           <button className="students-list-upload-btn" onClick={onUploadNew}>
             Upload new file
           </button>

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useStudentGradesStore } from '../../store/studentGradesStore'
+import { CURRENT_SESSION_KEY } from '../../store/sessionsStore'
 import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
 import { useTopicCatalogStore } from '../../store/topicCatalogStore'
 import { useProfileStore } from '../../store/profileStore'
@@ -10,6 +11,12 @@ import Combobox from '../../components/Combobox'
 import './SubjectsPage.css'
 
 const MIN_GENERATE_MS = 3000
+
+// A stable reference for "no cached grades for this session yet" —
+// returning a fresh [] from a zustand selector instead would make React
+// think the store keeps changing on every read, causing an infinite
+// re-render loop.
+const EMPTY_ARRAY = []
 
 function IconSpinner() {
   return (
@@ -117,7 +124,10 @@ export default function SubjectsPage({ onShowList, onGenerated, logDate }) {
   const [topicShaking, shakeTopic] = useShake()
   const [gradeShaking, shakeGrade] = useShake()
 
-  const studentGrades = useStudentGradesStore(s => s.studentGrades)
+  // Always the live current session's grades — logging what was taught
+  // today must never be influenced by whatever session the left nav's
+  // picker happens to be browsing elsewhere.
+  const studentGrades = useStudentGradesStore(s => s.bySession[CURRENT_SESSION_KEY] ?? EMPTY_ARRAY)
   const customerAcronym = useProfileStore(s => s.customer_acronym)
 
   const availableGrades = [...new Set(

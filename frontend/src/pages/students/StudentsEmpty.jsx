@@ -3,8 +3,7 @@ import * as XLSX from 'xlsx'
 import { useProfileStore } from '../../store/profileStore'
 import { useStudentsStore } from '../../store/studentsStore'
 import { useStudentGradesStore } from '../../store/studentGradesStore'
-import { useFutureRosterStore } from '../../store/futureRosterStore'
-import { useSessionsStore } from '../../store/sessionsStore'
+import { CURRENT_SESSION_KEY, getActiveSession, useSessionsStore } from '../../store/sessionsStore'
 import { resolveApiError } from '../../lib/api'
 import { ErrorCode } from '../../errors/errorCodes'
 import Dropdown from '../../components/Dropdown'
@@ -198,19 +197,25 @@ function summarizeUpload(previousCount, newCount, counts) {
 export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) {
   const acronym = useProfileStore(s => s.customer_acronym)
   const uploadAndRefresh = useStudentsStore(s => s.uploadAndRefresh)
-  const futureSession = useSessionsStore(s => s.futureSession)
+  const futureSession = useSessionsStore(s => s.sessions.find(sess => sess.is_future))
   const currentSession = useSessionsStore(s => s.sessions.find(sess => sess.is_current))
-  // 'current' | 'future' — the dropdown below only renders (and only ever
-  // becomes 'future') once a future session exists; shared with StudentsList
-  // so the two stay in sync, and doubles as the upload target — uploading
-  // always writes into whichever session is currently being viewed.
-  const uploadTarget = useSessionsStore(s => s.activeSessionTarget)
-  const setUploadTarget = useSessionsStore(s => s.setActiveSessionTarget)
+  // 'current' | 'future' — this screen only ever uploads into one of those
+  // two, never a past session (uploading must never target history). The
+  // shared site-wide selection can be a past session (browsed read-only
+  // elsewhere), which this screen has no use for — clamped to 'current'
+  // here so its own dropdown/upload target never lands on it.
+  const activeSession = useSessionsStore(getActiveSession)
+  const uploadTarget = activeSession?.is_future ? 'future' : 'current'
+  const setActiveSessionId = useSessionsStore(s => s.setActiveSessionId)
+  function setUploadTarget(target) {
+    const session = target === 'future' ? futureSession : currentSession
+    if (session) setActiveSessionId(session.session_id)
+  }
   // studentGrades.length, not students.length — the latter is every active
   // account at the school regardless of session (see StudentsPage.jsx's
   // studentCount comment); studentGrades is the future session's actual
   // strictly-scoped roster.
-  const futureRosterCount = useFutureRosterStore(s => s.studentGrades.length)
+  const futureRosterCount = useStudentGradesStore(s => (s.bySession[futureSession?.session_id] ?? []).length)
   const viewedCount = uploadTarget === 'future' && futureSession ? futureRosterCount : studentCount
 
   const studentLogin = acronym ? `${SAMPLE[0]}@${acronym}` : ''
@@ -267,23 +272,18 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
       setError(null)
       const previousCount = viewedCount
       const targetSessionId = uploadTarget === 'future' && futureSession ? futureSession.session_id : null
+      // uploadAndRefresh already refetches exactly the session written to
+      // (see studentsStore.js) and caches it under the matching key, so
+      // there's nothing further to refresh here.
       const counts = await uploadAndRefresh(result.rows, targetSessionId)
-      if (targetSessionId) {
-        // Refresh the isolated future-roster view too — the upload just
-        // changed it, and it's never touched by uploadAndRefresh (which
-        // only refetches the shared "current roster" store).
-        await useFutureRosterStore.getState().fetchFutureRoster(targetSessionId, true)
-      }
-      const newCount = targetSessionId
-        ? useFutureRosterStore.getState().studentGrades.length
-        : useStudentGradesStore.getState().studentGrades.length
+      const newCount = (useStudentGradesStore.getState().bySession[targetSessionId ?? CURRENT_SESSION_KEY] ?? []).length
       if (previousCount === 0) {
         // Covers both a brand new customer's current-session upload AND a
         // future session's very first roster upload — either way, the
         // viewed target had nothing in it before this upload, so jumping
         // to the list is the right move. StudentsList reads the same
-        // activeSessionTarget this screen does, so it lands on whichever
-        // session (current or future) was actually just uploaded.
+        // sessionsStore selection this screen does, so it lands on
+        // whichever session (current or future) was actually just uploaded.
         onUploaded?.()
       } else {
         // Staying on this screen is the point here — jumping straight to

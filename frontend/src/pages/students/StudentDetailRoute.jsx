@@ -1,5 +1,6 @@
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { useStudentsStore } from '../../store/studentsStore'
+import { CURRENT_SESSION_KEY } from '../../store/sessionsStore'
 import PageHeader from '../../components/PageHeader'
 import PageLoading from '../../components/PageLoading'
 import { useStudentRow } from './useStudentRow'
@@ -14,7 +15,7 @@ export default function StudentDetailRoute() {
   const { studentId } = useParams()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const studentsStatus = useStudentsStore(s => s.status)
+  const studentsStatus = useStudentsStore(s => s.bySession[CURRENT_SESSION_KEY]?.status ?? 'idle')
   const student = useStudentRow(studentId)
 
   if (!student) {

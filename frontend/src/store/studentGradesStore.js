@@ -5,17 +5,16 @@ import { create } from 'zustand'
 // most filtering pivots on grade/topic first rather than "which student",
 // so keeping grades flat and independent avoids unpacking nested arrays
 // for every grade- or quiz-first query.
-export const useStudentGradesStore = create((set, get) => ({
-  studentGrades: [],
+//
+// Cached per session (see sessionsStore's CURRENT_SESSION_KEY/
+// getActiveSessionKey) — populated only by studentsStore.fetchStudents(),
+// the single place that ever calls GET /students/mine, never fetched
+// independently here.
+export const useStudentGradesStore = create((set) => ({
+  bySession: {}, // key -> studentGrades[]
 
-  setGrades: (studentGrades) => set({ studentGrades }),
-  clearGrades: () => set({ studentGrades: [] }),
+  setGrades: (key, studentGrades) =>
+    set(state => ({ bySession: { ...state.bySession, [key]: studentGrades } })),
 
-  getGradeForStudent: (studentId) =>
-    get().studentGrades.find(g => g.student_id === studentId && g.is_active) ?? null,
-
-  getStudentIdsInGrade: (gradeName, section) =>
-    get().studentGrades
-      .filter(g => g.is_active && g.grade_name === gradeName && (section === undefined || g.section === section))
-      .map(g => g.student_id),
+  clearGrades: () => set({ bySession: {} }),
 }))
