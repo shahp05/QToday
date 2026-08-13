@@ -5,7 +5,7 @@ from db.database import get_db
 from errors.app_error import AppError
 from errors.error_codes import ErrorCode
 from schemas.qa import QARequest, QAResponse, QAUpdateRequest
-from services.auth_service import get_current_user
+from services.auth_service import get_current_user, is_staff
 from services.qa_service import get_or_generate_qa, update_qa
 
 router = APIRouter(prefix="/api/qa", tags=["qa"])
@@ -17,7 +17,7 @@ async def fetch_qa(
     claims: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if not claims.get("is_school_admin"):
+    if not is_staff(claims):
         raise AppError(ErrorCode.AUTH_FORBIDDEN)
     customer_id = claims.get("customer_id")
     if not customer_id:
@@ -42,7 +42,7 @@ def patch_qa(
     claims: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if not claims.get("is_school_admin"):
+    if not is_staff(claims):
         raise AppError(ErrorCode.AUTH_FORBIDDEN)
     customer_id = claims.get("customer_id")
     if not customer_id:

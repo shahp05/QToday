@@ -10,6 +10,7 @@ from config.app_config import get_setting
 from db.models import QA, Quiz, QuizChallenge, QuizScore
 from errors.app_error import AppError
 from errors.error_codes import ErrorCode
+from services.auth_service import is_staff
 from services.quiz_scoring_service import evaluate_challenge, resolve_grading_context
 from services.session_service import get_current_session_id
 
@@ -18,13 +19,11 @@ def resolve_authorized_student_id(
     db: Session, *, claims: dict, requested_student_id: int | None,
 ) -> int:
     """A student can only ever see their own data — requested_student_id is
-    optional for them (defaults to self) but must match if given. A school
-    admin/teacher (same role in this app, see routers/teach_logs.py) or
-    system admin can look up any student, but only within their own school
-    (system admin: any school) — this is what makes the endpoint reusable
-    for the later "teacher views a student/grade" feature without changing
-    its shape. Parent access is deferred (see teach_log_service._scope_clause
-    for the same note on the read side)."""
+    optional for them (defaults to self) but must match if given. Either of
+    a school's own staff (is_staff — sys admin or teacher) or a system admin
+    can look up any student, but only within their own school (system
+    admin: any school). Parent access is deferred (see
+    teach_log_service._scope_clause for the same note on the read side)."""
     if claims.get("is_student"):
         own = db.execute(
             text("SELECT student_id FROM students WHERE user_id = :uid AND is_active = TRUE"),
@@ -36,7 +35,7 @@ def resolve_authorized_student_id(
             raise AppError(ErrorCode.AUTH_FORBIDDEN)
         return own.student_id
 
-    if claims.get("is_school_admin") or claims.get("is_system_admin"):
+    if is_staff(claims) or claims.get("is_system_admin"):
         if requested_student_id is None:
             raise AppError(ErrorCode.VALIDATION_ERROR)
         if claims.get("is_system_admin"):
@@ -64,10 +63,11 @@ def resolve_authorized_student_ids(
 ) -> list[int]:
     """Batched sibling of resolve_authorized_student_id for the teacher
     class-status view (Students list) — there's no batch use case for a
-    student looking up their own data, so only a school admin (any student
-    at their own school) or system admin (any student at all) may call this.
-    Silently drops any id that doesn't resolve rather than erroring, since
-    the caller only ever passes ids it already fetched from /students/mine."""
+    student looking up their own data, so only a school's own staff
+    (is_staff — any student at their own school) or system admin (any
+    student at all) may call this. Silently drops any id that doesn't
+    resolve rather than erroring, since the caller only ever passes ids it
+    already fetched from /students/mine."""
     if not requested_student_ids:
         return []
     if claims.get("is_system_admin"):
@@ -75,7 +75,7 @@ def resolve_authorized_student_ids(
             text("SELECT student_id FROM students WHERE student_id = ANY(:sids) AND is_active = TRUE"),
             {"sids": requested_student_ids},
         ).fetchall()
-    elif claims.get("is_school_admin"):
+    elif is_staff(claims):
         rows = db.execute(
             text("""
                 SELECT student_id FROM students

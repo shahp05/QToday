@@ -9,6 +9,22 @@ from services.jwt_service import TokenError, decode_access_token
 from services.password_service import verify_password
 
 
+def is_staff(claims: dict) -> bool:
+    """True for either of a customer's two teaching-staff roles — the sys
+    admin (is_school_admin, is_sysadm in the db) and an ordinary teacher
+    (is_school_teacher, is_adm). Both are "teachers" in every user-facing
+    sense (log what they taught, generate/edit/discard QA, view the topic
+    catalog); the sys admin's is_school_admin claim additionally unlocks
+    admin-only actions layered on top (xlsx upload, teach-log visibility
+    across every teacher rather than just their own, super-admin
+    assignment, and eventually billing/account management) — those stay
+    gated on is_school_admin alone, not this helper. Use this wherever a
+    check would otherwise read `is_school_admin` but the action is really
+    "any staff member," not "the admin specifically" — qa.py and
+    teach_logs.py's topic-catalog endpoint used to get this wrong."""
+    return bool(claims.get("is_school_admin") or claims.get("is_school_teacher"))
+
+
 def login(db: Session, login_key: str, password: str) -> int:
     """Verify credentials and return the user_id. Callers fetch the full
     profile separately via profile_service.get_profile — this function's

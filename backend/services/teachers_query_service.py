@@ -3,13 +3,17 @@ from sqlalchemy.orm import Session
 
 
 def get_my_teachers(db: Session, user_id: int) -> dict:
-    """Only a school admin (is_sysadm + customer_id set) can see the
-    school's teacher roster — mirrors students_query_service.get_my_students."""
+    """Any active, customer-attached user (sys admin, teacher, student, or
+    parent) can see the school's teacher roster — it's directory
+    information, not sensitive to any one role. A system admin (no
+    customer_id) gets nothing, same as before. Write actions on this data
+    (upload, super-admin assignment) are gated separately and far more
+    strictly, in routers/teachers.py — this is read-only."""
     user = db.execute(
-        text("SELECT customer_id, is_sysadm FROM users WHERE user_id = :uid AND is_active = TRUE"),
+        text("SELECT customer_id FROM users WHERE user_id = :uid AND is_active = TRUE"),
         {"uid": user_id},
     ).fetchone()
-    if user is None or not user.is_sysadm or user.customer_id is None:
+    if user is None or user.customer_id is None:
         return {"teachers": []}
 
     rows = db.execute(

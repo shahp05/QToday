@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from db.database import get_db
 from errors.app_error import AppError
 from errors.error_codes import ErrorCode
-from services.auth_service import get_current_user
+from services.auth_service import get_current_user, is_staff
 from services.session_service import validate_session_readable
 from services.teach_log_service import get_topic_catalog, get_topic_grade_qa, list_subjects_taught
 
@@ -73,9 +73,7 @@ def get_topic_catalog_endpoint(
     claims: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # "Teacher" and "school admin" are the same role in this app (see
-    # POST /api/qa) — this gate matches that, not a separate teacher claim.
-    if not claims.get("is_school_admin"):
+    if not is_staff(claims):
         raise AppError(ErrorCode.AUTH_FORBIDDEN)
     customer_id = claims.get("customer_id")
     if not customer_id:

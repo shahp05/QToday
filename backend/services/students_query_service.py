@@ -16,11 +16,13 @@ def get_my_students(db: Session, user_id: int, session_id: int | None = None) ->
     """Branches on the caller's role (re-checked fresh from the DB, not the
     JWT) to decide which students they may see:
       - parent: their active wards, regardless of which school each is at
-      - school admin (is_sysadm + customer_id set): the whole school roster
+      - a school's own staff (is_sysadm or is_adm — sys admin or teacher —
+        + customer_id set): the whole school roster. Not narrowed to "just
+        this teacher's classes" — that needs a subjects/topics-authored
+        table that doesn't exist yet, so for now every staff member of a
+        school sees the same full roster, same as the sys admin always has.
       - student: only their own record
-      - anything else (teacher/is_adm, or a platform-level admin) -> none yet.
-        The teacher case needs a subjects/topics-authored table that
-        doesn't exist yet — deferred.
+      - anything else (a platform-level admin) -> none.
 
     session_id, when given (routers/students.py only ever passes this for
     an is_school_admin caller, pre-validated against that customer's real
@@ -45,7 +47,7 @@ def get_my_students(db: Session, user_id: int, session_id: int | None = None) ->
             ),
             {"uid": user_id},
         ).fetchall()
-    elif user.is_sysadm and user.customer_id is not None:
+    elif (user.is_sysadm or user.is_adm) and user.customer_id is not None:
         rows = db.execute(
             text(
                 f"SELECT {_STUDENT_COLUMNS} {_STUDENT_JOINS} "
