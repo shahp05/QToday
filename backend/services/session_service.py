@@ -88,10 +88,13 @@ def ensure_session_bootstrapped(db: Session, customer_id: int) -> int:
 
 def validate_session_target(db: Session, customer_id: int, session_id: int) -> None:
     """Raises SESSION_TARGET_INVALID unless session_id is exactly this
-    customer's current session or their one pending future session —
-    shared by every caller that lets an admin pick which session an
-    action applies to (student upload, roster viewing), so a stale or
-    another customer's session_id can never be passed through."""
+    customer's current session or their one pending future session — the
+    strict gate for every WRITE that lets an admin pick which session an
+    action applies to (student/teacher upload, quiz submission, logging a
+    subject), so a stale, past, or another customer's session_id can never
+    be written into. See validate_session_readable for the read-only
+    sibling — deliberately kept separate rather than relaxed, since a write
+    landing on a past session by mistake would corrupt closed-out history."""
     if session_id == get_current_session_id(db, customer_id):
         return
     future_row = db.execute(
@@ -101,6 +104,24 @@ def validate_session_target(db: Session, customer_id: int, session_id: int) -> N
     if future_row is not None and session_id == future_row.session_id:
         return
     raise AppError(ErrorCode.SESSION_TARGET_INVALID)
+
+
+def validate_session_readable(db: Session, customer_id: int, session_id: int) -> None:
+    """Raises SESSION_TARGET_INVALID unless session_id belongs to this
+    customer at all — current, the one pending future session, or any past
+    session. Deliberately more permissive than validate_session_target:
+    browsing a past session's data read-only is safe for any of the
+    customer's own sessions; only writes need the stricter current/future
+    only check."""
+    row = db.execute(
+        text(
+            "SELECT 1 FROM academic_sessions "
+            "WHERE customer_id = :cid AND session_id = :sid AND is_active = TRUE"
+        ),
+        {"cid": customer_id, "sid": session_id},
+    ).fetchone()
+    if row is None:
+        raise AppError(ErrorCode.SESSION_TARGET_INVALID)
 
 
 def _activate_session(db: Session, customer_id: int, session_id: int) -> None:

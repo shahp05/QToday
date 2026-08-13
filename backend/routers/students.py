@@ -7,7 +7,7 @@ from errors.error_codes import ErrorCode
 from jobs.tasks import hash_new_account_passwords_task
 from schemas.students import StudentsUploadRequest
 from services.auth_service import get_current_user
-from services.session_service import validate_session_target
+from services.session_service import validate_session_readable
 from services.students_query_service import get_my_students
 from services.students_upload_service import process_students_upload
 
@@ -20,15 +20,17 @@ def list_my_students(
     claims: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # session_id is an admin-only concept (browsing a specific — possibly
-    # future — session's roster). Any other role passing it is silently
-    # ignored, falling back to the default "current" view — session
-    # selection never applies to a parent/student's own view.
+    # session_id is an admin-only concept (browsing a specific — current,
+    # future, or a past — session's roster). Any other role passing it is
+    # silently ignored, falling back to the default "current" view —
+    # session selection never applies to a parent/student's own view. Read-
+    # only, so it's validated against the permissive readable check (any of
+    # this customer's own sessions), not the strict write-only one.
     if session_id is not None and claims.get("is_school_admin"):
         customer_id = claims.get("customer_id")
         if not customer_id:
             raise AppError(ErrorCode.SCHOOL_NOT_ASSOCIATED)
-        validate_session_target(db, customer_id, session_id)
+        validate_session_readable(db, customer_id, session_id)
         return get_my_students(db, claims["user_id"], session_id=session_id)
     return get_my_students(db, claims["user_id"])
 

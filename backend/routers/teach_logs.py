@@ -5,6 +5,7 @@ from db.database import get_db
 from errors.app_error import AppError
 from errors.error_codes import ErrorCode
 from services.auth_service import get_current_user
+from services.session_service import validate_session_readable
 from services.teach_log_service import get_topic_catalog, get_topic_grade_qa, list_subjects_taught
 
 router = APIRouter(prefix="/api/teach-logs", tags=["teach-logs"])
@@ -16,6 +17,15 @@ def get_subjects_taught(
     claims: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # Every role may browse their own history by session (see sessions.py's
+    # "No admin gate" GET /sessions) — unlike Students/Teachers this isn't
+    # admin-only, just validated so a stale or foreign session_id gets a
+    # clear error instead of silently resolving to an empty result.
+    if session_id is not None:
+        customer_id = claims.get("customer_id")
+        if not customer_id:
+            raise AppError(ErrorCode.SCHOOL_NOT_ASSOCIATED)
+        validate_session_readable(db, customer_id, session_id)
     return list_subjects_taught(
         db,
         customer_id=claims["customer_id"],
@@ -36,6 +46,11 @@ def get_qa_for_topic_grade(
     claims: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    if session_id is not None:
+        customer_id = claims.get("customer_id")
+        if not customer_id:
+            raise AppError(ErrorCode.SCHOOL_NOT_ASSOCIATED)
+        validate_session_readable(db, customer_id, session_id)
     qa_items = get_topic_grade_qa(
         db,
         customer_id=claims["customer_id"],

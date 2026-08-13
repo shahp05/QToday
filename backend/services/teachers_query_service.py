@@ -23,3 +23,26 @@ def get_my_teachers(db: Session, user_id: int) -> dict:
     ).fetchall()
 
     return {"teachers": [dict(row._mapping) for row in rows]}
+
+
+def get_teachers_for_session(db: Session, customer_id: int, session_id: int) -> dict:
+    """Teachers who logged at least one subject in this (past) session,
+    derived from teach_logs rather than the current live roster. Unlike
+    get_my_teachers, this correctly includes someone who has since left
+    (deactivated) and excludes someone who joined afterward — teachers
+    themselves carry no session_id (only teach_logs rows do), so "who
+    taught in session X" can only ever be answered from the log, not from
+    who's an active account today."""
+    rows = db.execute(
+        text(
+            "SELECT DISTINCT u.user_id, u.org_id, u.user_name AS name, u.email_id AS email, "
+            "u.is_sysadm AS is_super_admin, u.file_url AS photo_url "
+            "FROM teach_logs tl "
+            "JOIN users u ON u.user_id = tl.user_id "
+            "WHERE tl.customer_id = :cid AND tl.session_id = :sid AND tl.is_active = TRUE "
+            "ORDER BY name"
+        ),
+        {"cid": customer_id, "sid": session_id},
+    ).fetchall()
+
+    return {"teachers": [dict(row._mapping) for row in rows]}

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from db.database import get_db
@@ -7,7 +7,8 @@ from errors.error_codes import ErrorCode
 from jobs.tasks import hash_new_account_passwords_task
 from schemas.teachers import SetSuperAdminRequest, TeachersUploadRequest
 from services.auth_service import get_current_user
-from services.teachers_query_service import get_my_teachers
+from services.session_service import validate_session_readable
+from services.teachers_query_service import get_my_teachers, get_teachers_for_session
 from services.teachers_role_service import set_super_admin
 from services.teachers_upload_service import process_teachers_upload
 
@@ -16,9 +17,21 @@ router = APIRouter(prefix="/api/teachers", tags=["teachers"])
 
 @router.get("/mine")
 def list_my_teachers(
+    session_id: int | None = Query(None),
     claims: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # session_id is an admin-only concept (browsing who taught in a past
+    # session) — mirrors GET /students/mine. Read-only, so it's derived
+    # from teach_logs (get_teachers_for_session), not the live roster.
+    if session_id is not None:
+        if not claims.get("is_school_admin"):
+            raise AppError(ErrorCode.AUTH_FORBIDDEN)
+        customer_id = claims.get("customer_id")
+        if not customer_id:
+            raise AppError(ErrorCode.SCHOOL_NOT_ASSOCIATED)
+        validate_session_readable(db, customer_id, session_id)
+        return get_teachers_for_session(db, customer_id, session_id)
     return get_my_teachers(db, claims["user_id"])
 
 
