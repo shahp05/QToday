@@ -1,12 +1,18 @@
 import { useState } from 'react'
 import { useProfileStore } from '../../store/profileStore'
 import { useTeachersStore } from '../../store/teachersStore'
+import { CURRENT_SESSION_KEY, getActiveSessionKey, useSessionsStore } from '../../store/sessionsStore'
 import { resolveFileUrl } from '../../lib/api'
 import { uploadMyPhoto } from '../../services/photoService'
 import EditablePhoto from '../../components/EditablePhoto'
 import { Toast } from '../../components/ui/Toast'
 import PageHeader from '../../components/PageHeader'
 import './TeachersList.css'
+
+// A stable reference for "no cached data for this session yet" — returning
+// a fresh [] from a zustand selector instead would make React think the
+// store keeps changing on every read, causing an infinite re-render loop.
+const EMPTY_ARRAY = []
 
 function IconTick() {
   return (
@@ -23,10 +29,15 @@ function IconBoxSpinner() {
 export default function TeachersList({ onUploadNew, onBack }) {
   const isAdmin = useProfileStore(s => s.is_school_admin)
   const myOrgId = useProfileStore(s => s.org_id)
-  const teachers = useTeachersStore(s => s.teachers)
+  const activeKey = useSessionsStore(getActiveSessionKey)
+  const teachers = useTeachersStore(s => s.bySession[activeKey]?.teachers ?? EMPTY_ARRAY)
   const setSuperAdmin = useTeachersStore(s => s.setSuperAdmin)
   const updateTeacherPhoto = useTeachersStore(s => s.updateTeacherPhoto)
   const rows = [...teachers].sort((a, b) => a.name.localeCompare(b.name))
+  // Super-admin status is a live/current-only concept (see the permission
+  // matrix design) — locked for any non-current session, same as upload
+  // being hidden entirely for one.
+  const isViewingCurrent = activeKey === CURRENT_SESSION_KEY
 
   const [pendingOrgId, setPendingOrgId] = useState(null)
   const [error, setError] = useState('')
@@ -54,7 +65,7 @@ export default function TeachersList({ onUploadNew, onBack }) {
       <PageHeader
         title="Teachers"
         onBack={onBack}
-        actions={isAdmin && (
+        actions={isAdmin && onUploadNew && (
           <button className="teachers-list-upload-btn" onClick={onUploadNew}>
             Upload new file
           </button>
@@ -66,7 +77,7 @@ export default function TeachersList({ onUploadNew, onBack }) {
           {rows.map(row => {
             const isSelf = row.org_id === myOrgId
             const isPending = pendingOrgId === row.org_id
-            const locked = !isAdmin || isSelf || isPending
+            const locked = !isAdmin || isSelf || isPending || !isViewingCurrent
             return (
               <div className="teachers-row" key={row.org_id}>
                 <span className="teachers-row-photo">

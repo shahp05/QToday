@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useProfileStore } from '../../store/profileStore'
 import { useTeachersStore } from '../../store/teachersStore'
+import { CURRENT_SESSION_KEY, getActiveSession, useSessionsStore } from '../../store/sessionsStore'
 import { usePageView } from '../../hooks/usePageView'
 import PageLoading from '../../components/PageLoading'
 import TeachersEmpty from './TeachersEmpty'
@@ -10,7 +11,11 @@ import TeachersList from './TeachersList'
 export default function TeachersPage() {
   const navigate = useNavigate()
   usePageView('teachers') // every page-header page names itself in the URL
-  const teachersStatus = useTeachersStore(s => s.status)
+  // The top-level "does this school have any teachers at all" gate is
+  // always about the LIVE current session, regardless of what the left
+  // nav's session picker happens to be browsing — that's TeachersList's
+  // own concern (it reads the active session directly).
+  const teachersStatus = useTeachersStore(s => s.bySession[CURRENT_SESSION_KEY]?.status ?? 'idle')
   // /teachers/mine includes the signed-in admin's own row (is_sysadm counts
   // as a "teacher" server-side — see get_my_teachers) — so on a customer
   // that's never uploaded a real teacher, this would otherwise be 1, not 0,
@@ -18,8 +23,25 @@ export default function TeachersPage() {
   // what makes "no teachers" mean what it visually looks like.
   const selfUserId = useProfileStore(s => s.user_id)
   const isSchoolAdmin = useProfileStore(s => s.is_school_admin)
-  const teacherCount = useTeachersStore(s => s.teachers.filter(t => t.user_id !== selfUserId).length)
+  const teacherCount = useTeachersStore(s =>
+    (s.bySession[CURRENT_SESSION_KEY]?.teachers ?? []).filter(t => t.user_id !== selfUserId).length
+  )
   const [showUpload, setShowUpload] = useState(false)
+  const fetchTeachers = useTeachersStore(s => s.fetchTeachers)
+  const activeSessionId = useSessionsStore(s => s.activeSessionId)
+  const activeSession = useSessionsStore(getActiveSession)
+  // A past session is always read-only — uploading must never target
+  // history (see the permission matrix design).
+  const isViewingPastSession = activeSession != null && !activeSession.is_current && !activeSession.is_future
+
+  // Kept fetched here, not inside TeachersEmpty — TeachersEmpty doesn't
+  // mount at all when the current roster is non-empty, so an eager fetch
+  // there would miss that (common) path. fetchTeachers itself resolves
+  // whether activeSessionId is actually current and whether the signed-in
+  // role is even allowed to browse a different one.
+  useEffect(() => {
+    fetchTeachers(activeSessionId)
+  }, [activeSessionId, fetchTeachers])
 
   // Checked before the loading guard below — TeachersEmpty owns its own
   // loading/spinner state (including while uploadAndRefresh briefly flips
@@ -58,7 +80,7 @@ export default function TeachersPage() {
   }
   return (
     <TeachersList
-      onUploadNew={() => setShowUpload(true)}
+      onUploadNew={isViewingPastSession ? undefined : () => setShowUpload(true)}
       onBack={() => navigate(-1)}
     />
   )

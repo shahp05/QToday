@@ -1,50 +1,90 @@
 import { create } from 'zustand'
 import { fetchMyTeachers, setTeacherSuperAdmin, uploadTeachers } from '../services/teachersService'
+import { useProfileStore } from './profileStore'
+import { CURRENT_SESSION_KEY, useSessionsStore } from './sessionsStore'
 
+// The only place in the app that calls GET /teachers/mine — mirrors
+// studentsStore.js's shape/reasoning exactly: cached per session
+// (bySession[key]) so switching the site-wide session picker never
+// re-fetches data already in hand, and access rights are enforced here
+// once (only a school admin's request for a non-current session is ever
+// actually honored) rather than by every caller remembering the rule.
 export const useTeachersStore = create((set, get) => ({
-  teachers: [],
-  status: 'idle', // idle | loading | loaded | error
-  error: null,
+  bySession: {}, // key -> { teachers: [], status, error }
 
-  fetchTeachers: async () => {
-    set({ status: 'loading', error: null })
+  fetchTeachers: async (sessionId = null, force = false) => {
+    const isSchoolAdmin = useProfileStore.getState().is_school_admin
+    const requestedId = isSchoolAdmin ? sessionId : null
+    const currentId = useSessionsStore.getState().sessions.find(s => s.is_current)?.session_id ?? null
+    const isCurrent = requestedId == null || requestedId === currentId
+    const key = isCurrent ? CURRENT_SESSION_KEY : requestedId
+    const apiSessionId = isCurrent ? null : requestedId
+
+    const existing = get().bySession[key]
+    if (!force && existing && (existing.status === 'loaded' || existing.status === 'loading')) return
+
+    set(state => ({
+      bySession: { ...state.bySession, [key]: { teachers: existing?.teachers ?? [], status: 'loading', error: null } },
+    }))
     try {
-      const data = await fetchMyTeachers()
-      set({ teachers: data.teachers, status: 'loaded' })
+      const data = await fetchMyTeachers(apiSessionId)
+      set(state => ({
+        bySession: { ...state.bySession, [key]: { teachers: data.teachers, status: 'loaded', error: null } },
+      }))
     } catch (err) {
-      set({ status: 'error', error: err.message })
+      set(state => ({
+        bySession: { ...state.bySession, [key]: { ...state.bySession[key], status: 'error', error: err.message } },
+      }))
     }
   },
 
-  uploadAndRefresh: async (rows) => {
-    const counts = await uploadTeachers(rows) // throws on failure — caller handles the error
-    await useTeachersStore.getState().fetchTeachers()
+  // sessionId is omitted for the ordinary case (uploads the current
+  // roster); passed explicitly only when targeting the pending future
+  // session (staged new hires — see teachers_upload_service.py, additive
+  // only, never a past session). Uploading is always admin-only, so the
+  // refresh below always legitimately requests whatever was just written.
+  uploadAndRefresh: async (rows, sessionId) => {
+    const counts = await uploadTeachers(rows, sessionId) // throws on failure — caller handles the error
+    await get().fetchTeachers(sessionId, true)
     return counts
   },
 
+  // Super-admin status is a live/current-only concept (see the permission
+  // matrix design — "who's the school's super admin right now" isn't
+  // something a past session's view should be able to change), so this
+  // only ever touches the current slice.
   setSuperAdmin: async (orgId, isSuperAdmin) => {
     const result = await setTeacherSuperAdmin(orgId, isSuperAdmin) // throws on failure — caller handles the error
-    // Apply the single changed row from the response directly instead of
-    // refetching the whole roster — halves the round trips before the
-    // checkbox (bound to store data) can reflect the new state.
-    set({
-      teachers: get().teachers.map(t =>
-        t.org_id === result.org_id ? { ...t, is_super_admin: result.is_super_admin } : t
-      ),
+    set(state => {
+      const current = state.bySession[CURRENT_SESSION_KEY]
+      if (!current) return state
+      return {
+        bySession: {
+          ...state.bySession,
+          [CURRENT_SESSION_KEY]: {
+            ...current,
+            teachers: current.teachers.map(t =>
+              t.org_id === result.org_id ? { ...t, is_super_admin: result.is_super_admin } : t
+            ),
+          },
+        },
+      }
     })
   },
 
-  // Applies a single row's new photo_url directly instead of refetching the
-  // whole roster — same pattern as setSuperAdmin above.
+  // Patches every cached session slice that happens to include this
+  // teacher — a photo isn't session data, same reasoning as
+  // studentsStore.updateStudentPhoto.
   updateTeacherPhoto: (userId, photoUrl) => {
-    set({
-      teachers: get().teachers.map(t =>
-        t.user_id === userId ? { ...t, photo_url: photoUrl } : t
+    set(state => ({
+      bySession: Object.fromEntries(
+        Object.entries(state.bySession).map(([key, slice]) => [
+          key,
+          { ...slice, teachers: slice.teachers.map(t => t.user_id === userId ? { ...t, photo_url: photoUrl } : t) },
+        ])
       ),
-    })
+    }))
   },
 
-  clearTeachers: () => {
-    set({ teachers: [], status: 'idle', error: null })
-  },
+  clearTeachers: () => set({ bySession: {} }),
 }))

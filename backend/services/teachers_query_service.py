@@ -17,6 +17,10 @@ def get_my_teachers(db: Session, user_id: int) -> dict:
             "SELECT user_id, org_id, user_name AS name, email_id AS email, "
             "is_sysadm AS is_super_admin, file_url AS photo_url "
             "FROM users WHERE customer_id = :cid AND (is_adm = TRUE OR is_sysadm = TRUE) AND is_active = TRUE "
+            # A future-session upload stages new hires with start_date set
+            # to when they actually begin (see teachers_upload_service.py)
+            # — invisible in the live roster until that date arrives.
+            "AND (start_date IS NULL OR start_date <= CURRENT_DATE) "
             "ORDER BY user_name"
         ),
         {"cid": user.customer_id},

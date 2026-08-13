@@ -2,8 +2,10 @@ import { useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { useProfileStore } from '../../store/profileStore'
 import { useTeachersStore } from '../../store/teachersStore'
+import { CURRENT_SESSION_KEY, getActiveSession, useSessionsStore } from '../../store/sessionsStore'
 import { resolveApiError } from '../../lib/api'
 import { ErrorCode } from '../../errors/errorCodes'
+import Dropdown from '../../components/Dropdown'
 import { Toast } from '../../components/ui/Toast'
 import './TeachersEmpty.css'
 
@@ -193,6 +195,25 @@ export default function TeachersEmpty({ onUploaded, teacherCount, onShowList }) 
   // always in the raw refetched count).
   const selfUserId = useProfileStore(s => s.user_id)
   const uploadAndRefresh = useTeachersStore(s => s.uploadAndRefresh)
+  const futureSession = useSessionsStore(s => s.sessions.find(sess => sess.is_future))
+  const currentSession = useSessionsStore(s => s.sessions.find(sess => sess.is_current))
+  // 'current' | 'future' — this screen only ever uploads into one of those
+  // two, never a past session. The shared site-wide selection can be a
+  // past session (browsed read-only elsewhere), which this screen has no
+  // use for — clamped to 'current' here, same pattern as StudentsEmpty.
+  const activeSession = useSessionsStore(getActiveSession)
+  const uploadTarget = activeSession?.is_future ? 'future' : 'current'
+  const setActiveSessionId = useSessionsStore(s => s.setActiveSessionId)
+  function setUploadTarget(target) {
+    const session = target === 'future' ? futureSession : currentSession
+    if (session) setActiveSessionId(session.session_id)
+  }
+  // teachers[].length, not the raw prop — the prop is always the current
+  // session's count (see TeachersPage.jsx); this screen needs whichever
+  // target is actually being viewed, same reasoning as StudentsEmpty's
+  // futureRosterCount/viewedCount.
+  const futureRosterCount = useTeachersStore(s => (s.bySession[futureSession?.session_id]?.teachers ?? []).length)
+  const viewedCount = uploadTarget === 'future' && futureSession ? futureRosterCount : teacherCount
   const teacherLogin = acronym ? `${SAMPLE[0]}@${acronym}` : ''
   const loginRows = [
     [SAMPLE[0], teacherLogin, teacherLogin],
@@ -242,15 +263,24 @@ export default function TeachersEmpty({ onUploaded, teacherCount, onShowList }) 
 
       setUploading(true)
       setError(null)
-      const previousCount = teacherCount
-      const counts = await uploadAndRefresh(result.rows)
+      const previousCount = viewedCount
+      const targetSessionId = uploadTarget === 'future' && futureSession ? futureSession.session_id : null
+      // uploadAndRefresh already refetches exactly the session written to
+      // and caches it under the matching key, so there's nothing further
+      // to refresh here (see teachersStore.js).
+      const counts = await uploadAndRefresh(result.rows, targetSessionId)
+      const newCount = (useTeachersStore.getState().bySession[targetSessionId ?? CURRENT_SESSION_KEY]?.teachers ?? [])
+        .filter(t => t.user_id !== selfUserId).length
       if (previousCount === 0) {
+        // Covers both a brand new customer's current-session upload AND a
+        // future session's first staged hire — either way, the viewed
+        // target had nothing in it before this upload, so jumping to the
+        // list is the right move.
         onUploaded?.()
       } else {
         // Staying on this screen is the point here — jumping straight to
         // the list wouldn't tell the admin what this upload actually
         // changed for a roster that already existed.
-        const newCount = useTeachersStore.getState().teachers.filter(t => t.user_id !== selfUserId).length
         setSuccessMessage(summarizeUpload(previousCount, newCount, counts))
       }
     } catch (err) {
@@ -266,6 +296,12 @@ export default function TeachersEmpty({ onUploaded, teacherCount, onShowList }) 
     handleFile(e.dataTransfer.files[0], 'drop')
   }
 
+  const sessionTargetLabel = uploadTarget === 'future' && futureSession
+    ? `New Academic Session ${futureSession.label}`
+    : currentSession
+      ? `Current Academic Session ${currentSession.label}`
+      : null
+
   return (
     <div className="teachers-empty">
 
@@ -273,6 +309,17 @@ export default function TeachersEmpty({ onUploaded, teacherCount, onShowList }) 
 
       <div className="teachers-empty-header">
         <p className="teachers-empty-label">Upload teachers xlsx in the format below:</p>
+        {futureSession && (
+          <Dropdown
+            className="teachers-empty-session-dropdown"
+            value={uploadTarget}
+            onChange={setUploadTarget}
+            options={[
+              { key: 'current', label: currentSession ? `Current — ${currentSession.label}` : 'Current session' },
+              { key: 'future', label: `New session — starts ${futureSession.label}` },
+            ]}
+          />
+        )}
         {teacherCount > 0 && (
           <button className="teachers-empty-list-btn" onClick={onShowList}>
             Teachers {teacherCount}
@@ -310,9 +357,11 @@ export default function TeachersEmpty({ onUploaded, teacherCount, onShowList }) 
               ? 'Uploading…'
               : selectedFile && source === 'drop' ? selectedFile.name : 'Drop file here'}
           </span>
-          {selectedFile && source === 'drop' && error && (
+          {selectedFile && source === 'drop' && error ? (
             <span className="teachers-upload-error">{error}</span>
-          )}
+          ) : sessionTargetLabel ? (
+            <span className="teachers-upload-error">{sessionTargetLabel}</span>
+          ) : null}
           {selectedFile && source === 'drop' && !error && successMessage && (
             <span className="teachers-upload-success"><IconCheck />{successMessage}</span>
           )}
@@ -333,9 +382,11 @@ export default function TeachersEmpty({ onUploaded, teacherCount, onShowList }) 
               ? 'Uploading…'
               : selectedFile && source === 'browse' ? selectedFile.name : 'Browse file'}
           </span>
-          {selectedFile && source === 'browse' && error && (
+          {selectedFile && source === 'browse' && error ? (
             <span className="teachers-upload-error">{error}</span>
-          )}
+          ) : sessionTargetLabel ? (
+            <span className="teachers-upload-error">{sessionTargetLabel}</span>
+          ) : null}
           {selectedFile && source === 'browse' && !error && successMessage && (
             <span className="teachers-upload-success"><IconCheck />{successMessage}</span>
           )}

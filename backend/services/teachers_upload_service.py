@@ -6,7 +6,31 @@ from errors.error_codes import ErrorCode
 from services.password_service import placeholder_password_hash
 
 
-def process_teachers_upload(db: Session, customer_id: int, rows: list[dict]) -> tuple[dict, list[int]]:
+def _resolve_teacher_start_date(db: Session, customer_id: int, session_id: int | None):
+    """None for the ordinary case (session_id omitted, or explicitly the
+    live current session's own id) — new teachers go straight into the
+    active roster, same as before this existed. Only returns a real date
+    when session_id names this customer's pending future session: new
+    teachers then get users.start_date set to it, so they're staged
+    (invisible in the current roster — see get_my_teachers) until that
+    date actually arrives. The caller has already validated session_id is
+    legitimately current or future (never past) via validate_session_target
+    before this runs."""
+    if session_id is None:
+        return None
+    future_row = db.execute(
+        text(
+            "SELECT start_date FROM academic_sessions "
+            "WHERE customer_id = :cid AND is_future = TRUE AND session_id = :sid"
+        ),
+        {"cid": customer_id, "sid": session_id},
+    ).fetchone()
+    return future_row.start_date if future_row else None
+
+
+def process_teachers_upload(
+    db: Session, customer_id: int, rows: list[dict], target_session_id: int | None = None
+) -> tuple[dict, list[int]]:
     """Reconciles the uploaded roster against the db for this customer:
     creates/updates/reactivates teachers present in the upload, and
     deactivates teachers that exist for this customer but are no longer
@@ -14,6 +38,16 @@ def process_teachers_upload(db: Session, customer_id: int, rows: list[dict]) -> 
     customer_id set — there is no separate teachers table. Every upload
     is treated as the complete current roster for this customer. Runs as
     one transaction — any error rolls back the whole upload.
+
+    A future-session upload (target_session_id naming the pending future
+    session) is deliberately additive-only, unlike students: new hires get
+    users.start_date staged to that session's start_date (see
+    _resolve_teacher_start_date), but nothing gets deactivated — a future
+    file is an incremental "who's joining next", not the complete future
+    roster, since there's no equivalent of student_grades to stage a
+    departure into without prematurely revoking someone's current access.
+    A departure is still just handled via an ordinary current-session
+    upload once it actually happens.
 
     Set-based throughout (see students_upload_service for why) — a
     handful of bulk queries total instead of one round trip per row.
@@ -28,6 +62,8 @@ def process_teachers_upload(db: Session, customer_id: int, rows: list[dict]) -> 
         {"cid": customer_id},
     ).fetchone()
     acronym = customer.customer_acronym
+    start_date = _resolve_teacher_start_date(db, customer_id, target_session_id)
+    is_future_target = start_date is not None
 
     counts = {"teachers_created": 0, "teachers_updated": 0, "teachers_deactivated": 0}
 
@@ -107,14 +143,14 @@ def process_teachers_upload(db: Session, customer_id: int, rows: list[dict]) -> 
                 inserted = db.execute(
                     text(
                         "INSERT INTO users (login_key, password_hash, user_name, email_id, country_id, "
-                        "customer_id, org_id, is_adm, is_sysadm) "
-                        "SELECT login_key, password_hash, user_name, email, :country_id, :customer_id, org_id, TRUE, FALSE "
+                        "customer_id, org_id, is_adm, is_sysadm, start_date) "
+                        "SELECT login_key, password_hash, user_name, email, :country_id, :customer_id, org_id, TRUE, FALSE, :start_date "
                         "FROM unnest((:login_keys)::text[], (:password_hashes)::text[], (:names)::text[], (:emails)::text[], (:org_ids)::text[]) "
                         "AS t(login_key, password_hash, user_name, email, org_id) "
                         "RETURNING user_id"
                     ),
                     {
-                        "country_id": customer.country_id, "customer_id": customer_id,
+                        "country_id": customer.country_id, "customer_id": customer_id, "start_date": start_date,
                         "login_keys": login_keys, "password_hashes": password_hashes,
                         "names": [row["name"] for row in to_insert],
                         "emails": [row["email"] for row in to_insert],
@@ -142,19 +178,23 @@ def process_teachers_upload(db: Session, customer_id: int, rows: list[dict]) -> 
                 )
             counts["teachers_updated"] = len(users_to_touch)
 
-        missing = db.execute(
-            text(
-                "SELECT user_id FROM users WHERE customer_id = :cid AND is_adm = TRUE "
-                "AND is_active = TRUE AND NOT (org_id = ANY(:org_ids))"
-            ),
-            {"cid": customer_id, "org_ids": list(seen_org_ids)},
-        ).fetchall()
-        if missing:
-            db.execute(
-                text("UPDATE users SET is_active = FALSE, date_modified = NOW() WHERE user_id = ANY(:ids)"),
-                {"ids": [r.user_id for r in missing]},
-            )
-        counts["teachers_deactivated"] = len(missing)
+        # Additive-only for a future-session upload — see the docstring for
+        # why there's no equivalent of student_grades to stage a departure
+        # into without prematurely revoking someone's current access.
+        if not is_future_target:
+            missing = db.execute(
+                text(
+                    "SELECT user_id FROM users WHERE customer_id = :cid AND is_adm = TRUE "
+                    "AND is_active = TRUE AND NOT (org_id = ANY(:org_ids))"
+                ),
+                {"cid": customer_id, "org_ids": list(seen_org_ids)},
+            ).fetchall()
+            if missing:
+                db.execute(
+                    text("UPDATE users SET is_active = FALSE, date_modified = NOW() WHERE user_id = ANY(:ids)"),
+                    {"ids": [r.user_id for r in missing]},
+                )
+            counts["teachers_deactivated"] = len(missing)
 
         db.commit()
     except Exception:

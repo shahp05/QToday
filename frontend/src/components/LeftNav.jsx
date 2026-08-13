@@ -83,7 +83,7 @@ export default function LeftNav() {
   const resetQuoteAutoAdvance = useDashboardQuoteStore(s => s.reset)
   const clearStudentsListFilter = useStudentsListFilterStore(s => s.clear)
   const studentsStatus = useStudentsStore(s => s.bySession[CURRENT_SESSION_KEY]?.status ?? 'idle')
-  const teachersStatus = useTeachersStore(s => s.status)
+  const teachersStatus = useTeachersStore(s => s.bySession[CURRENT_SESSION_KEY]?.status ?? 'idle')
   const subjectsStatus = useSubjectsTaughtStore(s => s.status)
   const navigate = useNavigate()
   const location = useLocation()
