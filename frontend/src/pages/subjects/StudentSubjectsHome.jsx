@@ -52,7 +52,10 @@ function waitForStatus(useStore) {
   })
 }
 
-export default function StudentSubjectsHome() {
+// readOnly: parent viewing their selected ward's subjects — same topic-card
+// layout as a student's own view, but quiz-play (Play button, card-click,
+// Progress) is unreachable, since a parent isn't the one taking the quiz.
+export default function StudentSubjectsHome({ readOnly = false }) {
   const navigate = useNavigate()
   const [view, setView] = usePageView('topics') // 'topics' | 'progress'
   // subjects (and each subject's topics) already arrive alphabetically
@@ -77,10 +80,16 @@ export default function StudentSubjectsHome() {
   // topic_id -> quiz_id, for topics whose LLM scoring pass hasn't finished yet
   const [scoringTopics, setScoringTopics] = useState({})
 
-  useEffect(() => { fetchQuizProgress() }, [fetchQuizProgress])
+  // Quiz progress/history are the acting student's own data — a parent
+  // viewing a ward has no authorized access to them (see
+  // quiz_service.resolve_authorized_student_id's documented parent
+  // deferral), so readOnly skips both fetches; topicStatsById/quizHistory
+  // simply stay at their empty initial state, and the Progress button
+  // (gated on quizHistory.length > 0 below) naturally never appears.
+  useEffect(() => { if (!readOnly) fetchQuizProgress() }, [readOnly, fetchQuizProgress])
   // Fetched eagerly (not gated on the Progress click) so the button can show
   // a total-quizzes-played count across every subject as soon as the page loads.
-  useEffect(() => { fetchQuizHistory() }, [fetchQuizHistory])
+  useEffect(() => { if (!readOnly) fetchQuizHistory() }, [readOnly, fetchQuizHistory])
 
   // Polls every scoring-in-progress quiz until the background LLM pass
   // (jobs/tasks.py:score_quiz_task) finishes — see conversation history for
@@ -112,6 +121,10 @@ export default function StudentSubjectsHome() {
     return () => clearInterval(interval)
   }, [scoringTopics, fetchQuizProgress, refreshQuizHistory])
 
+  // "Play" only makes sense when the viewer is the one who'll take the
+  // quiz — a parent viewing their ward's subjects sees "Subjects" instead.
+  const pageTitle = readOnly ? 'Subjects' : 'Play'
+
   if (activeQuiz) {
     return (
       <QuizPage
@@ -142,7 +155,7 @@ export default function StudentSubjectsHome() {
   if (subjectsStatus === 'loading' || subjectsStatus === 'idle') {
     return (
       <div className="student-subjects">
-        <PageHeader title="Play" onBack={() => navigate(-1)} />
+        <PageHeader title={pageTitle} onBack={() => navigate(-1)} />
         <PageLoading />
       </div>
     )
@@ -151,7 +164,7 @@ export default function StudentSubjectsHome() {
   if (subjectsStatus === 'error') {
     return (
       <div className="student-subjects">
-        <PageHeader title="Play" onBack={() => navigate(-1)} />
+        <PageHeader title={pageTitle} onBack={() => navigate(-1)} />
         <Toast message={subjectsError} onDismiss={clearSubjectsError} />
         <p className="content-card-placeholder" style={{ padding: '0 24px' }}>Couldn't load subjects.</p>
       </div>
@@ -162,7 +175,7 @@ export default function StudentSubjectsHome() {
     return (
       <div className="student-subjects content-card">
         <h2 className="content-card-title">Subjects</h2>
-        <p className="content-card-placeholder">No subjects available for your grade yet.</p>
+        <p className="content-card-placeholder">No subjects available for {readOnly ? 'this' : 'your'} grade yet.</p>
       </div>
     )
   }
@@ -212,7 +225,7 @@ export default function StudentSubjectsHome() {
   return (
     <div className="student-subjects">
       <PageHeader
-        title="Play"
+        title={pageTitle}
         onBack={() => navigate(-1)}
         actions={(
           view === 'topics' ? (
@@ -260,6 +273,7 @@ export default function StudentSubjectsHome() {
           subjects={subjects}
           activeSubjectId={activeSubjectId}
           topicStatsById={topicStatsById}
+          readOnly={readOnly}
           onCardClick={topic => startQuiz(topic, 'card')}
           onPlayClick={topic => startQuiz(topic, 'play')}
           loadingQuiz={loadingQuiz}

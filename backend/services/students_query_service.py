@@ -3,12 +3,18 @@ from sqlalchemy.orm import Session
 
 _STUDENT_COLUMNS = (
     "s.student_id, u.org_id, u.user_name AS name, u.file_url AS photo_url, "
-    "s.customer_id, s.board_id, s.is_active, c.customer_name, c.customer_acronym"
+    "s.customer_id, s.board_id, s.is_active, c.customer_name, c.customer_acronym, "
+    "b.board_code, b.board_name, co.country_name"
 )
 _STUDENT_JOINS = (
     "FROM students s "
     "JOIN users u ON u.user_id = s.user_id "
     "LEFT JOIN customers c ON c.customer_id = s.customer_id "
+    # Board is the student's own (s.board_id), not the school's — a
+    # customer's students aren't guaranteed to share one board. Country
+    # has no per-student column, so it comes from the student's school.
+    "LEFT JOIN boards b ON b.board_id = s.board_id "
+    "LEFT JOIN countries co ON co.country_id = c.country_id "
 )
 
 

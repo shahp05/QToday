@@ -13,6 +13,7 @@ import { useDashboardQuoteStore } from '../store/dashboardQuoteStore'
 import { useStudentsListFilterStore } from '../store/studentsListFilterStore'
 import Dropdown from './Dropdown'
 import ScheduleSessionDialog from './ScheduleSessionDialog'
+import WardPickerDialog from './WardPickerDialog'
 import logo from '../assets/logo_48.webp'
 import './LeftNav.css'
 
@@ -67,11 +68,16 @@ function IconLogout() {
 const EMPTY_ARRAY = []
 
 const NAV_ITEMS = [
-  { id: 'subjects',  label: 'Subjects',  Icon: IconSubjects },
+  // A parent's Subjects view lives under the repurposed "Students" button
+  // instead (see the parent ward button below) — the site subjects nav
+  // item itself (teach-log browsing) has no meaning for them.
+  { id: 'subjects',  label: 'Subjects',  Icon: IconSubjects, visible: p => !p.is_parent },
   // Only the customer's sys admin (uploads/manages the roster) and its
-  // teachers (view it) have any use for this page — a student only has
-  // their own row, and a parent's equivalent is their child(ren), not this.
-  { id: 'students',  label: 'Students',  Icon: IconStudents, visible: p => p.is_school_admin || p.is_school_teacher },
+  // teachers (view it) have any use for the roster page itself — a student
+  // only has their own row. A parent gets this same button repurposed as
+  // their selected ward's photo/name (see the render loop below) rather
+  // than the roster page, so it's visible to them too.
+  { id: 'students',  label: 'Students',  Icon: IconStudents, visible: p => p.is_school_admin || p.is_school_teacher || p.is_parent },
   { id: 'teachers',  label: 'Teachers',  Icon: IconTeachers },
   { id: 'account',   label: 'Account',   Icon: IconAccount  },
 ]
@@ -125,17 +131,21 @@ export default function LeftNav() {
     setActiveSessionId(sessionId)
   }
 
-  // A parent has no customer_id of their own — "which session" is
-  // meaningless until a ward (child) is selected, since each can be at a
-  // different school. Minimal selector only: a plain dropdown once there's
-  // more than one ward, auto-selecting the first otherwise — not the full
-  // "Students button becomes the child's photo" redesign.
+  // A parent has no customer_id of their own — "which session"/"which
+  // school" is meaningless until a ward (child) is selected, since each can
+  // be at a different school. A single ward auto-selects silently; more than
+  // one opens a picker popup from the repurposed "Students" button (see the
+  // render loop and WardPickerDialog below) instead of navigating anywhere.
   const isParent = profile.is_parent
   const wards = useStudentsStore(s => s.bySession[CURRENT_SESSION_KEY]?.students ?? EMPTY_ARRAY)
   const selectedWardId = useParentWardStore(s => s.selectedStudentId)
   const setSelectedWardId = useParentWardStore(s => s.setSelectedStudentId)
+  const selectedWard = wards.find(w => w.student_id === selectedWardId) ?? null
   const clearTeachersCache = useTeachersStore(s => s.clearTeachers)
   const fetchTeachersForWard = useTeachersStore(s => s.fetchTeachers)
+  const clearSubjectsCache = useSubjectsTaughtStore(s => s.clearSubjectsTaught)
+  const fetchSubjectsForWard = useSubjectsTaughtStore(s => s.fetchSubjectsTaught)
+  const [showWardPicker, setShowWardPicker] = useState(false)
 
   // Done directly during render (not an effect) — a one-time derived-state
   // adjustment, same pattern used elsewhere in this codebase (e.g.
@@ -145,22 +155,24 @@ export default function LeftNav() {
   }
 
   // A different ward can mean a different school entirely — nothing cached
-  // under the plain session-keyed caches (teachers, the session list
-  // itself) is valid across that boundary. Clearing and refetching on every
-  // change (including the very first selection, when both are empty
-  // anyway) is simpler than threading a second cache dimension by ward
-  // through every store built on CURRENT_SESSION_KEY.
+  // under the plain session-keyed caches (teachers, subjects taught, the
+  // session list itself) is valid across that boundary. Clearing and
+  // refetching on every change (including the very first selection, when
+  // both are empty anyway) is simpler than threading a second cache
+  // dimension by ward through every store built on CURRENT_SESSION_KEY.
   useEffect(() => {
     if (!isParent || selectedWardId == null) return
     clearTeachersCache()
+    clearSubjectsCache()
     clearSessions()
     fetchSessions(selectedWardId)
-    // Dashboard's own eager fetchTeachers() call (on mount, for every
-    // role) fires before a parent's ward is known and bails out with
-    // nothing to fetch — this is what actually populates the Teachers nav
-    // item's data/loading state for a parent, since nothing else retries
-    // it once the ward becomes known.
+    // Dashboard's own eager fetchTeachers()/fetchSubjectsTaught() calls (on
+    // mount, for every role) fire before a parent's ward is known and bail
+    // out with nothing to fetch — this is what actually populates the
+    // Teachers nav item and the Subjects page for a parent, since nothing
+    // else retries them once the ward becomes known.
     fetchTeachersForWard()
+    fetchSubjectsForWard()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isParent, selectedWardId])
 
@@ -170,11 +182,19 @@ export default function LeftNav() {
     subjects: subjectsStatus === 'idle' || subjectsStatus === 'loading',
   }
 
-  const infoItems = [
-    { label: 'School',  value: profile.customer_acronym || '—' },
-    { label: 'Board',   value: profile.board_code       || '—' },
-    { label: 'Country', value: profile.country_name     || '—' },
-  ]
+  // A parent has no school/board/country of their own — these reflect the
+  // selected ward's instead once one is known.
+  const infoItems = isParent
+    ? [
+        { label: 'School',  value: selectedWard?.customer_acronym || '—' },
+        { label: 'Board',   value: selectedWard?.board_code        || '—' },
+        { label: 'Country', value: selectedWard?.country_name      || '—' },
+      ]
+    : [
+        { label: 'School',  value: profile.customer_acronym || '—' },
+        { label: 'Board',   value: profile.board_code       || '—' },
+        { label: 'Country', value: profile.country_name     || '—' },
+      ]
 
   // Active state (and the isActive() guard below) match on a path prefix,
   // not exact equality, so Students stays highlighted while a student's
@@ -184,6 +204,14 @@ export default function LeftNav() {
   }
 
   function handleNav(id) {
+    // The "Students" button is repurposed for a parent into a ward
+    // display/switcher, not a link to the (admin-only) roster page — it
+    // opens the picker when there's an actual choice, otherwise does
+    // nothing (a single ward has nothing to switch to).
+    if (isParent && id === 'students') {
+      if (wards.length > 1) setShowWardPicker(true)
+      return
+    }
     if (isActive(id)) return
     navigate(`/dashboard/${id}`)
   }
@@ -211,40 +239,36 @@ export default function LeftNav() {
       </div>
 
       <nav className="leftnav-items">
-        {NAV_ITEMS.filter(item => !item.visible || item.visible(profile)).map(({ id, label, Icon }) => (
-          <button
-            key={id}
-            className={`leftnav-item ${isActive(id) ? 'leftnav-item--active' : ''}`}
-            onClick={() => handleNav(id)}
-            aria-label={label}
-            aria-current={isActive(id) ? 'page' : undefined}
-          >
-            {isLoadingById[id] ? <IconSpinner /> : <Icon />}
-            <span className="leftnav-item-label">{label}</span>
-          </button>
-        ))}
+        {NAV_ITEMS.filter(item => !item.visible || item.visible(profile)).map(({ id, label, Icon }) => {
+          // A parent's "Students" button shows the selected ward's own
+          // photo/name instead of the generic icon/label — same button,
+          // same size, just standing in for a page this role doesn't have.
+          const isWardButton = isParent && id === 'students'
+          const buttonLabel = isWardButton ? (selectedWard?.name || label) : label
+          return (
+            <button
+              key={id}
+              className={`leftnav-item ${isActive(id) ? 'leftnav-item--active' : ''}`}
+              onClick={() => handleNav(id)}
+              aria-label={buttonLabel}
+              aria-current={isActive(id) ? 'page' : undefined}
+            >
+              {isWardButton ? (
+                selectedWard?.photo_url
+                  ? <img src={selectedWard.photo_url} alt="" className="leftnav-item-ward-photo" />
+                  : <IconStudents />
+              ) : (
+                isLoadingById[id] ? <IconSpinner /> : <Icon />
+              )}
+              <span className="leftnav-item-label">{buttonLabel}</span>
+            </button>
+          )
+        })}
       </nav>
 
       <div className="leftnav-spacer" />
 
       <div className="leftnav-info">
-        {/* Minimal ward selector — only shown when there's an actual choice
-           to make (a single ward auto-selects silently above). Not the
-           full point-6 redesign (Students button as the child's photo,
-           school/board/country for the selected child, etc.) — just enough
-           for the session picker below to have a "which child" to resolve
-           against. */}
-        {isParent && wards.length > 1 && (
-          <div className="leftnav-session-block">
-            <span className="leftnav-info-label">Child</span>
-            <Dropdown
-              className="leftnav-session-dropdown"
-              value={selectedWardId}
-              onChange={setSelectedWardId}
-              options={wards.map(w => ({ key: w.student_id, label: w.name }))}
-            />
-          </div>
-        )}
         {/* Sys admin always gets it (they can create a new session even
            with no history yet); everyone else only once there's actual
            history to browse — "New session" never appears for them at
@@ -285,6 +309,16 @@ export default function LeftNav() {
           if (fut) setActiveSessionId(fut.session_id)
         }}
       />
+
+      {isParent && (
+        <WardPickerDialog
+          open={showWardPicker}
+          wards={wards}
+          selectedWardId={selectedWardId}
+          onSelect={setSelectedWardId}
+          onClose={() => setShowWardPicker(false)}
+        />
+      )}
 
       <button
         className="leftnav-item leftnav-item--logout"

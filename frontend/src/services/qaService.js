@@ -27,9 +27,15 @@ export async function fetchOrGenerateQA({ subjectName, topicName, grade, section
   return res.json() // { items, warning_code, subject_id, topic_id, grade_id }
 }
 
-export async function fetchSubjectsTaught(sessionId) {
-  const qs = sessionId != null ? `?session_id=${sessionId}` : ''
-  const res = await apiFetch(`/teach-logs/subjects-taught${qs}`)
+// studentId is a parent's selected ward — a parent has no customer_id of
+// their own (their wards can be at different schools), so the backend
+// resolves "which school" from it instead; every other role omits it.
+export async function fetchSubjectsTaught(sessionId, studentId) {
+  const params = new URLSearchParams()
+  if (sessionId != null) params.set('session_id', sessionId)
+  if (studentId != null) params.set('student_id', studentId)
+  const qs = params.toString()
+  const res = await apiFetch(`/teach-logs/subjects-taught${qs ? `?${qs}` : ''}`)
   if (!res.ok) throw new Error(await apiErrorMessage(res))
   return res.json() // { subjects, most_recent }
 }

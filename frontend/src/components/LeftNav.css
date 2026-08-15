@@ -91,6 +91,13 @@
   to { transform: rotate(360deg); }
 }
 
+.leftnav-item-ward-photo {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 .leftnav-item-label {
   font-family: var(--font-family);
   font-size: 10px;

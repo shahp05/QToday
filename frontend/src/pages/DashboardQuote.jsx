@@ -19,6 +19,7 @@ export default function DashboardQuote() {
   const isStudent        = useProfileStore(s => s.is_student)
   const isSchoolTeacher  = useProfileStore(s => s.is_school_teacher)
   const isSchoolAdmin    = useProfileStore(s => s.is_school_admin)
+  const isParent         = useProfileStore(s => s.is_parent)
   const hasAutoAdvanced  = useDashboardQuoteStore(s => s.hasAutoAdvanced)
   const markAutoAdvanced = useDashboardQuoteStore(s => s.markAutoAdvanced)
   const [expired, setExpired] = useState(false)
@@ -27,14 +28,14 @@ export default function DashboardQuote() {
     if (hasAutoAdvanced) return
     const timer = setTimeout(() => {
       markAutoAdvanced()
-      if (isStudent || isSchoolTeacher || isSchoolAdmin) {
+      if (isStudent || isSchoolTeacher || isSchoolAdmin || isParent) {
         navigate('/dashboard/subjects')
       } else {
         setExpired(true)
       }
     }, LOGIN_QUOTE_DURATION_MS)
     return () => clearTimeout(timer)
-  }, [hasAutoAdvanced, isStudent, isSchoolTeacher, isSchoolAdmin, navigate, markAutoAdvanced])
+  }, [hasAutoAdvanced, isStudent, isSchoolTeacher, isSchoolAdmin, isParent, navigate, markAutoAdvanced])
 
   if (expired) {
     return (

@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import { fetchSubjectsTaught, fetchTopicGradeQA } from '../services/qaService'
 import { resolveApiError } from '../lib/api'
 import { ErrorCode } from '../errors/errorCodes'
+import { useParentWardStore } from './parentWardStore'
+import { useProfileStore } from './profileStore'
 
 // subjects-taught only ships qa_count + eagerly-loads the most-recently-
 // taught (topic, grade)'s qa_items — everything else is fetched on demand
@@ -22,11 +24,18 @@ export const useSubjectsTaughtStore = create((set, get) => ({
   // after a mutation that actually changes this data server-side (see
   // SubjectsPage's post-log refetch), or when switching sessionId (a
   // different session means genuinely different data, not a stale cache).
+  // A parent has no customer_id of their own — every fetch here resolves
+  // their currently selected ward (parentWardStore) and sends it as
+  // student_id, mirroring teachersStore.fetchTeachers.
   fetchSubjectsTaught: async (force = false, sessionId = null) => {
+    const isParent = useProfileStore.getState().is_parent
+    const wardId = isParent ? useParentWardStore.getState().selectedStudentId : null
+    if (isParent && wardId == null) return // no ward selected/loaded yet — nothing to fetch
+
     if (!force && (get().status === 'loaded' || get().status === 'loading')) return
     set({ status: 'loading', error: null })
     try {
-      const data = await fetchSubjectsTaught(sessionId)
+      const data = await fetchSubjectsTaught(sessionId, wardId)
       set({ subjects: data.subjects, mostRecent: data.most_recent, status: 'loaded' })
     } catch (err) {
       set({ status: 'error', error: err.message })
