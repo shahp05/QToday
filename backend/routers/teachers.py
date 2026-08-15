@@ -7,7 +7,12 @@ from errors.error_codes import ErrorCode
 from jobs.tasks import hash_new_account_passwords_task
 from schemas.teachers import SetSuperAdminRequest, TeachersUploadRequest
 from services.auth_service import get_current_user
-from services.session_service import validate_session_readable, validate_session_target
+from services.session_service import (
+    resolve_parent_ward_customer_id,
+    resolve_session_browsing_customer_id,
+    validate_session_readable,
+    validate_session_target,
+)
 from services.teachers_query_service import get_my_teachers, get_teachers_for_session
 from services.teachers_role_service import set_super_admin
 from services.teachers_upload_service import process_teachers_upload
@@ -18,20 +23,27 @@ router = APIRouter(prefix="/api/teachers", tags=["teachers"])
 @router.get("/mine")
 def list_my_teachers(
     session_id: int | None = Query(None),
+    student_id: int | None = Query(None),  # a parent's selected ward — see resolve_session_browsing_customer_id
     claims: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # session_id is an admin-only concept (browsing who taught in a past
-    # session) — mirrors GET /students/mine. Read-only, so it's derived
-    # from teach_logs (get_teachers_for_session), not the live roster.
+    # session_id is for browsing who taught in a past/current/future
+    # session — open to every role, mirrors GET /students/mine. Read-only,
+    # so it's derived from teach_logs (get_teachers_for_session), not the
+    # live roster.
     if session_id is not None:
-        if not claims.get("is_school_admin"):
-            raise AppError(ErrorCode.AUTH_FORBIDDEN)
-        customer_id = claims.get("customer_id")
-        if not customer_id:
-            raise AppError(ErrorCode.SCHOOL_NOT_ASSOCIATED)
+        customer_id = resolve_session_browsing_customer_id(db, claims, student_id)
         validate_session_readable(db, customer_id, session_id)
         return get_teachers_for_session(db, customer_id, session_id)
+    # A parent has no customer_id of their own — even the ordinary "current
+    # teachers" view needs a selected ward to know which school. No ward
+    # selected yet is the same "nothing to show" state as before any data
+    # has loaded, not an error.
+    if claims.get("is_parent"):
+        if student_id is None:
+            return {"teachers": []}
+        customer_id = resolve_parent_ward_customer_id(db, claims["user_id"], student_id)
+        return get_my_teachers(db, claims["user_id"], customer_id=customer_id)
     return get_my_teachers(db, claims["user_id"])
 
 

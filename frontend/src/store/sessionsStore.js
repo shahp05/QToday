@@ -37,11 +37,15 @@ export const useSessionsStore = create(
       // session without telling them.
       activeSessionId: null,
 
-      fetchSessions: async (force = false) => {
+      // studentId is a parent's selected ward (see parentWardStore) — a
+      // parent has no customer_id of their own, so the backend resolves
+      // "which school's sessions" from it instead. Every other role omits
+      // it (their own customer_id is used server-side).
+      fetchSessions: async (studentId = null, force = false) => {
         if (!force && (get().status === 'loaded' || get().status === 'loading')) return
         set({ status: 'loading', error: null })
         try {
-          const data = await fetchSessions()
+          const data = await fetchSessions(studentId)
           const sessions = [
             ...data.sessions.map(s => ({ ...s, is_future: false })),
             ...(data.future_session ? [{ ...data.future_session, is_current: false, is_future: true }] : []),
@@ -76,7 +80,9 @@ export const useSessionsStore = create(
         set({ scheduling: true, scheduleError: null })
         try {
           await scheduleNextSession(startDate)
-          await get().fetchSessions(true)
+          // Only a sys admin can ever schedule a session — never a parent
+          // (they have no session-creation UI at all), so no studentId here.
+          await get().fetchSessions(null, true)
           await useSubjectsTaughtStore.getState().fetchSubjectsTaught(true)
           set({ scheduling: false })
           return true

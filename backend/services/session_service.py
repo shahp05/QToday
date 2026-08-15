@@ -124,6 +124,43 @@ def validate_session_readable(db: Session, customer_id: int, session_id: int) ->
         raise AppError(ErrorCode.SESSION_TARGET_INVALID)
 
 
+def resolve_parent_ward_customer_id(db: Session, parent_user_id: int, student_id: int) -> int:
+    """Verifies this parent is actively linked to this student, and returns
+    that student's own customer_id. A parent has no customer_id of their
+    own (their wards can be at different schools) — any session-scoped read
+    on their behalf must resolve "which school" from an explicitly selected
+    ward, never from the parent's own claims."""
+    row = db.execute(
+        text(
+            "SELECT s.customer_id FROM parents p "
+            "JOIN students s ON s.student_id = p.student_id "
+            "WHERE p.user_id = :uid AND p.student_id = :sid AND p.is_active = TRUE AND s.is_active = TRUE"
+        ),
+        {"uid": parent_user_id, "sid": student_id},
+    ).fetchone()
+    if row is None or row.customer_id is None:
+        raise AppError(ErrorCode.AUTH_FORBIDDEN)
+    return row.customer_id
+
+
+def resolve_session_browsing_customer_id(db: Session, claims: dict, student_id: int | None) -> int:
+    """Resolves which customer_id a session-scoped read (validate_session_
+    readable + whatever query follows it) should be checked against. Every
+    non-parent role already belongs to exactly one customer, straight from
+    their claims. A parent doesn't — student_id must name one of their
+    active wards, and it's that ward's own school that applies, since
+    "which session" is inherently meaningless for a parent until a specific
+    child (and therefore a specific school) is selected."""
+    if claims.get("is_parent"):
+        if student_id is None:
+            raise AppError(ErrorCode.VALIDATION_ERROR)
+        return resolve_parent_ward_customer_id(db, claims["user_id"], student_id)
+    customer_id = claims.get("customer_id")
+    if not customer_id:
+        raise AppError(ErrorCode.SCHOOL_NOT_ASSOCIATED)
+    return customer_id
+
+
 def _activate_session(db: Session, customer_id: int, session_id: int) -> None:
     """The actual cutover primitive — flips exactly one customer's current
     session onto session_id. No student_grades/teach_logs writes happen

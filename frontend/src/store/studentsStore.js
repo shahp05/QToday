@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import { fetchMyStudents, uploadStudents } from '../services/studentsService'
-import { useProfileStore } from './profileStore'
 import { CURRENT_SESSION_KEY, useSessionsStore } from './sessionsStore'
 import { useStudentGradesStore } from './studentGradesStore'
 import { useStudentParentsStore } from './studentParentsStore'
@@ -26,12 +25,12 @@ export const useStudentsStore = create((set, get) => ({
   // sessionId: the real session_id to view, or null/omitted for the live
   // current session — whatever the caller has on hand (e.g. sessionsStore's
   // activeSessionId, unresolved). This function is what decides whether
-  // that's actually current (normalizing to CURRENT_SESSION_KEY either
-  // way, so "current" only ever has one cache entry no matter how it was
-  // asked for) and whether the caller's role even allows a different one.
+  // that's actually current, normalizing to CURRENT_SESSION_KEY either way
+  // so "current" only ever has one cache entry no matter how it was asked
+  // for — the backend (not this client) is the actual authority on whether
+  // the signed-in role is allowed to browse a non-current one.
   fetchStudents: async (sessionId = null, force = false) => {
-    const isSchoolAdmin = useProfileStore.getState().is_school_admin
-    const requestedId = isSchoolAdmin ? sessionId : null
+    const requestedId = sessionId
     const currentId = useSessionsStore.getState().sessions.find(s => s.is_current)?.session_id ?? null
     const isCurrent = requestedId == null || requestedId === currentId
     const key = isCurrent ? CURRENT_SESSION_KEY : requestedId

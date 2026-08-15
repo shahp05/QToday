@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useProfileStore } from '../store/profileStore'
 import { CURRENT_SESSION_KEY, useSessionsStore } from '../store/sessionsStore'
+import { useParentWardStore } from '../store/parentWardStore'
 import { useStudentsStore } from '../store/studentsStore'
 import { useTeachersStore } from '../store/teachersStore'
 import { useSubjectsTaughtStore } from '../store/subjectsTaughtStore'
@@ -60,6 +61,11 @@ function IconLogout() {
   )
 }
 
+// A stable reference for "no wards cached yet" — returning a fresh [] from
+// a zustand selector instead would make React think the store keeps
+// changing on every read, causing an infinite re-render loop.
+const EMPTY_ARRAY = []
+
 const NAV_ITEMS = [
   { id: 'subjects',  label: 'Subjects',  Icon: IconSubjects },
   // Only the customer's sys admin (uploads/manages the roster) and its
@@ -80,6 +86,7 @@ export default function LeftNav() {
   const clearQuizHistory = useQuizHistoryStore(s => s.clearQuizHistory)
   const clearClassProgress = useClassQuizProgressStore(s => s.clearClassProgress)
   const clearSessions = useSessionsStore(s => s.clearSessions)
+  const clearParentWard = useParentWardStore(s => s.clear)
   const resetQuoteAutoAdvance = useDashboardQuoteStore(s => s.reset)
   const clearStudentsListFilter = useStudentsListFilterStore(s => s.clear)
   const studentsStatus = useStudentsStore(s => s.bySession[CURRENT_SESSION_KEY]?.status ?? 'idle')
@@ -94,9 +101,8 @@ export default function LeftNav() {
   // sessionsStore.activeSessionId directly, so switching here is what makes
   // "was this upload meant for the current or the new session?" unambiguous
   // everywhere at once, not just wherever the control happened to live.
-  // Includes past sessions (read-only browsing) once they exist — sys-admin
-  // only for now, though; opening this up to every role is a separate,
-  // later decision, not just a matter of removing this gate.
+  // Visible to every role once past sessions exist — only "New session"
+  // (creating one) stays sys-admin only, below.
   const sessions = useSessionsStore(s => s.sessions)
   const currentSession = sessions.find(sess => sess.is_current)
   const futureSession = sessions.find(sess => sess.is_future)
@@ -105,6 +111,7 @@ export default function LeftNav() {
   const pastSessions = sessions.filter(sess => !sess.is_current && !sess.is_future)
   const activeSessionId = useSessionsStore(s => s.activeSessionId)
   const setActiveSessionId = useSessionsStore(s => s.setActiveSessionId)
+  const fetchSessions = useSessionsStore(s => s.fetchSessions)
   const [showSessionDialog, setShowSessionDialog] = useState(false)
 
   // Picking "New session" before one has ever been scheduled opens the
@@ -117,6 +124,45 @@ export default function LeftNav() {
     }
     setActiveSessionId(sessionId)
   }
+
+  // A parent has no customer_id of their own — "which session" is
+  // meaningless until a ward (child) is selected, since each can be at a
+  // different school. Minimal selector only: a plain dropdown once there's
+  // more than one ward, auto-selecting the first otherwise — not the full
+  // "Students button becomes the child's photo" redesign.
+  const isParent = profile.is_parent
+  const wards = useStudentsStore(s => s.bySession[CURRENT_SESSION_KEY]?.students ?? EMPTY_ARRAY)
+  const selectedWardId = useParentWardStore(s => s.selectedStudentId)
+  const setSelectedWardId = useParentWardStore(s => s.setSelectedStudentId)
+  const clearTeachersCache = useTeachersStore(s => s.clearTeachers)
+  const fetchTeachersForWard = useTeachersStore(s => s.fetchTeachers)
+
+  // Done directly during render (not an effect) — a one-time derived-state
+  // adjustment, same pattern used elsewhere in this codebase (e.g.
+  // TeachLogList's auto-expand-most-recent).
+  if (isParent && selectedWardId == null && wards.length > 0) {
+    setSelectedWardId(wards[0].student_id)
+  }
+
+  // A different ward can mean a different school entirely — nothing cached
+  // under the plain session-keyed caches (teachers, the session list
+  // itself) is valid across that boundary. Clearing and refetching on every
+  // change (including the very first selection, when both are empty
+  // anyway) is simpler than threading a second cache dimension by ward
+  // through every store built on CURRENT_SESSION_KEY.
+  useEffect(() => {
+    if (!isParent || selectedWardId == null) return
+    clearTeachersCache()
+    clearSessions()
+    fetchSessions(selectedWardId)
+    // Dashboard's own eager fetchTeachers() call (on mount, for every
+    // role) fires before a parent's ward is known and bails out with
+    // nothing to fetch — this is what actually populates the Teachers nav
+    // item's data/loading state for a parent, since nothing else retries
+    // it once the ward becomes known.
+    fetchTeachersForWard()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isParent, selectedWardId])
 
   const isLoadingById = {
     students: studentsStatus === 'idle' || studentsStatus === 'loading',
@@ -151,6 +197,7 @@ export default function LeftNav() {
     clearQuizHistory()
     clearClassProgress()
     clearSessions()
+    clearParentWard()
     clearStudentsListFilter()
     resetQuoteAutoAdvance()
     navigate('/')
@@ -181,19 +228,42 @@ export default function LeftNav() {
       <div className="leftnav-spacer" />
 
       <div className="leftnav-info">
-        {profile.is_school_admin && (
+        {/* Minimal ward selector — only shown when there's an actual choice
+           to make (a single ward auto-selects silently above). Not the
+           full point-6 redesign (Students button as the child's photo,
+           school/board/country for the selected child, etc.) — just enough
+           for the session picker below to have a "which child" to resolve
+           against. */}
+        {isParent && wards.length > 1 && (
+          <div className="leftnav-session-block">
+            <span className="leftnav-info-label">Child</span>
+            <Dropdown
+              className="leftnav-session-dropdown"
+              value={selectedWardId}
+              onChange={setSelectedWardId}
+              options={wards.map(w => ({ key: w.student_id, label: w.name }))}
+            />
+          </div>
+        )}
+        {/* Sys admin always gets it (they can create a new session even
+           with no history yet); everyone else only once there's actual
+           history to browse — "New session" never appears for them at
+           all, only sys admins may create one. */}
+        {(profile.is_school_admin || pastSessions.length > 0) && (
           <div className="leftnav-session-block">
             <span className="leftnav-info-label">Session</span>
             <Dropdown
               className="leftnav-session-dropdown"
               value={activeSessionId}
               onChange={handleSessionChange}
-              // Current always the default/first, then the pending future
-              // session (or the "New session" placeholder to schedule
-              // one), then past sessions in reverse chronology.
+              // Current always the default/first, then (sys admin only)
+              // the pending future session or the "New session" placeholder
+              // to schedule one, then past sessions in reverse chronology.
               options={[
                 { key: currentSession?.session_id ?? 'current', label: currentSession?.label || 'Current' },
-                { key: futureSession ? futureSession.session_id : 'schedule-new', label: futureSession ? futureSession.label : 'New session' },
+                ...(profile.is_school_admin
+                  ? [{ key: futureSession ? futureSession.session_id : 'schedule-new', label: futureSession ? futureSession.label : 'New session' }]
+                  : []),
                 ...pastSessions.map(sess => ({ key: sess.session_id, label: sess.label })),
               ]}
             />

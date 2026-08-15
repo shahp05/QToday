@@ -2,19 +2,26 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 
-def get_my_teachers(db: Session, user_id: int) -> dict:
+def get_my_teachers(db: Session, user_id: int, customer_id: int | None = None) -> dict:
     """Any active, customer-attached user (sys admin, teacher, student, or
     parent) can see the school's teacher roster — it's directory
     information, not sensitive to any one role. A system admin (no
     customer_id) gets nothing, same as before. Write actions on this data
     (upload, super-admin assignment) are gated separately and far more
-    strictly, in routers/teachers.py — this is read-only."""
-    user = db.execute(
-        text("SELECT customer_id FROM users WHERE user_id = :uid AND is_active = TRUE"),
-        {"uid": user_id},
-    ).fetchone()
-    if user is None or user.customer_id is None:
-        return {"teachers": []}
+    strictly, in routers/teachers.py — this is read-only.
+
+    customer_id, when given, is used directly instead of resolving it from
+    user_id — this is how a parent (who has none of their own) sees their
+    selected ward's school's roster; the caller resolves it via
+    session_service.resolve_parent_ward_customer_id first."""
+    if customer_id is None:
+        user = db.execute(
+            text("SELECT customer_id FROM users WHERE user_id = :uid AND is_active = TRUE"),
+            {"uid": user_id},
+        ).fetchone()
+        if user is None or user.customer_id is None:
+            return {"teachers": []}
+        customer_id = user.customer_id
 
     rows = db.execute(
         text(
@@ -27,7 +34,7 @@ def get_my_teachers(db: Session, user_id: int) -> dict:
             "AND (start_date IS NULL OR start_date <= CURRENT_DATE) "
             "ORDER BY user_name"
         ),
-        {"cid": user.customer_id},
+        {"cid": customer_id},
     ).fetchall()
 
     return {"teachers": [dict(row._mapping) for row in rows]}

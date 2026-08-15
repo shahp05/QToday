@@ -1,20 +1,31 @@
 import { create } from 'zustand'
 import { fetchMyTeachers, setTeacherSuperAdmin, uploadTeachers } from '../services/teachersService'
+import { useParentWardStore } from './parentWardStore'
 import { useProfileStore } from './profileStore'
 import { CURRENT_SESSION_KEY, useSessionsStore } from './sessionsStore'
 
 // The only place in the app that calls GET /teachers/mine — mirrors
 // studentsStore.js's shape/reasoning exactly: cached per session
 // (bySession[key]) so switching the site-wide session picker never
-// re-fetches data already in hand, and access rights are enforced here
-// once (only a school admin's request for a non-current session is ever
-// actually honored) rather than by every caller remembering the rule.
+// re-fetches data already in hand. Access rights for a non-current
+// session are enforced backend-side (any role may browse one — see
+// resolve_session_browsing_customer_id) — this client doesn't re-guess it.
+//
+// A parent has no customer_id of their own, so every fetch here resolves
+// their currently selected ward (parentWardStore) and sends it as
+// student_id — there's only ever one ward "active" at a time, so the cache
+// itself stays keyed by session alone (not ward too); LeftNav clears it
+// whenever the selected ward changes instead, which is simpler than
+// threading a second cache dimension through every key here.
 export const useTeachersStore = create((set, get) => ({
   bySession: {}, // key -> { teachers: [], status, error }
 
   fetchTeachers: async (sessionId = null, force = false) => {
-    const isSchoolAdmin = useProfileStore.getState().is_school_admin
-    const requestedId = isSchoolAdmin ? sessionId : null
+    const isParent = useProfileStore.getState().is_parent
+    const wardId = isParent ? useParentWardStore.getState().selectedStudentId : null
+    if (isParent && wardId == null) return // no ward selected/loaded yet — nothing to fetch
+
+    const requestedId = sessionId
     const currentId = useSessionsStore.getState().sessions.find(s => s.is_current)?.session_id ?? null
     const isCurrent = requestedId == null || requestedId === currentId
     const key = isCurrent ? CURRENT_SESSION_KEY : requestedId
@@ -27,7 +38,7 @@ export const useTeachersStore = create((set, get) => ({
       bySession: { ...state.bySession, [key]: { teachers: existing?.teachers ?? [], status: 'loading', error: null } },
     }))
     try {
-      const data = await fetchMyTeachers(apiSessionId)
+      const data = await fetchMyTeachers(apiSessionId, wardId)
       set(state => ({
         bySession: { ...state.bySession, [key]: { teachers: data.teachers, status: 'loaded', error: null } },
       }))
