@@ -21,7 +21,7 @@ import math
 import traceback
 from datetime import date, datetime
 
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select, text, tuple_
 from sqlalchemy.orm import Session
 
 from config.app_config import get_setting
@@ -34,6 +34,7 @@ from llm.factory import LLMPurpose, get_llm_client
 from services.allocation_service import active_cells, compute_allocation
 from services.batch_job_service import close_job, fail_job, is_due, start_job
 from services.error_log_service import log_error
+from services.grade_rules import grade_name_range, target_grade_name
 from services.session_service import get_current_session_id
 from services.subject_icon_service import resolve_icon_key
 from services.matching_service import match_subject, match_subject_area, match_subject_area_globally, match_topic
@@ -213,12 +214,16 @@ async def _finalize(
     committed in its own transaction first so a failure partway through QA
     generation/insertion (which leaves the session needing a rollback) can
     never take the already-valid log write down with it."""
+    grade_to_row = db.execute(
+        select(Grade).where(Grade.grade_name == target_grade_name(grade))
+    ).scalar_one()
     teach_log = TeachLog(
         user_id=user_id,
         customer_id=customer_id,
         subject_id=subject.subject_id,
         topic_id=topic.topic_id,
         grade_id=grade_row.grade_id,
+        grade_to_id=grade_to_row.grade_id,
         section=section,
         session_id=get_current_session_id(db, customer_id),
     )
@@ -500,45 +505,79 @@ _MISSING_QA_BUFFER_MINUTES = 30
 
 
 def _teach_log_triples_missing_qa(db: Session) -> list[tuple[int, int, int]]:
-    """Distinct (subject, topic, grade) triples with a logged lesson but zero
-    QA rows — the signature of a real-time generate-on-teach-log call that
-    failed and rolled back (see _finalize's except block: a failed attempt
-    leaves no rows behind at all, unlike a row that generated but failed
-    verification, which stays as is_active=False rather than disappearing
-    entirely). A row that exists but is merely unverified belongs to
-    verify_pending_qa instead, not here. Excludes teach_logs younger than
-    _MISSING_QA_BUFFER_MINUTES — see that constant's comment for why."""
-    qa_exists = (
-        select(QA.qa_id)
-        .where(
-            QA.subject_id == TeachLog.subject_id,
-            QA.topic_id == TeachLog.topic_id,
-            QA.grade_id == TeachLog.grade_id,
-            QA.is_active == True,  # noqa: E712
-        )
-        .exists()
-    )
-    return db.execute(
-        select(TeachLog.subject_id, TeachLog.topic_id, TeachLog.grade_id)
+    """Distinct (subject, topic, grade) triples missing QA — spanning not
+    just each teach_log's own taught grade but every grade_name from that
+    grade through its grade_to_id (services.grade_rules), so a topic
+    taught at grade 3 also gets QA prepared for grades 4-5: a student who
+    has since advanced past grade 3 can still quiz on it for retention.
+    This naturally subsumes the original real-time-failure fallback too —
+    the taught grade itself is always the first grade in its own range —
+    without a separate code path. Excludes teach_logs younger than
+    _MISSING_QA_BUFFER_MINUTES (logged_at, not date_created — see that
+    constant's comment) so a still-in-flight real-time generation for the
+    taught grade is never double-triggered.
+
+    Range math is done entirely on grade_name (the real 1-12 grade
+    number), never grade_id — grade_id isn't sequential with grade_name
+    (seeded in migration order, not grade order), so walking grade_id
+    values directly would produce a meaningless range."""
+    groups = db.execute(
+        select(TeachLog.subject_id, TeachLog.topic_id, TeachLog.grade_id, TeachLog.grade_to_id)
         .where(
             TeachLog.is_active == True,  # noqa: E712
             TeachLog.logged_at <= func.now() - text(f"interval '{_MISSING_QA_BUFFER_MINUTES} minutes'"),
-            ~qa_exists,
         )
         .distinct()
     ).all()
+    if not groups:
+        return []
+
+    grades = db.execute(select(Grade)).scalars().all()
+    name_by_id = {g.grade_id: g.grade_name for g in grades}
+    id_by_name = {g.grade_name: g.grade_id for g in grades}
+
+    candidates: set[tuple[int, int, int]] = set()
+    subject_topic_pairs: set[tuple[int, int]] = set()
+    for subject_id, topic_id, grade_id, grade_to_id in groups:
+        start_name = name_by_id.get(grade_id)
+        end_name = name_by_id.get(grade_to_id)
+        if start_name is None or end_name is None:
+            continue
+        subject_topic_pairs.add((subject_id, topic_id))
+        for grade_name in range(start_name, end_name + 1):
+            target_grade_id = id_by_name.get(grade_name)
+            if target_grade_id is not None:
+                candidates.add((subject_id, topic_id, target_grade_id))
+
+    if not candidates:
+        return []
+
+    existing = db.execute(
+        select(QA.subject_id, QA.topic_id, QA.grade_id)
+        .where(
+            QA.is_active == True,  # noqa: E712
+            tuple_(QA.subject_id, QA.topic_id).in_(list(subject_topic_pairs)),
+        )
+        .distinct()
+    ).all()
+    existing_set = {(s, t, g) for s, t, g in existing}
+
+    return [c for c in candidates if c not in existing_set]
 
 
 async def generate_missing_qa(db: Session) -> dict:
-    """Periodic fallback sweep (jobs/tasks.py:generate_missing_qa_task) for
-    real-time QA generation that failed at teach-log time. Subject/topic/
-    grade are already resolved by the time a teach_log exists — logging a
-    lesson only happens after get_or_generate_qa matched or created them —
-    so unlike get_or_generate_qa there is no fuzzy-match/LLM-validate step
-    here; this reuses _get_verified_qa directly, the exact function the
+    """Periodic sweep (jobs/tasks.py:generate_missing_qa_task) that (a)
+    retries real-time QA generation that failed at teach-log time, and (b)
+    proactively prepares QA for the retention grade range each teach_log
+    defines (grade_id through grade_to_id — see
+    _teach_log_triples_missing_qa). Subject/topic/grade are already
+    resolved by the time a teach_log exists — logging a lesson only
+    happens after get_or_generate_qa matched or created them — so unlike
+    get_or_generate_qa there is no fuzzy-match/LLM-validate step here;
+    this reuses _get_verified_qa directly, the exact function the
     real-time path calls once a triple is already resolved, so generation
-    behaves identically either way. Runs sequentially, one triple at a time
-    (shares this one db Session — not safe for concurrent use, same
+    behaves identically either way. Runs sequentially, one triple at a
+    time (shares this one db Session — not safe for concurrent use, same
     reasoning as verify_pending_qa above). A triple whose call fails is
     logged and skipped rather than aborting the rest of the sweep."""
     triples = _teach_log_triples_missing_qa(db)

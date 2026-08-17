@@ -473,6 +473,11 @@ class TeachLog(Base):
     subject_id:    Mapped[int]           = mapped_column(ForeignKey("subjects.subject_id"), nullable=False)
     topic_id:      Mapped[int]           = mapped_column(ForeignKey("topics.topic_id"), nullable=False)
     grade_id:      Mapped[int]           = mapped_column(ForeignKey("grades.grade_id"), nullable=False)
+    # Highest grade (by grade_name, via services.grade_rules) this taught
+    # topic's QA should also be prepared for, so a student who has since
+    # advanced past grade_id can still quiz on it for retention. Set once
+    # at insert, from grade_id's grade_name — never itself a grade_name.
+    grade_to_id:   Mapped[int]           = mapped_column(ForeignKey("grades.grade_id"), nullable=False)
     section:       Mapped[str|None]      = mapped_column(String(5))
     session_id:    Mapped[int|None]      = mapped_column(ForeignKey("academic_sessions.session_id"), nullable=True)
     date_created:  Mapped[datetime]      = mapped_column(DateTime, nullable=False, server_default=func.now())
@@ -489,6 +494,7 @@ class TeachLog(Base):
     subject:  Mapped["Subject"] = relationship(foreign_keys=[subject_id])
     topic:    Mapped["Topic"]   = relationship(foreign_keys=[topic_id])
     grade:    Mapped["Grade"]   = relationship(foreign_keys=[grade_id])
+    grade_to: Mapped["Grade"]   = relationship(foreign_keys=[grade_to_id])
     session:  Mapped["AcademicSession|None"] = relationship(foreign_keys=[session_id])
 
 
