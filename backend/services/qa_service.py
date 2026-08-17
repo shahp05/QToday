@@ -21,7 +21,7 @@ import math
 import traceback
 from datetime import date, datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from config.app_config import get_setting
@@ -486,6 +486,19 @@ async def verify_pending_qa(db: Session) -> dict:
     return {"groups_found": len(groups), "groups_processed": groups_processed, "verified": verified_count}
 
 
+# Must be >= jobs/tasks.py:generate_missing_qa_task's cron interval (30
+# minutes): the real-time path commits teach_log BEFORE its own QA
+# generate-and-verify call finishes (see _finalize), so a triple can sit
+# with zero QA rows for the whole duration of that in-flight call. Without
+# this buffer, a sweep landing inside that window would start a second,
+# parallel generation for the same triple — wasted LLM spend and a
+# duplicated question set, since qa has no uniqueness constraint on
+# content. logged_at (not date_created, which qa_service._finalize
+# backdates for calendar-logged lessons) is the real insertion time, so
+# this buffer holds even for backdated rows.
+_MISSING_QA_BUFFER_MINUTES = 30
+
+
 def _teach_log_triples_missing_qa(db: Session) -> list[tuple[int, int, int]]:
     """Distinct (subject, topic, grade) triples with a logged lesson but zero
     QA rows — the signature of a real-time generate-on-teach-log call that
@@ -493,7 +506,8 @@ def _teach_log_triples_missing_qa(db: Session) -> list[tuple[int, int, int]]:
     leaves no rows behind at all, unlike a row that generated but failed
     verification, which stays as is_active=False rather than disappearing
     entirely). A row that exists but is merely unverified belongs to
-    verify_pending_qa instead, not here."""
+    verify_pending_qa instead, not here. Excludes teach_logs younger than
+    _MISSING_QA_BUFFER_MINUTES — see that constant's comment for why."""
     qa_exists = (
         select(QA.qa_id)
         .where(
@@ -506,7 +520,11 @@ def _teach_log_triples_missing_qa(db: Session) -> list[tuple[int, int, int]]:
     )
     return db.execute(
         select(TeachLog.subject_id, TeachLog.topic_id, TeachLog.grade_id)
-        .where(TeachLog.is_active == True, ~qa_exists)  # noqa: E712
+        .where(
+            TeachLog.is_active == True,  # noqa: E712
+            TeachLog.logged_at <= func.now() - text(f"interval '{_MISSING_QA_BUFFER_MINUTES} minutes'"),
+            ~qa_exists,
+        )
         .distinct()
     ).all()
 

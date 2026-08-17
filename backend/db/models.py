@@ -476,6 +476,10 @@ class TeachLog(Base):
     section:       Mapped[str|None]      = mapped_column(String(5))
     session_id:    Mapped[int|None]      = mapped_column(ForeignKey("academic_sessions.session_id"), nullable=True)
     date_created:  Mapped[datetime]      = mapped_column(DateTime, nullable=False, server_default=func.now())
+    # Real wall-clock insertion time — unlike date_created, never backdated
+    # by qa_service._finalize's log_date handling. Lets generate_missing_qa
+    # tell "actually just inserted" apart from "backdated to look old".
+    logged_at:     Mapped[datetime]      = mapped_column(DateTime, nullable=False, server_default=func.now())
     date_modified: Mapped[datetime]      = mapped_column(DateTime, nullable=False, server_default=func.now())
     date_deleted:  Mapped[datetime|None] = mapped_column(DateTime, nullable=True)
     is_active:     Mapped[bool]          = mapped_column(Boolean, nullable=False, default=True)
