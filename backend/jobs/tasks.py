@@ -14,7 +14,9 @@ from services.batch_job_service import close_job, fail_job, is_due, start_job
 from services.country_service import fetch_and_sync_countries
 from services.error_log_service import mark_old_error_logs_for_purge, physically_delete_purged_error_logs
 from services.password_service import hash_password
-from services.qa_service import poll_and_finalize_qa_batch, should_top_up_qa, submit_qa_top_up_batch, verify_pending_qa
+from services.qa_service import (
+    generate_missing_qa, poll_and_finalize_qa_batch, should_top_up_qa, submit_qa_top_up_batch, verify_pending_qa,
+)
 from services.quiz_scoring_service import score_pending_quiz
 from services.session_service import run_due_cutovers
 
@@ -234,6 +236,26 @@ async def session_cutover_sweep_task(timestamp: int) -> dict:
             db.rollback()
             fail_job(db, job)
             raise
+    finally:
+        db.close()
+
+
+# Fallback for real-time generation failures: the LLM call inside
+# _finalize (routers/qa.py's teach-log path) can fail after the teach_log
+# itself is already committed (see qa_service._finalize's except block),
+# leaving that (subject, topic, grade) taught but with zero QA rows. This
+# sweep picks those up and retries via the same _get_verified_qa the
+# real-time path uses (qa_service.generate_missing_qa). The 30-minute
+# cadence lives here, in the cron string, rather than in app_settings —
+# consistent with poll_qa_generation_batches below and every other
+# @app.periodic job in this file; Procrastinate reads a periodic task's
+# cron at decoration time, not from the DB.
+@app.periodic(cron="*/30 * * * *", periodic_id="generate_missing_qa")
+@app.task(queue="qa_generation")
+async def generate_missing_qa_task(timestamp: int) -> dict:
+    db = SessionLocal()
+    try:
+        return await generate_missing_qa(db)
     finally:
         db.close()
 

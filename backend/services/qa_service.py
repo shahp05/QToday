@@ -486,6 +486,84 @@ async def verify_pending_qa(db: Session) -> dict:
     return {"groups_found": len(groups), "groups_processed": groups_processed, "verified": verified_count}
 
 
+def _teach_log_triples_missing_qa(db: Session) -> list[tuple[int, int, int]]:
+    """Distinct (subject, topic, grade) triples with a logged lesson but zero
+    QA rows — the signature of a real-time generate-on-teach-log call that
+    failed and rolled back (see _finalize's except block: a failed attempt
+    leaves no rows behind at all, unlike a row that generated but failed
+    verification, which stays as is_active=False rather than disappearing
+    entirely). A row that exists but is merely unverified belongs to
+    verify_pending_qa instead, not here."""
+    qa_exists = (
+        select(QA.qa_id)
+        .where(
+            QA.subject_id == TeachLog.subject_id,
+            QA.topic_id == TeachLog.topic_id,
+            QA.grade_id == TeachLog.grade_id,
+            QA.is_active == True,  # noqa: E712
+        )
+        .exists()
+    )
+    return db.execute(
+        select(TeachLog.subject_id, TeachLog.topic_id, TeachLog.grade_id)
+        .where(TeachLog.is_active == True, ~qa_exists)  # noqa: E712
+        .distinct()
+    ).all()
+
+
+async def generate_missing_qa(db: Session) -> dict:
+    """Periodic fallback sweep (jobs/tasks.py:generate_missing_qa_task) for
+    real-time QA generation that failed at teach-log time. Subject/topic/
+    grade are already resolved by the time a teach_log exists — logging a
+    lesson only happens after get_or_generate_qa matched or created them —
+    so unlike get_or_generate_qa there is no fuzzy-match/LLM-validate step
+    here; this reuses _get_verified_qa directly, the exact function the
+    real-time path calls once a triple is already resolved, so generation
+    behaves identically either way. Runs sequentially, one triple at a time
+    (shares this one db Session — not safe for concurrent use, same
+    reasoning as verify_pending_qa above). A triple whose call fails is
+    logged and skipped rather than aborting the rest of the sweep."""
+    triples = _teach_log_triples_missing_qa(db)
+
+    processed = 0
+    generated_count = 0
+    failed = 0
+    for subject_id, topic_id, grade_id in triples:
+        subject = db.get(Subject, subject_id)
+        topic = db.get(Topic, topic_id)
+        grade_row = db.get(Grade, grade_id)
+        if (
+            subject is None or not subject.is_active
+            or topic is None or not topic.is_active
+            or grade_row is None or not grade_row.is_active
+        ):
+            continue
+        subject_area = db.get(SubjectArea, topic.subject_area_id)
+        if subject_area is None or not subject_area.is_active:
+            continue
+
+        try:
+            qa_rows = await _get_verified_qa(db, subject, topic, subject_area, grade_row, grade_row.grade_name)
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            failed += 1
+            log_error(
+                db,
+                type="batch",
+                error_code=ErrorCode.LLM_GENERATION_FAILED,
+                description=str(exc),
+                stack_trace=traceback.format_exc(),
+                context={"subject_id": subject_id, "topic_id": topic_id, "grade_id": grade_id},
+            )
+            continue
+
+        processed += 1
+        generated_count += len(qa_rows)
+
+    return {"triples_found": len(triples), "processed": processed, "generated": generated_count, "failed": failed}
+
+
 async def _validate_subject_topic(
     subject_name: str, topic_name: str, grade: int, user_country_id: int, db: Session
 ) -> dict:
