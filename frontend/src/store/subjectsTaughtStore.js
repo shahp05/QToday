@@ -27,7 +27,9 @@ export const useSubjectsTaughtStore = create((set, get) => ({
   // A parent has no customer_id of their own — every fetch here resolves
   // their currently selected ward (parentWardStore) and sends it as
   // student_id, mirroring teachersStore.fetchTeachers.
-  fetchSubjectsTaught: async (force = false, sessionId = null) => {
+  // (sessionId, force) — matches teachersStore.fetchTeachers/
+  // studentsStore.fetchStudents' argument order, not force-first.
+  fetchSubjectsTaught: async (sessionId = null, force = false) => {
     const isParent = useProfileStore.getState().is_parent
     const wardId = isParent ? useParentWardStore.getState().selectedStudentId : null
     if (isParent && wardId == null) return // no ward selected/loaded yet — nothing to fetch

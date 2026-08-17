@@ -9,6 +9,7 @@ from errors.app_error import AppError
 from errors.error_codes import ErrorCode
 from services.email_service import send_verification_code
 from services.password_service import hash_password
+from services.session_service import ensure_session_bootstrapped
 
 
 def _get_setting(db: Session, key: str, default):
@@ -177,6 +178,15 @@ def verify_and_create(db: Session, email: str, code: str) -> dict:
             "oid": org_id,
         },
     ).scalar()
+
+    # Previously session #1 only got created lazily on the customer's first
+    # student roster upload (see ensure_session_bootstrapped) — until then
+    # GET /sessions has no is_current row at all, so the left-nav session
+    # dropdown fell back to a bare "Current" placeholder label and its
+    # activeSessionId never matched any real option (showing "Select…").
+    # Bootstrapping right here means every account has a real, dated
+    # session ("<signup date>") from the moment it exists.
+    ensure_session_bootstrapped(db, customer_id)
 
     db.commit()
     return {"customer_id": customer_id, "user_id": user_id}

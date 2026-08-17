@@ -83,7 +83,7 @@ export const useSessionsStore = create(
           // Only a sys admin can ever schedule a session — never a parent
           // (they have no session-creation UI at all), so no studentId here.
           await get().fetchSessions(null, true)
-          await useSubjectsTaughtStore.getState().fetchSubjectsTaught(true)
+          await useSubjectsTaughtStore.getState().fetchSubjectsTaught(null, true)
           set({ scheduling: false })
           return true
         } catch (err) {

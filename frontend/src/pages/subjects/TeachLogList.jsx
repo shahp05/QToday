@@ -75,6 +75,7 @@ function IconClose() {
 
 export default function TeachLogList({
   onBack, onLogNew, onEmptyDayClick,
+  readOnly = false, // browsing a past session — no logging a new subject, editing/flagging existing QA still allowed (QaCard's own concern)
   selection, onSelectionChange,
   showCalendar, onShowCalendarChange,
   calendarMonth, onCalendarMonthChange,
@@ -282,9 +283,11 @@ export default function TeachLogList({
             >
               <IconHistory />
             </button>
-            <button className="teach-log-list-new-btn" onClick={onLogNew}>
-              New Subject
-            </button>
+            {!readOnly && (
+              <button className="teach-log-list-new-btn" onClick={onLogNew}>
+                New Subject
+              </button>
+            )}
           </>
         )}
       />

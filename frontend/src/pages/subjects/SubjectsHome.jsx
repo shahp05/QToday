@@ -11,7 +11,7 @@ function initialCalendarMonth() {
   return d
 }
 
-export default function SubjectsHome({ defaultView }) {
+export default function SubjectsHome({ defaultView, isViewingPastSession = false }) {
   const navigate = useNavigate()
   const [view, setView] = usePageView(defaultView === 'teachLog' ? 'log' : 'subjects')
   const showCalendar = view === 'log'
@@ -26,13 +26,15 @@ export default function SubjectsHome({ defaultView }) {
   // resolves, the same "adjust state during render" pattern TeachLogList
   // itself uses for auto-expanding the most recent topic — this runs before
   // TeachLogList would ever paint its (now unreachable) empty state, so
-  // there's no flash between the two screens.
+  // there's no flash between the two screens. Never applies while browsing
+  // a past session — that form logs a NEW subject, a write action history
+  // must never expose, regardless of how many (or few) were logged then.
   const subjectsStatus = useSubjectsTaughtStore(s => s.status)
   const subjectsExist = useSubjectsTaughtStore(s => s.subjects.length > 0)
   const [didSyncEmptyDefault, setDidSyncEmptyDefault] = useState(false)
   if (!didSyncEmptyDefault && defaultView === 'teachLog' && subjectsStatus === 'loaded') {
     setDidSyncEmptyDefault(true)
-    if (!subjectsExist) setShowList(false)
+    if (!subjectsExist && !isViewingPastSession) setShowList(false)
   }
   // Lifted up from TeachLogList/TeachLogCalendar so it survives the
   // "New Subject" round trip through SubjectsPage — TeachLogList unmounts
@@ -42,15 +44,21 @@ export default function SubjectsHome({ defaultView }) {
   const [selection, setSelection] = useState(null) // { subjectId, topicId, gradeId } | null
   const [calendarMonth, setCalendarMonth] = useState(initialCalendarMonth)
 
-  if (showList) {
+  // A past session is always read-only (see the permission matrix design)
+  // — SubjectsPage (the "which subject did you teach today?" logging form)
+  // must never be reachable while browsing one, no matter how empty that
+  // session's subjects list is, so it's shown unconditionally here instead
+  // of gating on showList.
+  if (showList || isViewingPastSession) {
     return (
       <TeachLogList
         onBack={() => navigate(-1)}
-        onLogNew={() => {
+        readOnly={isViewingPastSession}
+        onLogNew={isViewingPastSession ? undefined : () => {
           setLogDate(null)
           setShowList(false)
         }}
-        onEmptyDayClick={date => {
+        onEmptyDayClick={isViewingPastSession ? undefined : date => {
           setLogDate(date)
           setShowList(false)
         }}

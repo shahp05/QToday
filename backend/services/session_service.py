@@ -54,16 +54,17 @@ def ensure_session_bootstrapped(db: Session, customer_id: int) -> int:
     """Called the first time ANY write touches a customer with zero
     academic_sessions rows — creates session #1 (start_date = today,
     is_current = TRUE) and, in the SAME transaction, bulk re-tags every
-    existing active student_grades row for this customer (session_id IS
-    NULL, i.e. pre-tracking legacy rows) onto it. This is a one-time fix:
-    after it runs, every active student_grades row for this customer always
-    carries a real session_id, so current_session_clause never needs a
-    permanent NULL fallback. teach_logs are deliberately NOT re-tagged here
-    — pre-bootstrap logs are genuinely prior history (an analogous session
-    boundary), not "this session's progress," so leaving them NULL (and
-    browsable as "before sessions") is correct, not an oversight.
-    Idempotent in the sense that it's only ever called when
-    get_current_session_id has already returned None."""
+    existing active student_grades AND teach_logs row for this customer
+    (session_id IS NULL, i.e. pre-tracking rows) onto it. There's no
+    meaningful "before sessions" era for a customer's own data — everything
+    they've ever done belongs to whichever session was in effect, and
+    before this feature existed that was implicitly session #1 — so both
+    tables get folded into it here rather than left permanently orphaned
+    under a NULL/"legacy" bucket nothing in the UI ever exposed anyway.
+    After this runs, every active row for this customer always carries a
+    real session_id, so current_session_clause/_session_clause never need a
+    permanent NULL fallback. Idempotent in the sense that it's only ever
+    called when get_current_session_id has already returned None."""
     label = _format_label(date.today())
     row = db.execute(
         text(
@@ -80,6 +81,13 @@ def ensure_session_bootstrapped(db: Session, customer_id: int) -> int:
             "UPDATE student_grades sg SET session_id = :sid, date_modified = NOW() "
             "FROM students st WHERE sg.student_id = st.student_id "
             "AND st.customer_id = :cid AND sg.is_active = TRUE AND sg.session_id IS NULL"
+        ),
+        {"sid": session_id, "cid": customer_id},
+    )
+    db.execute(
+        text(
+            "UPDATE teach_logs SET session_id = :sid, date_modified = NOW() "
+            "WHERE customer_id = :cid AND is_active = TRUE AND session_id IS NULL"
         ),
         {"sid": session_id, "cid": customer_id},
     )
