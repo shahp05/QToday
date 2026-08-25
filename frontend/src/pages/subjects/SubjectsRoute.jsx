@@ -1,37 +1,39 @@
 import { useEffect } from 'react'
-import { useProfileStore } from '../../store/profileStore'
+import { useNavigate } from 'react-router-dom'
 import { getActiveSession, useSessionsStore } from '../../store/sessionsStore'
-import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
+import { useProfileStore } from '../../store/profileStore'
+import { useSubjectsFeatureVisible } from '../../hooks/useSubjectsFeatureVisible'
 import StudentSubjectsHome from './StudentSubjectsHome'
 import SubjectsHome from './SubjectsHome'
 
 // /dashboard/subjects — same URL for every role, different content: a
 // student plays quizzes here, a teacher/admin logs what they taught, and a
 // parent gets the same topic-card view as a student but read-only (no
-// quiz-play) for their selected ward.
+// quiz-play) for their selected ward. subjectsTaughtStore itself is kept
+// fresh by Dashboard.jsx (session/ward-reactive), not fetched here, so this
+// component only ever reads it.
 export default function SubjectsRoute() {
+  const navigate = useNavigate()
   const isStudent      = useProfileStore(s => s.is_student)
   const isParent       = useProfileStore(s => s.is_parent)
   const isSchoolAdmin  = useProfileStore(s => s.is_school_admin)
 
-  // A parent's fetch is ward-driven (see LeftNav's ward-switch effect) —
-  // this covers the session-dropdown-driven case every other role uses,
-  // mirroring TeachersPage/StudentsPage's own activeSessionId effect.
-  // Subjects previously had none at all: subjectsTaughtStore is a single
-  // flat slot (unlike teachers/students' bySession cache), always force-
-  // fetched here rather than relying on a per-session cache key to dedup —
-  // switching the session dropdown was otherwise silently ignored, always
-  // showing whichever session Dashboard's one-time mount fetch had loaded.
-  const activeSessionId = useSessionsStore(s => s.activeSessionId)
   const activeSession = useSessionsStore(getActiveSession)
-  const fetchSubjectsTaught = useSubjectsTaughtStore(s => s.fetchSubjectsTaught)
   const isViewingPastSession = activeSession != null && !activeSession.is_current && !activeSession.is_future
 
+  // Per spec, the Subjects feature is hidden (nav icon + this route) when
+  // there's nothing for the current role/session/data state to show — see
+  // the hook's own docstring for the full per-role matrix. Redirected away
+  // here (not just left un-navigable from the nav icon) so a stale link, a
+  // Back navigation, or the underlying data changing out from under an
+  // already-open page all land somewhere real instead of showing an
+  // enforced-empty page. Only acts once `ready` — never redirect on a
+  // still-loading guess.
+  const { ready, visible } = useSubjectsFeatureVisible()
   useEffect(() => {
-    if (isParent) return
-    fetchSubjectsTaught(activeSessionId, true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isParent, activeSessionId])
+    if (ready && !visible) navigate('/dashboard', { replace: true })
+  }, [ready, visible, navigate])
+  if (ready && !visible) return null
 
   if (isStudent) return <StudentSubjectsHome readOnly={isViewingPastSession} />
   if (isParent) return <StudentSubjectsHome readOnly />

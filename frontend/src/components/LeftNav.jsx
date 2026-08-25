@@ -8,6 +8,7 @@ import { useTeachersStore } from '../store/teachersStore'
 import { useSubjectsTaughtStore } from '../store/subjectsTaughtStore'
 import { useDashboardQuoteStore } from '../store/dashboardQuoteStore'
 import { resetUserScopedStores } from '../store/resetUserScopedStores'
+import { useSubjectsFeatureVisible } from '../hooks/useSubjectsFeatureVisible'
 import Dropdown from './Dropdown'
 import ScheduleSessionDialog from './ScheduleSessionDialog'
 import WardPickerDialog from './WardPickerDialog'
@@ -93,6 +94,7 @@ export default function LeftNav() {
   const studentsStatus = useStudentsStore(s => s.bySession[CURRENT_SESSION_KEY]?.status ?? 'idle')
   const teachersStatus = useTeachersStore(s => s.bySession[CURRENT_SESSION_KEY]?.status ?? 'idle')
   const subjectsStatus = useSubjectsTaughtStore(s => s.status)
+  const { visible: subjectsFeatureVisible } = useSubjectsFeatureVisible()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -226,7 +228,9 @@ export default function LeftNav() {
       </div>
 
       <nav className="leftnav-items">
-        {NAV_ITEMS.filter(item => !item.visible || item.visible(profile)).map(({ id, label, Icon }) => {
+        {NAV_ITEMS.filter(item =>
+          (!item.visible || item.visible(profile)) && (item.id !== 'subjects' || subjectsFeatureVisible)
+        ).map(({ id, label, Icon }) => {
           // A parent's "Students" button shows the selected ward's own
           // photo/name instead of the generic icon/label — same button,
           // same size, just standing in for a page this role doesn't have.
