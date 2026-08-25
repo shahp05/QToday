@@ -8,7 +8,7 @@ import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
 import { useClassQuizProgressStore } from '../../store/classQuizProgressStore'
 import { topicSummaryStatus } from '../../lib/topicStatus'
 import { resolveFileUrl } from '../../lib/api'
-import { uploadMyPhoto, uploadStudentPhoto } from '../../services/photoService'
+import { uploadMyPhoto } from '../../services/photoService'
 import EditablePhoto from '../../components/EditablePhoto'
 import { Toast } from '../../components/ui/Toast'
 import PageHeader from '../../components/PageHeader'
@@ -213,7 +213,6 @@ export default function StudentsList({
   selectedGrade, onSelectedGradeChange, selectedSection, onSelectedSectionChange,
 }) {
   const isAdmin = useProfileStore(s => s.is_school_admin)
-  const isSchoolTeacher = useProfileStore(s => s.is_school_teacher)
   const isStudentViewer = useProfileStore(s => s.is_student)
   const grades = useGroupedStudents()
 
@@ -229,18 +228,18 @@ export default function StudentsList({
   const updateStudentPhoto = useStudentsStore(s => s.updateStudentPhoto)
 
   const [photoError, setPhotoError] = useState('')
-  // A teacher/admin may set any visible student's photo; a student viewer
-  // only ever sees their own single row (students_query_service.py scopes
-  // it that way server-side), so this one flag covers every row for them.
-  // Photo upload isn't session data (a person's photo, not a record tied to
-  // one academic year) — it stays enabled even while browsing a past
-  // session, unlike upload/quiz-play, which do write session data.
-  const canEditPhoto = isAdmin || isSchoolTeacher || isStudentViewer
+  // Per spec, photos are self-upload only — a teacher/admin may never set a
+  // student's photo on their behalf. A student viewer only ever sees their
+  // own single row (students_query_service.py scopes it that way
+  // server-side), so this one flag covers every row for them; teachers/
+  // admins never get an editable row here. Photo upload isn't session data
+  // (a person's photo, not a record tied to one academic year) — it stays
+  // enabled even while browsing a past session, unlike upload/quiz-play,
+  // which do write session data.
+  const canEditPhoto = isStudentViewer
 
   async function handlePhotoUpload(studentId, file) {
-    const data = isStudentViewer
-      ? await uploadMyPhoto(file)
-      : await uploadStudentPhoto(studentId, file)
+    const data = await uploadMyPhoto(file)
     updateStudentPhoto(studentId, data.photo_url)
   }
 

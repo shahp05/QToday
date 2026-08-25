@@ -50,34 +50,10 @@ def _set_user_photo(db: Session, *, user_id: int, photo_url: str) -> dict:
 
 
 async def upload_own_photo(db: Session, *, file: UploadFile, user_id: int) -> dict:
-    """Any authenticated user may set their own photo — students and
-    teachers alike, no role check needed since it's always self-targeted."""
+    """Any authenticated user may set their own photo — students, teachers
+    and parents alike, no role check needed since it's always self-targeted.
+    Per spec, this is the ONLY way to set a photo — no staff-on-behalf-of-
+    another-user path exists (see git history for the removed
+    upload_student_photo, which violated that rule)."""
     photo_url = await _save_uploaded_photo(file)
     return _set_user_photo(db, user_id=user_id, photo_url=photo_url)
-
-
-async def upload_student_photo(db: Session, *, file: UploadFile, claims: dict, student_id: int) -> dict:
-    """A school admin or school teacher may set a student's photo — scoped
-    to their own school, same pattern as resolve_authorized_student_id in
-    quiz_service.py. A system admin may target any student."""
-    if not (claims.get("is_school_admin") or claims.get("is_school_teacher") or claims.get("is_system_admin")):
-        raise AppError(ErrorCode.AUTH_FORBIDDEN)
-
-    if claims.get("is_system_admin"):
-        row = db.execute(
-            text("SELECT user_id FROM students WHERE student_id = :sid AND is_active = TRUE"),
-            {"sid": student_id},
-        ).first()
-    else:
-        row = db.execute(
-            text("""
-                SELECT user_id FROM students
-                WHERE student_id = :sid AND customer_id = :cid AND is_active = TRUE
-            """),
-            {"sid": student_id, "cid": claims.get("customer_id")},
-        ).first()
-    if row is None:
-        raise AppError(ErrorCode.STUDENT_NOT_FOUND)
-
-    photo_url = await _save_uploaded_photo(file)
-    return _set_user_photo(db, user_id=row.user_id, photo_url=photo_url)

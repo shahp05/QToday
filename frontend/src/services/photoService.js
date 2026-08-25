@@ -11,11 +11,3 @@ export async function uploadMyPhoto(file) {
   if (!res.ok) throw new Error(await apiErrorMessage(res))
   return res.json() // { photo_url }
 }
-
-export async function uploadStudentPhoto(studentId, file) {
-  const formData = new FormData()
-  formData.append('file', file)
-  const res = await apiFetch(`/students/${studentId}/photo`, { method: 'POST', body: formData })
-  if (!res.ok) throw new Error(await apiErrorMessage(res))
-  return res.json() // { photo_url }
-}
