@@ -205,7 +205,6 @@ export default function QuizPage({ subjectName, topicName, topicId, gradeId, que
       <div className="quiz-page">
         <div className="quiz-center">
           <div className="quiz-page-message content-card">
-            <p className="content-card-placeholder">No questions available for this topic yet.</p>
             <button className="quiz-exit-btn" onClick={onExit}>Back to topics</button>
           </div>
         </div>

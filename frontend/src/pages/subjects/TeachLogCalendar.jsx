@@ -136,7 +136,6 @@ function FilterDropdown({ label, options, isChecked, onToggle, renderOption }) {
       </button>
       {open && (
         <div className="teach-log-cal-dropdown-panel">
-          {options.length === 0 && <p className="teach-log-cal-dropdown-empty">Nothing to show</p>}
           {options.map(opt => (
             <label key={opt.id} className="teach-log-cal-dropdown-item">
               <input
@@ -279,10 +278,7 @@ export default function TeachLogCalendar({ onEmptyDayClick, viewDate, onViewDate
       {(status === 'loading' || status === 'idle') && <PageLoading />}
 
       {status === 'error' && (
-        <>
-          <Toast message={error} onDismiss={clearSubjectsError} />
-          <p className="teach-log-list-empty">Couldn't load your subjects.</p>
-        </>
+        <Toast message={error} onDismiss={clearSubjectsError} />
       )}
 
       {status === 'loaded' && (

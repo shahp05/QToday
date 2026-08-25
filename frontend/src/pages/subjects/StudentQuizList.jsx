@@ -58,7 +58,7 @@ export default function StudentQuizList({ quizzes, status, error, onDismissError
   }
 
   if (quizzes.length === 0) {
-    return <p className="content-card-placeholder">No quizzes played for this subject yet.</p>
+    return null
   }
 
   return <StudentQuizAccordion key={autoExpandKey} quizzes={quizzes} readOnly={readOnly} />

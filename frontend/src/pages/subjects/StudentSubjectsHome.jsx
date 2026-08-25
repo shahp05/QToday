@@ -166,16 +166,14 @@ export default function StudentSubjectsHome({ readOnly = false }) {
       <div className="student-subjects">
         <PageHeader title={pageTitle} onBack={() => navigate(-1)} />
         <Toast message={subjectsError} onDismiss={clearSubjectsError} />
-        <p className="content-card-placeholder" style={{ padding: '0 24px' }}>Couldn't load subjects.</p>
       </div>
     )
   }
 
   if (subjects.length === 0) {
     return (
-      <div className="student-subjects content-card">
-        <h2 className="content-card-title">Subjects</h2>
-        <p className="content-card-placeholder">No subjects available for {readOnly ? 'this' : 'your'} grade yet.</p>
+      <div className="student-subjects">
+        <PageHeader title={pageTitle} onBack={() => navigate(-1)} />
       </div>
     )
   }

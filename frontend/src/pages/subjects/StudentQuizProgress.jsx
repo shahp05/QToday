@@ -148,14 +148,12 @@ export default function StudentQuizProgress({
 
         <div className="student-quiz-progress-scroll">
           {activeView === 'chart' ? (
-            selectedTopic
-              ? <StudentProgressChart topic={selectedTopic} quizzes={topicQuizzes} />
-              : <p className="student-quiz-progress-empty">Pick a topic to see its progress chart.</p>
+            selectedTopic && <StudentProgressChart topic={selectedTopic} quizzes={topicQuizzes} />
           ) : quizHistoryStatus === 'loading' || quizHistoryStatus === 'idle' ? (
             <div className="student-quiz-list-loading">
               <span className="student-topic-spinner student-topic-spinner--lg" />
             </div>
-          ) : selectedTopic ? (
+          ) : selectedTopic && (
             <StudentQuizList
               quizzes={topicQuizzes}
               status={quizHistoryStatus}
@@ -164,8 +162,6 @@ export default function StudentQuizProgress({
               autoExpandKey={selectedTopicId}
               readOnly={readOnly}
             />
-          ) : (
-            <p className="student-quiz-progress-empty">No quizzes played yet — pick a topic once you have.</p>
           )}
         </div>
       </div>

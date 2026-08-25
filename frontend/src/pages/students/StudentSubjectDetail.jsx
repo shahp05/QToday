@@ -102,10 +102,6 @@ export default function StudentSubjectDetail({ student, initialSubjectId, onBack
 
       {status === 'error' && <Toast message={error} onDismiss={() => dismissError(student.student_id)} />}
 
-      {status !== 'error' && subjectsForGrade.length === 0 && (
-        <p className="content-card-placeholder" style={{ padding: '0 24px' }}>No subjects taught to this student's grade yet.</p>
-      )}
-
       {status !== 'error' && subjectsForGrade.length > 0 && (
         view === 'progress' ? (
           <div className="student-subjects-body student-subjects-body--progress">

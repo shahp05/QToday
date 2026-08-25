@@ -317,10 +317,7 @@ export default function TeachLogList({
       )}
 
       {!showCalendar && status === 'error' && (
-        <>
-          <Toast message={error} onDismiss={clearSubjectsError} />
-          <p className="teach-log-list-empty">Couldn't load your subjects.</p>
-        </>
+        <Toast message={error} onDismiss={clearSubjectsError} />
       )}
 
       {!showCalendar && status === 'loaded' && (
@@ -377,10 +374,6 @@ export default function TeachLogList({
 
                 <div className="teach-log-qa-scroll-wrap">
                   <div className="teach-log-qa-scroll" ref={qaScrollRef}>
-                    {currentGrade?.qa_items?.length === 0 && (
-                      <p className="teach-log-list-empty">No questions generated for this grade yet.</p>
-                    )}
-
                     {currentGrade?.qa_items?.map(qa => (
                       <QaCard key={qa.qa_id} qa={qa} onUpdated={handleQaUpdated} onFlagged={handleQaFlagged} />
                     ))}

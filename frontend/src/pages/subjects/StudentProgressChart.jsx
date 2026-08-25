@@ -96,7 +96,7 @@ export default function StudentProgressChart({ topic, quizzes }) {
     .sort((a, b) => a.ts - b.ts)
 
   if (scoredQuizzes.length === 0) {
-    return <p className="student-quiz-progress-empty">No scored quizzes yet — play one to start tracking progress.</p>
+    return null
   }
 
   const domainStart = taughtDates.length > 0

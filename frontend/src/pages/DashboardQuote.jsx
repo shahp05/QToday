@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useProfileStore } from '../store/profileStore'
 import { useDashboardQuoteStore } from '../store/dashboardQuoteStore'
@@ -31,7 +31,6 @@ export default function DashboardQuote() {
   const isParent         = useProfileStore(s => s.is_parent)
   const hasAutoAdvanced  = useDashboardQuoteStore(s => s.hasAutoAdvanced)
   const markAutoAdvanced = useDashboardQuoteStore(s => s.markAutoAdvanced)
-  const [expired, setExpired] = useState(false)
 
   // Which session (current/past/future) governs which row of the spec's
   // navigation table applies — only a school admin can ever have a future
@@ -105,21 +104,15 @@ export default function DashboardQuote() {
         return
       }
 
-      setExpired(true)
+      // No recognized role (shouldn't happen for a real account) — same as
+      // every other "nothing to navigate to yet" case above, just keep
+      // showing the quote rather than a placeholder message.
     }, LOGIN_QUOTE_DURATION_MS)
     return () => clearTimeout(timer)
   }, [
     hasAutoAdvanced, isStudent, isSchoolTeacher, isSchoolAdmin, isParent, navigate, markAutoAdvanced,
     isFutureSession, isPastSession, subjectsTaughtCount, currentStudentCount, wardCount,
   ])
-
-  if (expired) {
-    return (
-      <div className="content-card">
-        <p className="content-card-placeholder">Select a page from the menu to get started.</p>
-      </div>
-    )
-  }
 
   return <LoginQuote />
 }

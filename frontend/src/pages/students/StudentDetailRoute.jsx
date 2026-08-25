@@ -31,8 +31,8 @@ export default function StudentDetailRoute() {
       )
     }
     return (
-      <div className="content-card">
-        <p className="content-card-placeholder">Student not found.</p>
+      <div className="student-subjects">
+        <PageHeader title="Student" onBack={() => navigate(-1)} />
       </div>
     )
   }
