@@ -201,7 +201,27 @@ def list_sessions(db: Session, customer_id: int) -> dict:
     """Past+current sessions (most recent first) for the history-browsing
     picker, the pending future session (if any, kept separate — nothing to
     browse in it yet), and whether any legacy (session_id IS NULL) rows
-    exist for the "before sessions" picker entry."""
+    exist for the "before sessions" picker entry.
+
+    Bootstraps session #1 first if this customer has never written
+    anything session-tracked yet (get_current_session_id returns None) —
+    per spec, "the first academic session ... will be created at the time
+    of signup," but ensure_session_bootstrapped is only ever actually
+    triggered by a customer's first WRITE (student/teacher upload, a
+    logged subject — see its own docstring), not automatically at signup.
+    A customer who signs up and goes straight to browsing (e.g. an admin
+    just looking around before uploading anything) would otherwise see a
+    genuinely empty sessions list here — confirmed against real data: two
+    seeded test customers with zero academic_sessions rows reproduce
+    exactly that. Read-only endpoints having to write is unusual, but the
+    alternative is a customer who can be authenticated and viewing their
+    own dashboard yet have no current session to select — a real,
+    reachable state the frontend cannot sensibly render around, not an
+    edge case worth pushing onto every caller of this list."""
+    if get_current_session_id(db, customer_id) is None:
+        ensure_session_bootstrapped(db, customer_id)
+        db.commit()
+
     sessions = db.execute(
         text(
             "SELECT session_id, label, start_date, is_current "
