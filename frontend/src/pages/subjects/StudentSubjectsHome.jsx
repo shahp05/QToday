@@ -171,11 +171,7 @@ export default function StudentSubjectsHome({ readOnly = false }) {
   }
 
   if (subjects.length === 0) {
-    return (
-      <div className="student-subjects">
-        <PageHeader title={pageTitle} onBack={() => navigate(-1)} />
-      </div>
-    )
+    return null
   }
 
   const activeSubjectId = subjects.some(s => s.subject_id === selectedSubjectId)
