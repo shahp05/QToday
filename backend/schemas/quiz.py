@@ -64,11 +64,17 @@ class QuizDetailQuestion(BaseModel):
     marks: float
     score: Optional[float] = None
     is_scored: bool
-    # Set once this question has been challenged (resolved synchronously —
-    # there's no "pending" state) — the UI shows both under the question and
-    # hides the challenge button once present, without a separate lookup.
+    # challenge_reason is set as soon as a challenge is submitted;
+    # challenge_response stays None until the LLM re-grade resolves (either
+    # synchronously or via the periodic sweep) — that gap is the "awaiting
+    # response" state the UI shows. Hides the challenge button once
+    # challenge_reason is present, without a separate lookup.
     challenge_reason: Optional[str] = None
     challenge_response: Optional[str] = None
+    # Informational only — how long the student actually took vs. the
+    # question's expected time. Neither affects scoring.
+    time_taken_seconds: Optional[int] = None
+    expected_time_seconds: Optional[int] = None
 
 
 class QuizDetailResponse(BaseModel):
@@ -91,7 +97,10 @@ class ChallengeQuizQuestionResponse(BaseModel):
     challenge_id: int
     date_created: str
     challenge_reason: str
-    challenge_response: str
+    # None while the challenge is still pending — the real-time LLM call
+    # failed or was unavailable, and the periodic sweep
+    # (resolve_pending_challenges) hasn't retried it yet.
+    challenge_response: Optional[str] = None
     score: float
     marks: float
     answer: str

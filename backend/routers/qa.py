@@ -48,4 +48,11 @@ def patch_qa(
     if not customer_id:
         raise AppError(ErrorCode.SCHOOL_NOT_ASSOCIATED)
 
-    return update_qa(db, qa_id=qa_id, user_id=claims["user_id"], customer_id=customer_id, payload=payload)
+    return update_qa(
+        db,
+        qa_id=qa_id,
+        user_id=claims["user_id"],
+        customer_id=customer_id,
+        is_school_admin=bool(claims.get("is_school_admin")),
+        payload=payload,
+    )

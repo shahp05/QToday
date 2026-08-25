@@ -13,13 +13,16 @@ updated) even if the student closes the app.
 """
 import json
 import re
+import traceback
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from db.models import Board, Country, Grade, Quiz, QuizScore, Student, Subject, Topic
+from errors.error_codes import ErrorCode
 from llm.factory import LLMPurpose, get_llm_client
+from services.error_log_service import log_error
 
 _LATEX_PATTERN = re.compile(r"\$.+?\$")
 
@@ -79,9 +82,8 @@ async def score_pending_quiz(db: Session, *, quiz_id: int) -> dict:
     context = resolve_grading_context(db, quiz)
     if context is None:
         # Don't send the LLM "unknown" placeholders — skip this pass entirely
-        # and leave every row is_scored=False so the periodic batch-scoring
-        # process (planned; not yet built) picks the quiz up and retries once
-        # this call runs again.
+        # and leave every row is_scored=False so the periodic sweep
+        # (score_stuck_quizzes below) picks the quiz up and retries later.
         return {"skipped": True, "reason": "scoring context missing"}
 
     try:
@@ -91,8 +93,9 @@ async def score_pending_quiz(db: Session, *, quiz_id: int) -> dict:
 
     # Matched by quiz_score_id, not position — a partial/reordered response
     # still scores whatever it did answer for; anything missing or malformed
-    # stays is_scored=False for a future batch retry (not yet built) rather
-    # than blocking the rows the LLM did handle correctly.
+    # stays is_scored=False for the periodic sweep (score_stuck_quizzes
+    # below) to retry, rather than blocking the rows the LLM did handle
+    # correctly.
     by_id = {quiz_score.quiz_score_id: quiz_score for quiz_score in pending}
     scored_count = 0
     for item in items:
@@ -122,6 +125,64 @@ def _finalize_if_complete(db: Session, quiz: Quiz) -> None:
     quiz.total_score = sum(s or 0 for s in all_scores)
     quiz.date_scored = datetime.now(timezone.utc)
     db.commit()
+
+
+_STUCK_QUIZ_BUFFER_MINUTES = 30
+
+
+async def score_stuck_quizzes(db: Session) -> dict:
+    """Periodic sweep (jobs/tasks.py:score_stuck_quizzes_task) — the retry
+    path for score_quiz_task's single at-submit-time attempt. That task
+    only ever runs once, right after a student submits; if the LLM call
+    inside score_pending_quiz fails (rate limit, timeout, transient error —
+    see its `except Exception` branch) or the grading context is briefly
+    unavailable, the quiz was previously left "scoring in progress" forever
+    with nothing to retry it. This finds every quiz still carrying an
+    unscored QuizScore row and calls score_pending_quiz again for each.
+    Excludes quizzes younger than _STUCK_QUIZ_BUFFER_MINUTES (date_created)
+    so a still-in-flight real-time scoring pass from /submit is never
+    double-triggered. Runs sequentially, one quiz at a time, sharing this
+    one db Session — same reasoning as qa_service.generate_missing_qa. A
+    quiz whose retry raises is logged and skipped rather than aborting the
+    rest of the sweep."""
+    quiz_ids = [row.quiz_id for row in db.execute(
+        select(Quiz.quiz_id)
+        .join(QuizScore, QuizScore.quiz_id == Quiz.quiz_id)
+        .where(
+            Quiz.is_active == True,  # noqa: E712
+            Quiz.date_scored.is_(None),
+            QuizScore.is_scored == False,  # noqa: E712
+            Quiz.date_created <= func.now() - text(f"interval '{_STUCK_QUIZ_BUFFER_MINUTES} minutes'"),
+        )
+        .distinct()
+    ).all()]
+
+    processed = 0
+    scored = 0
+    still_pending = 0
+    for quiz_id in quiz_ids:
+        try:
+            result = await score_pending_quiz(db, quiz_id=quiz_id)
+        except Exception as exc:
+            db.rollback()
+            still_pending += 1
+            log_error(
+                db,
+                type="batch",
+                error_code=ErrorCode.LLM_GENERATION_FAILED,
+                description=str(exc),
+                stack_trace=traceback.format_exc(),
+                context={"quiz_id": quiz_id},
+            )
+            continue
+
+        processed += 1
+        if result.get("skipped"):
+            still_pending += 1
+        else:
+            scored += result.get("scored", 0)
+
+    return {"quizzes_found": len(quiz_ids), "processed": processed, "scored": scored, "still_pending": still_pending}
 
 
 async def _evaluate_batch(pending: list[QuizScore], context: GradingContext) -> list[dict]:

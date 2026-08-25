@@ -1,16 +1,19 @@
 import math
 import random
 import re
+import traceback
 from datetime import datetime, timezone
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from config.app_config import get_setting
 from db.models import QA, Quiz, QuizChallenge, QuizScore
 from errors.app_error import AppError
 from errors.error_codes import ErrorCode
+from services.access_scope import teacher_scope_filter
 from services.auth_service import is_staff
+from services.error_log_service import log_error
 from services.quiz_scoring_service import evaluate_challenge, resolve_grading_context
 from services.session_service import get_current_session_id
 
@@ -88,26 +91,34 @@ def resolve_authorized_student_ids(
     return [r.student_id for r in rows]
 
 
-def get_class_quiz_progress(db: Session, *, student_ids: list[int]) -> dict:
+def get_class_quiz_progress(
+    db: Session, *, student_ids: list[int], teacher_scope: tuple[str, dict] | None = None
+) -> dict:
     """Same per-topic stats get_student_quiz_progress computes, batched across
     many students in two queries instead of one round-trip per student — the
     source for the teacher Students list's per-subject status chips. Only
     student_avg_pct, last_score_pct, and last_played are needed there (the
     same fields topicSummaryStatus() in the frontend already keys its
     red/amber/green/not-played classification on), so max_score_pct and
-    attempts — only used by the student's own Progress screen — are left out."""
+    attempts — only used by the student's own Progress screen — are left out.
+    avg_pct is marks-weighted (SUM(total_score)/SUM(total_marks)) — see
+    get_student_quiz_progress's docstring for why. teacher_scope restricts
+    this to only the (subject, grade) pairs a plain-teacher caller actually
+    taught — see get_student_quiz_progress."""
     if not student_ids:
         return {"progress": []}
 
+    scope_sql, scope_params = teacher_scope or ("", {})
     avg_rows = db.execute(
-        text("""
+        text(f"""
             SELECT student_id, topic_id, subject_id,
-                   ROUND(AVG(total_score / total_marks * 100)) AS avg_pct
+                   ROUND(SUM(total_score) / SUM(total_marks) * 100) AS avg_pct
             FROM quizzes
             WHERE student_id = ANY(:sids) AND is_active = TRUE AND total_score IS NOT NULL
+            {scope_sql}
             GROUP BY student_id, topic_id, subject_id
         """),
-        {"sids": student_ids},
+        {"sids": student_ids, **scope_params},
     ).fetchall()
     if not avg_rows:
         return {"progress": []}
@@ -115,15 +126,16 @@ def get_class_quiz_progress(db: Session, *, student_ids: list[int]) -> dict:
     # DISTINCT ON picks each student's newest quiz per topic, same technique
     # as get_student_quiz_progress's last_rows query.
     last_rows = db.execute(
-        text("""
+        text(f"""
             SELECT DISTINCT ON (student_id, topic_id) student_id, topic_id,
                    ROUND(total_score / total_marks * 100) AS last_pct,
                    date_created::date AS last_played
             FROM quizzes
             WHERE student_id = ANY(:sids) AND is_active = TRUE AND total_score IS NOT NULL
+            {scope_sql}
             ORDER BY student_id, topic_id, date_created DESC
         """),
-        {"sids": student_ids},
+        {"sids": student_ids, **scope_params},
     ).fetchall()
     last_by_key = {(r.student_id, r.topic_id): r for r in last_rows}
 
@@ -141,31 +153,41 @@ def get_class_quiz_progress(db: Session, *, student_ids: list[int]) -> dict:
     return {"progress": progress}
 
 
-def get_student_quiz_progress(db: Session, *, student_id: int) -> dict:
+def get_student_quiz_progress(db: Session, *, student_id: int, teacher_scope: tuple[str, dict] | None = None) -> dict:
     """Per-topic quiz stats for one student: their own average score, the
     best score across every student at the same school for that topic, the
     score and date of their most recent attempt, and how many attempts
     they've made. Only quizzes that have actually been scored (total_score
     IS NOT NULL) count toward averages — an in-progress/unscored quiz
     shouldn't drag down or inflate either number. Percentages are rounded to
-    the nearest whole number since that's all the progress bars display."""
+    the nearest whole number since that's all the progress bars display.
+    avg_pct is marks-weighted — SUM(total_score)/SUM(total_marks) across
+    every quiz on the topic, not a mean of each quiz's own percentage — so a
+    single small quiz (e.g. 2 marks, scored 100%) can't skew the topic
+    average the same way a large one (e.g. 20 marks, scored 40%) would
+    under a plain average of percentages. teacher_scope (from
+    access_scope.teacher_scope_filter) restricts this to only the (subject,
+    grade) pairs a plain-teacher caller actually taught — None for a
+    student viewing their own data or a school admin, who see everything."""
     customer_row = db.execute(
         text("SELECT customer_id FROM students WHERE student_id = :sid"),
         {"sid": student_id},
     ).first()
     customer_id = customer_row.customer_id if customer_row else None
 
+    scope_sql, scope_params = teacher_scope or ("", {})
     own_rows = db.execute(
-        text("""
+        text(f"""
             SELECT topic_id, subject_id,
-                   ROUND(AVG(total_score / total_marks * 100)) AS avg_pct,
+                   ROUND(SUM(total_score) / SUM(total_marks) * 100) AS avg_pct,
                    MAX(date_created)::date AS last_played,
                    COUNT(*) AS attempts
             FROM quizzes
             WHERE student_id = :sid AND is_active = TRUE AND total_score IS NOT NULL
+            {scope_sql}
             GROUP BY topic_id, subject_id
         """),
-        {"sid": student_id},
+        {"sid": student_id, **scope_params},
     ).fetchall()
 
     max_by_topic: dict[int, float] = {}
@@ -321,6 +343,13 @@ def submit_quiz(db: Session, *, claims: dict, payload) -> dict:
     qa_ids = [a.qa_id for a in payload.answers]
     if len(set(qa_ids)) != len(qa_ids):
         raise AppError(ErrorCode.VALIDATION_ERROR)
+    # Per spec: a quiz isn't saved if the student answered nothing. The
+    # frontend already blocks this (no Submit button when nothing's
+    # answered — see QuizPage.jsx), but that's a UI courtesy, not a
+    # boundary — a direct API call must be rejected here too, before any
+    # Quiz/QuizScore row is created.
+    if not any(a.student_response and a.student_response.strip() for a in payload.answers):
+        raise AppError(ErrorCode.VALIDATION_ERROR)
 
     qa_rows = db.execute(
         select(QA).where(
@@ -408,7 +437,7 @@ def submit_quiz(db: Session, *, claims: dict, payload) -> dict:
     }
 
 
-def get_student_quiz_history(db: Session, *, student_id: int) -> dict:
+def get_student_quiz_history(db: Session, *, student_id: int, teacher_scope: tuple[str, dict] | None = None) -> dict:
     """One row per quiz ever played by this student, across every subject,
     newest first — the source list for the student-facing Progress screen.
     Unlike get_student_quiz_progress (per-topic averages), this is per-attempt
@@ -416,9 +445,12 @@ def get_student_quiz_history(db: Session, *, student_id: int) -> dict:
     Grade comes from the quiz's own grade_id (snapshotted at submit time, see
     submit_quiz), not the student's current grade — a topic can be replayed
     across grades over time (promotion, retake at a different section, etc.),
-    and each attempt must keep showing the grade it was actually played at."""
+    and each attempt must keep showing the grade it was actually played at.
+    teacher_scope restricts this to only the (subject, grade) pairs a
+    plain-teacher caller actually taught — see get_student_quiz_progress."""
+    scope_sql, scope_params = teacher_scope or ("", {})
     rows = db.execute(
-        text("""
+        text(f"""
             SELECT q.quiz_id, q.subject_id, s.subject_name, q.topic_id, t.topic_name,
                    q.grade_id, g.grade_name,
                    q.date_created, q.total_marks, q.total_score,
@@ -428,9 +460,10 @@ def get_student_quiz_history(db: Session, *, student_id: int) -> dict:
             JOIN topics t ON t.topic_id = q.topic_id
             LEFT JOIN grades g ON g.grade_id = q.grade_id
             WHERE q.student_id = :sid AND q.is_active = TRUE
+            {scope_sql}
             ORDER BY q.date_created DESC
         """),
-        {"sid": student_id},
+        {"sid": student_id, **scope_params},
     ).fetchall()
 
     quizzes = [
@@ -506,6 +539,14 @@ def get_quiz_detail(db: Session, *, claims: dict, quiz_id: int) -> dict:
                 "is_scored": qs.is_scored,
                 "challenge_reason": challenge_by_qa_id[qs.qa_id].challenge_reason if qs.qa_id in challenge_by_qa_id else None,
                 "challenge_response": challenge_by_qa_id[qs.qa_id].challenge_response if qs.qa_id in challenge_by_qa_id else None,
+                # Informational only, per spec ("time taken will be matched
+                # against the ETA") — no effect on scoring. time_taken_
+                # seconds is QuizScore's own frozen value; expected_time_
+                # seconds comes from the live qa row (not itself frozen at
+                # quiz-creation time — unlike question/answer/options, a
+                # later ETA correction is fine to reflect on old quizzes).
+                "time_taken_seconds": qs.time_taken_seconds,
+                "expected_time_seconds": qs.qa.expected_time_seconds if qs.qa else None,
             }
             for qs in scores
         ],
@@ -513,15 +554,21 @@ def get_quiz_detail(db: Session, *, claims: dict, quiz_id: int) -> dict:
 
 
 async def challenge_quiz_question(db: Session, *, claims: dict, quiz_id: int, qa_id: int, reason: str) -> dict:
-    """A student disputing how one of their answers was scored: re-grades the
-    question via a single synchronous LLM call (evaluate_challenge) while the
-    student waits, then applies whatever it decides — this quiz's own frozen
-    score/answer, the quiz's total, and (if the reference answer was wrong)
-    the live QA row for every future quiz on it. Only allowed on a question
-    that's actually the caller's, already scored, answered, under full marks,
-    and not already challenged. Nothing is written until the LLM call
-    succeeds, so a failure (network/LLM error) leaves no trace — the student
-    can just submit again."""
+    """A student disputing how one of their answers was scored. A
+    QuizChallenge row is persisted BEFORE any LLM call is made (unlike the
+    old design, where nothing was written until the call succeeded) — this
+    function then attempts the LLM re-grade (evaluate_challenge, via
+    _try_resolve_challenge) synchronously so a healthy call still resolves
+    instantly for the waiting student. If that call fails (network/LLM
+    error) or the grading context is briefly unavailable, the row is left
+    pending (challenge_response NULL, date_closed NULL) instead of raising —
+    the periodic sweep (resolve_pending_challenges below) retries it later,
+    same pattern as score_quiz_task/score_stuck_quizzes for quiz scoring.
+    The UI shows "awaiting response" for a pending challenge (challenge_
+    reason set, challenge_response still None) rather than an error. Only
+    allowed on a question that's actually the caller's, already scored,
+    answered, under full marks, and not already challenged (pending or
+    resolved — only one challenge per question ever, per spec)."""
     student_id = _resolve_own_student_id(db, claims)
     quiz = db.get(Quiz, quiz_id)
     if quiz is None or not quiz.is_active or quiz.student_id != student_id:
@@ -551,17 +598,50 @@ async def challenge_quiz_question(db: Session, *, claims: dict, quiz_id: int, qa
     if already_challenged:
         raise AppError(ErrorCode.VALIDATION_ERROR)
 
+    # Persisted first, before any LLM call — a network/LLM failure below
+    # must never lose the student's challenge; it just stays pending for the
+    # periodic sweep to pick up.
+    challenge = QuizChallenge(quiz_id=quiz_id, qa_id=qa_id, challenge_reason=reason)
+    db.add(challenge)
+    db.commit()
+    db.refresh(challenge)
+
+    await _try_resolve_challenge(db, challenge, quiz=quiz, quiz_score=quiz_score)
+
+    return {
+        "challenge_id": challenge.challenge_id,
+        "date_created": challenge.date_created.isoformat(),
+        "challenge_reason": reason,
+        "challenge_response": challenge.challenge_response,  # None while still pending
+        "score": float(quiz_score.score),
+        "marks": float(quiz_score.marks),
+        "answer": quiz_score.answer,
+        "total_score": float(quiz.total_score),
+        "total_marks": float(quiz.total_marks),
+    }
+
+
+async def _try_resolve_challenge(db: Session, challenge: QuizChallenge, *, quiz: Quiz, quiz_score: QuizScore) -> bool:
+    """Attempts to resolve one pending challenge via the LLM re-grading call
+    — the one shared implementation used by both challenge_quiz_question's
+    real-time attempt and resolve_pending_challenges' periodic retry. Never
+    raises: on any failure it leaves `challenge` untouched (still pending,
+    date_closed NULL) and returns False; on success it applies the frozen
+    score/answer, the quiz total, and marks the challenge resolved, then
+    returns True."""
     context = resolve_grading_context(db, quiz)
     if context is None:
-        raise AppError(ErrorCode.EXTERNAL_SERVICE_FAILED)
+        return False
 
     grade_name = str(quiz_score.qa.grade.grade_name) if quiz_score.qa and quiz_score.qa.grade else "unknown"
     previous_score = float(quiz_score.score)
     try:
-        result = await evaluate_challenge(quiz_score, context=context, grade_name=grade_name, reason=reason)
+        result = await evaluate_challenge(
+            quiz_score, context=context, grade_name=grade_name, reason=challenge.challenge_reason,
+        )
         revised_score = max(0.0, min(float(quiz_score.marks), float(result["revised_score"])))
     except Exception:
-        raise AppError(ErrorCode.EXTERNAL_SERVICE_FAILED)
+        return False
 
     explanation = result.get("explanation") or ""
     # The LLM only ever writes the answer explanation — whether the score
@@ -575,33 +655,81 @@ async def challenge_quiz_question(db: Session, *, claims: dict, quiz_id: int, qa
         # correction the student directly proved — so this quiz's own frozen
         # answer is updated too (not just the live QA row for future quizzes).
         quiz_score.answer = result["corrected_answer"]
-        qa = db.get(QA, qa_id)
+        qa = db.get(QA, challenge.qa_id)
         if qa is not None:
             qa.answer = result["corrected_answer"]
 
-    challenge = QuizChallenge(
-        quiz_id=quiz_id, qa_id=qa_id, challenge_reason=reason, challenge_response=explanation,
-        date_closed=datetime.now(timezone.utc),
-    )
-    db.add(challenge)
+    challenge.challenge_response = explanation
+    challenge.is_upheld = revised_score > previous_score
+    challenge.date_closed = datetime.now(timezone.utc)
 
-    all_scores = db.execute(select(QuizScore.score).where(QuizScore.quiz_id == quiz_id)).scalars().all()
+    all_scores = db.execute(select(QuizScore.score).where(QuizScore.quiz_id == quiz.quiz_id)).scalars().all()
     quiz.total_score = sum(s or 0 for s in all_scores)
 
     db.commit()
     db.refresh(challenge)
+    return True
 
-    return {
-        "challenge_id": challenge.challenge_id,
-        "date_created": challenge.date_created.isoformat(),
-        "challenge_reason": reason,
-        "challenge_response": explanation,
-        "score": float(quiz_score.score),
-        "marks": float(quiz_score.marks),
-        "answer": quiz_score.answer,
-        "total_score": float(quiz.total_score),
-        "total_marks": float(quiz.total_marks),
-    }
+
+_STUCK_CHALLENGE_BUFFER_MINUTES = 30
+
+
+async def resolve_pending_challenges(db: Session) -> dict:
+    """Periodic sweep (jobs/tasks.py:resolve_pending_challenges_task) — the
+    retry path for challenge_quiz_question's real-time attempt, the same way
+    score_stuck_quizzes is the retry path for score_quiz_task. A pending
+    QuizChallenge row (date_closed NULL) means the real-time LLM call failed
+    or its grading context was briefly unavailable; nothing else revisits
+    it, so without this sweep a student's challenge would sit "awaiting
+    response" forever. Excludes challenges younger than
+    _STUCK_CHALLENGE_BUFFER_MINUTES so a still-in-flight real-time attempt is
+    never double-triggered. Runs sequentially, one challenge at a time,
+    sharing this one db Session — same reasoning as
+    quiz_scoring_service.score_stuck_quizzes. A challenge whose retry raises
+    is logged and skipped rather than aborting the rest of the sweep."""
+    pending = db.execute(
+        select(QuizChallenge).where(
+            QuizChallenge.is_active == True,  # noqa: E712
+            QuizChallenge.date_closed.is_(None),
+            QuizChallenge.date_created <= func.now() - text(f"interval '{_STUCK_CHALLENGE_BUFFER_MINUTES} minutes'"),
+        )
+    ).scalars().all()
+
+    resolved = 0
+    still_pending = 0
+    for challenge in pending:
+        quiz = db.get(Quiz, challenge.quiz_id)
+        quiz_score = db.execute(
+            select(QuizScore).where(
+                QuizScore.quiz_id == challenge.quiz_id, QuizScore.qa_id == challenge.qa_id,
+                QuizScore.is_active == True,  # noqa: E712
+            )
+        ).scalar_one_or_none()
+        if quiz is None or not quiz.is_active or quiz_score is None:
+            still_pending += 1
+            continue
+
+        try:
+            ok = await _try_resolve_challenge(db, challenge, quiz=quiz, quiz_score=quiz_score)
+        except Exception as exc:
+            db.rollback()
+            still_pending += 1
+            log_error(
+                db,
+                type="batch",
+                error_code=ErrorCode.LLM_GENERATION_FAILED,
+                description=str(exc),
+                stack_trace=traceback.format_exc(),
+                context={"challenge_id": challenge.challenge_id},
+            )
+            continue
+
+        if ok:
+            resolved += 1
+        else:
+            still_pending += 1
+
+    return {"challenges_found": len(pending), "resolved": resolved, "still_pending": still_pending}
 
 
 def get_quiz_status(db: Session, *, claims: dict, quiz_id: int) -> dict:

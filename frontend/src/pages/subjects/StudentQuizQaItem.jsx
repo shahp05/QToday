@@ -76,6 +76,11 @@ export default function StudentQuizQaItem({ q, quizId, onChallengeResolved }) {
   const isFullMarks = q.is_scored && q.score === q.marks
   const isAnswered = q.student_response != null && q.student_response !== ''
   const alreadyChallenged = q.challenge_reason != null
+  // challenge_response stays null until the LLM re-grade resolves — either
+  // right away (challenge_quiz_question's real-time attempt) or later via
+  // the periodic sweep (resolve_pending_challenges) if that first attempt
+  // failed. StudentQuizList polls while this is true.
+  const challengePending = alreadyChallenged && q.challenge_response == null
   const canChallenge = q.is_scored && !isFullMarks && isAnswered && !alreadyChallenged
 
   const [challenging, setChallenging] = useState(false)
@@ -124,6 +129,16 @@ export default function StudentQuizQaItem({ q, quizId, onChallengeResolved }) {
           {q.is_scored ? `${q.score}/${q.marks}` : 'Scoring…'}
         </span>
       </div>
+
+      {/* Informational only, per spec — actual time vs. this question's
+          expected time (ETA), never shown at all for older questions
+          generated before ETA was captured. */}
+      {q.time_taken_seconds != null && (
+        <p className="qa-card-answer student-quiz-qa-time">
+          Time taken: {q.time_taken_seconds}s
+          {q.expected_time_seconds != null && ` (expected ${q.expected_time_seconds}s)`}
+        </p>
+      )}
 
       {renderOptions ? (
         <ul className="qa-card-options">
@@ -223,7 +238,9 @@ export default function StudentQuizQaItem({ q, quizId, onChallengeResolved }) {
       {alreadyChallenged && (
         <div className="student-quiz-qa-challenge-result">
           <p className="student-quiz-qa-challenge-reason">You challenged: <MathText text={q.challenge_reason} /></p>
-          {q.challenge_response && <p className="student-quiz-qa-challenge-response"><MathText text={q.challenge_response} /></p>}
+          {challengePending
+            ? <p className="student-quiz-qa-pending">Awaiting response to your challenge…</p>
+            : <p className="student-quiz-qa-challenge-response"><MathText text={q.challenge_response} /></p>}
         </div>
       )}
     </div>

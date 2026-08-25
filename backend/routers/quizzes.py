@@ -12,6 +12,7 @@ from schemas.quiz import (
     SubmitQuizRequest,
     SubmitQuizResponse,
 )
+from services.access_scope import teacher_scope_filter
 from services.auth_service import get_current_user
 from services.quiz_service import (
     challenge_quiz_question,
@@ -29,6 +30,16 @@ from services.quiz_service import (
 router = APIRouter(prefix="/api/quizzes", tags=["quizzes"])
 
 
+def _teacher_scope(claims: dict, *, quiz_alias: str = "quizzes") -> tuple[str, dict] | None:
+    """None (unrestricted) for a student viewing their own data, a school
+    admin, or a system admin. A plain teacher only sees the (subject,
+    grade) pairs they've personally logged teaching — see
+    access_scope.teacher_scope_filter."""
+    if not claims.get("is_school_teacher") or claims.get("is_school_admin") or claims.get("is_system_admin"):
+        return None
+    return teacher_scope_filter(customer_id=claims.get("customer_id"), user_id=claims["user_id"], quiz_alias=quiz_alias)
+
+
 @router.get("/progress")
 def get_progress(
     student_id: int | None = None,
@@ -36,7 +47,7 @@ def get_progress(
     db: Session = Depends(get_db),
 ):
     resolved_student_id = resolve_authorized_student_id(db, claims=claims, requested_student_id=student_id)
-    return get_student_quiz_progress(db, student_id=resolved_student_id)
+    return get_student_quiz_progress(db, student_id=resolved_student_id, teacher_scope=_teacher_scope(claims))
 
 
 @router.get("/progress/class")
@@ -46,7 +57,7 @@ def get_class_progress(
     db: Session = Depends(get_db),
 ):
     resolved_ids = resolve_authorized_student_ids(db, claims=claims, requested_student_ids=student_ids)
-    return get_class_quiz_progress(db, student_ids=resolved_ids)
+    return get_class_quiz_progress(db, student_ids=resolved_ids, teacher_scope=_teacher_scope(claims))
 
 
 @router.get("/history", response_model=QuizHistoryResponse)
@@ -56,7 +67,9 @@ def get_history(
     db: Session = Depends(get_db),
 ):
     resolved_student_id = resolve_authorized_student_id(db, claims=claims, requested_student_id=student_id)
-    return get_student_quiz_history(db, student_id=resolved_student_id)
+    return get_student_quiz_history(
+        db, student_id=resolved_student_id, teacher_scope=_teacher_scope(claims, quiz_alias="q")
+    )
 
 
 @router.get("/start")

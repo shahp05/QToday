@@ -17,7 +17,8 @@ from services.password_service import hash_password
 from services.qa_service import (
     generate_missing_qa, poll_and_finalize_qa_batch, should_top_up_qa, submit_qa_top_up_batch, verify_pending_qa,
 )
-from services.quiz_scoring_service import score_pending_quiz
+from services.quiz_scoring_service import score_pending_quiz, score_stuck_quizzes
+from services.quiz_service import resolve_pending_challenges
 from services.session_service import run_due_cutovers
 
 REQUEST_TYPE_COUNTRY_LIST = "country_list"
@@ -154,6 +155,39 @@ async def score_quiz_task(quiz_id: int) -> dict:
             db.rollback()
             fail_job(db, job)
             raise
+    finally:
+        db.close()
+
+
+# Fallback for score_quiz_task, the same way generate_missing_qa_task is a
+# fallback for real-time QA generation: score_quiz_task only ever runs once,
+# right at submit time, so an LLM call that fails there previously left a
+# quiz "scoring in progress" forever (see quiz_scoring_service.
+# score_pending_quiz's docstring). This sweep retries every quiz still
+# carrying an unscored row. 30-minute cadence for the same reason
+# generate_missing_qa_task uses one — frequent enough that a stuck quiz
+# doesn't sit unscored for long, without hammering the LLM on every tick.
+@app.periodic(cron="*/30 * * * *", periodic_id="score_stuck_quizzes")
+@app.task(queue="quiz_scoring")
+async def score_stuck_quizzes_task(timestamp: int) -> dict:
+    db = SessionLocal()
+    try:
+        return await score_stuck_quizzes(db)
+    finally:
+        db.close()
+
+
+# Same fallback pattern as score_stuck_quizzes_task above, for challenges
+# instead of initial scoring: challenge_quiz_question's real-time LLM call
+# can fail after the QuizChallenge row is already committed (see
+# quiz_service.challenge_quiz_question), leaving it pending forever without
+# this sweep. Same 30-minute cadence for the same reason.
+@app.periodic(cron="*/30 * * * *", periodic_id="resolve_pending_challenges")
+@app.task(queue="quiz_scoring")
+async def resolve_pending_challenges_task(timestamp: int) -> dict:
+    db = SessionLocal()
+    try:
+        return await resolve_pending_challenges(db)
     finally:
         db.close()
 

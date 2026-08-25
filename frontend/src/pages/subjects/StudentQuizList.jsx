@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { scoreColor, scoreTextColor } from '../../lib/scoreColor'
 import { Toast } from '../../components/ui/Toast'
 import { fetchQuizDetail } from '../../services/quizService'
+import { useQuizHistoryStore } from '../../store/quizHistoryStore'
+import { useQuizProgressStore } from '../../store/quizProgressStore'
 import StudentQuizQaItem from './StudentQuizQaItem'
 import './StudentQuizList.css'
 
@@ -86,6 +88,35 @@ function StudentQuizAccordion({ quizzes, readOnly }) {
       setLoadingQuizId(null)
     }
   }
+
+  // Polls while any question in the open quiz is still awaiting a challenge
+  // response (challenge_reason set, challenge_response still null) — mirrors
+  // StudentSubjectsHome's scoring-in-progress poll for the same reason: the
+  // real-time LLM re-grade (challenge_quiz_question) may have failed and be
+  // waiting on the periodic sweep (resolve_pending_challenges) to retry it.
+  const hasPendingChallenge = detail?.questions.some(q => q.challenge_reason != null && q.challenge_response == null)
+  useEffect(() => {
+    if (!hasPendingChallenge || expandedQuizId == null) return
+    const interval = setInterval(async () => {
+      try {
+        const data = await fetchQuizDetail(expandedQuizId)
+        setDetail(data)
+        // A challenge resolving changes this quiz's total_score — the
+        // topic-card % and quiz-history row % (both fed by these stores,
+        // outside this component) need to catch up too, same as
+        // StudentQuizQaItem's onChallengeResolved handler does for the
+        // synchronous-resolve case.
+        const stillPending = data.questions.some(q => q.challenge_reason != null && q.challenge_response == null)
+        if (!stillPending) {
+          useQuizHistoryStore.getState().refreshQuizHistory()
+          useQuizProgressStore.getState().fetchQuizProgress()
+        }
+      } catch {
+        // transient network/poll failure — try again next tick
+      }
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [hasPendingChallenge, expandedQuizId])
 
   function toggleQuiz(quiz) {
     if (readOnly || !quiz.is_scored || loadingQuizId) return

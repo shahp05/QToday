@@ -31,6 +31,7 @@ from db.models import (
 from errors.app_error import AppError
 from errors.error_codes import ErrorCode
 from llm.factory import LLMPurpose, get_llm_client
+from services.access_scope import any_teacher_taught
 from services.allocation_service import active_cells, compute_allocation
 from services.batch_job_service import close_job, fail_job, is_due, start_job
 from services.error_log_service import log_error
@@ -1001,23 +1002,25 @@ def _exam_level_instruction(grade: int) -> str:
     return ""
 
 
-def update_qa(db: Session, *, qa_id: int, user_id: int, customer_id: int, payload) -> dict:
-    """Teacher-facing correction/flag path. Any teacher at a customer who has
-    actually taught this (subject, topic) may edit or flag it — content
-    edits assume good faith and mark the row verified; a flag pulls it out
-    of future serving instead (is_active=False) but keeps the row for audit."""
+def update_qa(db: Session, *, qa_id: int, user_id: int, customer_id: int, is_school_admin: bool, payload) -> dict:
+    """Teacher-facing correction/flag path. A school admin may edit/discard
+    any question of any subject-topic taught at their school. A plain
+    teacher is restricted to the grade it was actually taught in — by
+    themselves OR a colleague/substitute, per spec — content edits assume
+    good faith and mark the row verified; a flag pulls it out of future
+    serving instead (is_active=False) but keeps the row for audit."""
     qa = db.get(QA, qa_id)
     if qa is None or not qa.is_active:
         raise AppError(ErrorCode.QA_NOT_FOUND)
 
-    taught = db.execute(
-        select(TeachLog.teach_log_id).where(
-            TeachLog.customer_id == customer_id,
-            TeachLog.subject_id == qa.subject_id,
-            TeachLog.topic_id == qa.topic_id,
-        )
-    ).first()
-    if taught is None:
+    taught = any_teacher_taught(
+        db,
+        customer_id=customer_id,
+        subject_id=qa.subject_id,
+        topic_id=qa.topic_id,
+        grade_id=None if is_school_admin else qa.grade_id,
+    )
+    if not taught:
         raise AppError(ErrorCode.AUTH_FORBIDDEN)
 
     if payload.flag_reason is not None:
