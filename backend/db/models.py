@@ -445,9 +445,17 @@ class QuizScore(Base):
 class QuizChallenge(Base):
     """is_upheld: LLM's determination, NULL until resolved. date_closed
     doubles as the closed-flag (NULL=open, set=resolved) — no separate
-    boolean needed. Auto-correction of qa.answer when upheld is deferred."""
+    boolean needed. Auto-correction of qa.answer when upheld is deferred.
+    UniqueConstraint enforces "only once per question" at the db level —
+    the application-level check in quiz_service.challenge_quiz_question is
+    a courtesy for a clean error message; this is the actual guarantee
+    against a race between two concurrent duplicate requests. Safe because
+    nothing in this codebase ever sets is_active=False on a challenge (no
+    discard/retract flow exists), so there's no legitimate "make a new
+    attempt after this one was undone" case this would block."""
 
     __tablename__ = "quiz_challenges"
+    __table_args__ = (UniqueConstraint("quiz_id", "qa_id"),)
 
     challenge_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     quiz_id: Mapped[int] = mapped_column(ForeignKey("quizzes.quiz_id"), nullable=False)
