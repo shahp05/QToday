@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../lib/api'
 import { useProfileStore } from '../../store/profileStore'
 import { useDashboardQuoteStore } from '../../store/dashboardQuoteStore'
+import { resetUserScopedStores } from '../../store/resetUserScopedStores'
 import logo512 from '../../assets/logo_512.webp'
 import './LoginPage.css'
 
@@ -69,6 +70,13 @@ export default function LoginPage() {
         return
       }
       const j = await res.json()
+      // Wipes any leftover data (including a manually browsed session)
+      // from whoever last used this browser — including this same
+      // account, if it got back here via a token expiry rather than an
+      // explicit Logout, which doesn't clear this. Must run before
+      // setProfile/navigate so Dashboard's mount-time fetches start from
+      // a genuinely clean slate, not a stale activeSessionId.
+      resetUserScopedStores()
       setProfile(j.profile, j.access_token)
       resetQuoteAutoAdvance()
       navigate('/dashboard')

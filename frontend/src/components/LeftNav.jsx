@@ -6,11 +6,8 @@ import { useParentWardStore } from '../store/parentWardStore'
 import { useStudentsStore } from '../store/studentsStore'
 import { useTeachersStore } from '../store/teachersStore'
 import { useSubjectsTaughtStore } from '../store/subjectsTaughtStore'
-import { useQuizProgressStore } from '../store/quizProgressStore'
-import { useQuizHistoryStore } from '../store/quizHistoryStore'
-import { useClassQuizProgressStore } from '../store/classQuizProgressStore'
 import { useDashboardQuoteStore } from '../store/dashboardQuoteStore'
-import { useStudentsListFilterStore } from '../store/studentsListFilterStore'
+import { resetUserScopedStores } from '../store/resetUserScopedStores'
 import Dropdown from './Dropdown'
 import ScheduleSessionDialog from './ScheduleSessionDialog'
 import WardPickerDialog from './WardPickerDialog'
@@ -85,16 +82,14 @@ const NAV_ITEMS = [
 export default function LeftNav() {
   const profile = useProfileStore()
   const clearProfile = useProfileStore(s => s.clearProfile)
-  const clearStudents = useStudentsStore(s => s.clearStudents)
-  const clearTeachers = useTeachersStore(s => s.clearTeachers)
-  const clearSubjectsTaught = useSubjectsTaughtStore(s => s.clearSubjectsTaught)
-  const clearQuizProgress = useQuizProgressStore(s => s.clearQuizProgress)
-  const clearQuizHistory = useQuizHistoryStore(s => s.clearQuizHistory)
-  const clearClassProgress = useClassQuizProgressStore(s => s.clearClassProgress)
+  // Only this one is still needed standalone here — the ward-switch effect
+  // below clears sessions on its own (a ward change, not a logout).
+  // Everything else logout needs to wipe is covered by
+  // resetUserScopedStores(), the same helper LoginPage.jsx uses so a
+  // fresh login is guaranteed clean too, regardless of whether the
+  // previous session ended via this Logout button or a token expiry.
   const clearSessions = useSessionsStore(s => s.clearSessions)
-  const clearParentWard = useParentWardStore(s => s.clear)
   const resetQuoteAutoAdvance = useDashboardQuoteStore(s => s.reset)
-  const clearStudentsListFilter = useStudentsListFilterStore(s => s.clear)
   const studentsStatus = useStudentsStore(s => s.bySession[CURRENT_SESSION_KEY]?.status ?? 'idle')
   const teachersStatus = useTeachersStore(s => s.bySession[CURRENT_SESSION_KEY]?.status ?? 'idle')
   const subjectsStatus = useSubjectsTaughtStore(s => s.status)
@@ -218,15 +213,7 @@ export default function LeftNav() {
 
   function handleLogout() {
     clearProfile()
-    clearStudents()
-    clearTeachers()
-    clearSubjectsTaught()
-    clearQuizProgress()
-    clearQuizHistory()
-    clearClassProgress()
-    clearSessions()
-    clearParentWard()
-    clearStudentsListFilter()
+    resetUserScopedStores()
     resetQuoteAutoAdvance()
     navigate('/')
   }
