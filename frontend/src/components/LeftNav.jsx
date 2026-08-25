@@ -259,18 +259,19 @@ export default function LeftNav() {
         {/* Sys admin always gets it (they can create a new session even
            with no history yet); everyone else only once there's actual
            history to browse — "New session" never appears for them at
-           all, only sys admins may create one. */}
+           all, only sys admins may create one. Always renders once that
+           role check passes — NOT gated on sessions having loaded, since
+           hiding the whole block that way broke in practice. Instead, the
+           "current" option's key/value share the same 'current' fallback
+           (so they always match — no "Select…" placeholder) and its label
+           falls back to '' rather than a fabricated word — a blank trigger
+           for the split second before real data arrives beats either
+           hiding the control or showing text that isn't the real date. */}
         {(profile.is_school_admin || pastSessions.length > 0) && (
           <div className="leftnav-session-block">
             <span className="leftnav-info-label">Session</span>
             <Dropdown
               className="leftnav-session-dropdown"
-              // Falls back to the same 'current' placeholder key the first
-              // option below uses whenever sessions haven't loaded yet
-              // (activeSessionId starts null) — without this, that brief
-              // window has value=null matching no option's key, and
-              // Dropdown shows its own "Select…" placeholder instead of
-              // Current, even though Current is always the actual default.
               value={activeSessionId ?? 'current'}
               onChange={handleSessionChange}
               // Every real session (future, if one's actually been
@@ -285,7 +286,7 @@ export default function LeftNav() {
                 ...(profile.is_school_admin && futureSession
                   ? [{ key: futureSession.session_id, label: futureSession.label }]
                   : []),
-                { key: currentSession?.session_id ?? 'current', label: currentSession?.label || 'Current' },
+                { key: currentSession?.session_id ?? 'current', label: currentSession?.label ?? '' },
                 ...pastSessions.map(sess => ({ key: sess.session_id, label: sess.label })),
                 ...(profile.is_school_admin && !futureSession
                   ? [{ key: 'schedule-new', label: 'New session' }]
