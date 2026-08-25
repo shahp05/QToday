@@ -265,7 +265,13 @@ export default function LeftNav() {
             <span className="leftnav-info-label">Session</span>
             <Dropdown
               className="leftnav-session-dropdown"
-              value={activeSessionId}
+              // Falls back to the same 'current' placeholder key the first
+              // option below uses whenever sessions haven't loaded yet
+              // (activeSessionId starts null) — without this, that brief
+              // window has value=null matching no option's key, and
+              // Dropdown shows its own "Select…" placeholder instead of
+              // Current, even though Current is always the actual default.
+              value={activeSessionId ?? 'current'}
               onChange={handleSessionChange}
               // Every real session (future, if one's actually been
               // scheduled, then current, then past) in one descending-by-
