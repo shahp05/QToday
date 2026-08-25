@@ -83,10 +83,35 @@ def _scope_clause(db: Session, *, customer_id, user_id, is_school_admin, is_syst
             {"cid": customer_id, "gids": grade_ids, **session_params},
         )
 
-    # Plain teacher — only what they personally logged.
-    return (
-        f"tl.customer_id = :cid AND tl.user_id = :uid AND {session_sql}",
+    # Plain teacher — every (subject, grade) pair THEY personally logged,
+    # but for those specific pairs, every teacher's rows count, not just
+    # theirs. This is the substitute-teacher case: if a colleague covers
+    # the same subject in the same grade for a few days, their teach_logs
+    # (and any QA generated from them) must show up too — per spec's List
+    # of Topics condition 1 ("all topics in the subject even if some were
+    # taught by another teacher, provided it was in the same grade") and
+    # Teach Calendar Log condition 3. A grade the caller never personally
+    # taught this subject in still never appears, even if a colleague
+    # taught it there — matching "all grades the selected topic was taught
+    # BY THE TEACHER in."
+    own_pairs = db.execute(
+        text(f"""
+            SELECT DISTINCT tl.subject_id, tl.grade_id
+            FROM teach_logs tl
+            WHERE tl.customer_id = :cid AND tl.user_id = :uid AND tl.is_active = TRUE AND {session_sql}
+        """),
         {"cid": customer_id, "uid": user_id, **session_params},
+    ).fetchall()
+    if not own_pairs:
+        return None
+    subject_ids = [r.subject_id for r in own_pairs]
+    pair_grade_ids = [r.grade_id for r in own_pairs]
+    return (
+        f"""tl.customer_id = :cid AND {session_sql}
+            AND (tl.subject_id, tl.grade_id) IN (
+                SELECT * FROM unnest((:pair_subject_ids)::int[], (:pair_grade_ids)::int[])
+            )""",
+        {"cid": customer_id, "pair_subject_ids": subject_ids, "pair_grade_ids": pair_grade_ids, **session_params},
     )
 
 
@@ -152,9 +177,11 @@ def list_subjects_taught(
     one grade's questions at a time. Only the most-recently-taught
     (topic, grade) gets its QA eagerly attached; everything else is loaded
     on demand via get_topic_grade_qa() as the user clicks around.
-    Scope depends on caller: admins see the whole school, teachers see only
-    what they logged, students see their own grade/section regardless of
-    teacher, parents see their children's grade/section at this school."""
+    Scope depends on caller: admins see the whole school; teachers see every
+    (subject, grade) pair they've personally logged, PLUS any colleague's
+    log for that same pair (substitute-teacher case — see _scope_clause);
+    students see their own grade/section regardless of teacher; parents see
+    their children's grade/section at this school."""
     scope = _scope_clause(
         db, customer_id=customer_id, user_id=user_id,
         is_school_admin=is_school_admin, is_system_admin=is_system_admin,
