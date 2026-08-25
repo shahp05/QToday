@@ -114,6 +114,13 @@ function validateRows(rows) {
     parent2_email: colMap.parent2email !== undefined && !isBlank(row[colMap.parent2email]) ? String(row[colMap.parent2email]).trim() : null,
   }))
 
+  // Per spec: grade must be numeric and 1-12. Checked here too (not just
+  // server-side) so a typo shows up immediately instead of after a round
+  // trip — Number.isInteger also catches non-numeric cells, since
+  // parseInt('Five', 10) is NaN, which fails the integer check.
+  const badGradeRow = extracted.find(r => !Number.isInteger(r.grade) || r.grade < 1 || r.grade > 12)
+  if (badGradeRow) return { error: resolveApiError({ error_code: ErrorCode.GRADE_INVALID, context: { id: badGradeRow.org_id } }) }
+
   const dupError = duplicateIdError(extracted.map(r => r.org_id))
   if (dupError) return { error: dupError }
 

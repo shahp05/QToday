@@ -75,6 +75,12 @@ def process_students_upload(
         if row["org_id"] in seen_in_file:
             raise AppError(ErrorCode.DUPLICATE_ID, context={"id": row["org_id"]})
         seen_in_file.add(row["org_id"])
+        # Per spec, grade must be 1-12 — checked here, before _resolve_grades
+        # ever runs, since that function get-or-creates a `grades` row for
+        # any value it's given: an unchecked typo (e.g. 47) would otherwise
+        # permanently pollute the global grades table, not just this row.
+        if not (1 <= row["grade"] <= 12):
+            raise AppError(ErrorCode.GRADE_INVALID, context={"id": row["org_id"], "grade": row["grade"]})
 
     seen_org_ids = {row["org_id"] for row in rows}
     seen_parent_emails: set[str] = set()
