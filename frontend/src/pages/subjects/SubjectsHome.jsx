@@ -13,7 +13,11 @@ function initialCalendarMonth() {
 
 export default function SubjectsHome({ defaultView, isViewingPastSession = false }) {
   const navigate = useNavigate()
-  const [view, setView] = usePageView(defaultView === 'teachLog' ? 'log' : 'subjects')
+  // Past session (either role, not just admin) defaults to the Teach
+  // Calendar Log's calendar tab too — per spec, a teacher browsing history
+  // sees "Teach Calendar Log ... for the last session month," the same
+  // default an admin already got, just previously only wired for them.
+  const [view, setView] = usePageView(defaultView === 'teachLog' || isViewingPastSession ? 'log' : 'subjects')
   const showCalendar = view === 'log'
   const [showList, setShowList] = useState(defaultView === 'teachLog')
   const [logDate, setLogDate] = useState(null)
