@@ -43,6 +43,7 @@ def get_subjects_taught(
         is_student=claims.get("is_student", False),
         is_parent=claims.get("is_parent", False),
         session_id=session_id,
+        student_id=student_id,
     )
 
 
@@ -71,6 +72,7 @@ def get_qa_for_topic_grade(
         is_student=claims.get("is_student", False),
         is_parent=claims.get("is_parent", False),
         session_id=session_id,
+        student_id=student_id,
     )
     if qa_items is None:
         raise AppError(ErrorCode.TEACH_LOG_NOT_FOUND)

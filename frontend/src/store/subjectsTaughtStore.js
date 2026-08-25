@@ -62,7 +62,9 @@ export const useSubjectsTaughtStore = create((set, get) => ({
       })(),
     }))
     try {
-      const data = await fetchTopicGradeQA(topicId, gradeId, sessionId)
+      const isParent = useProfileStore.getState().is_parent
+      const wardId = isParent ? useParentWardStore.getState().selectedStudentId : null
+      const data = await fetchTopicGradeQA(topicId, gradeId, sessionId, wardId)
       set(state => ({
         subjects: state.subjects.map(s => ({
           ...s,

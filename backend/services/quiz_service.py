@@ -256,21 +256,33 @@ def _resolve_own_student_id(db: Session, claims: dict) -> int:
 def _assert_topic_taught(db: Session, *, student_id: int, topic_id: int, grade_id: int, customer_id: int) -> None:
     """sg.session_id is scoped to the student's own school's CURRENT
     session — a topic only taught against a not-yet-live pre-staged future
-    roster's grade shouldn't be quizzable today."""
+    roster's grade shouldn't be quizzable today. grade_id must be the
+    student's own current grade (sg.grade_id = :grade_id, not just any
+    grade), and some teach_logs row — any teacher, any session — must have
+    taught this topic at a grade whose retention range (grade_id through
+    grade_to_id, see grade_rules.py) covers it. Matches teach_log_service.
+    _learner_subjects_taught's visibility rule exactly, so a topic that's
+    listed there can always actually be played — a topic taught in an
+    earlier grade (a prior session) remains playable at every grade
+    through its grade_to, per spec's retention rules, not just the exact
+    grade it was originally taught in."""
     current_session_id = get_current_session_id(db, customer_id)
     session_clause = "sg.session_id IS NULL" if current_session_id is None else "sg.session_id = :current_sid"
-    params = {"sid": student_id, "topic_id": topic_id, "grade_id": grade_id}
+    params = {"sid": student_id, "topic_id": topic_id, "grade_id": grade_id, "cid": customer_id}
     if current_session_id is not None:
         params["current_sid"] = current_session_id
 
     visible = db.execute(
         text(f"""
             SELECT 1
-            FROM teach_logs tl
-            JOIN student_grades sg ON sg.grade_id = tl.grade_id AND sg.is_active = TRUE
-            WHERE sg.student_id = :sid AND tl.is_active = TRUE
-              AND tl.topic_id = :topic_id AND tl.grade_id = :grade_id
+            FROM student_grades sg
+            JOIN grades g ON g.grade_id = sg.grade_id
+            JOIN teach_logs tl ON tl.customer_id = :cid AND tl.is_active = TRUE AND tl.topic_id = :topic_id
+            JOIN grades g_taught ON g_taught.grade_id = tl.grade_id
+            JOIN grades g_to ON g_to.grade_id = tl.grade_to_id
+            WHERE sg.student_id = :sid AND sg.is_active = TRUE AND sg.grade_id = :grade_id
               AND {session_clause}
+              AND g_taught.grade_name <= g.grade_name AND g_to.grade_name >= g.grade_name
             LIMIT 1
         """),
         params,
