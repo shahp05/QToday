@@ -267,15 +267,23 @@ export default function LeftNav() {
               className="leftnav-session-dropdown"
               value={activeSessionId}
               onChange={handleSessionChange}
-              // Current always the default/first, then (sys admin only)
-              // the pending future session or the "New session" placeholder
-              // to schedule one, then past sessions in reverse chronology.
+              // Every real session (future, if one's actually been
+              // scheduled, then current, then past) in one descending-by-
+              // date run, with "New session" — a create action, not a
+              // session — anchored last rather than displacing Current
+              // from the top just because it's sys-admin-only. Only shown
+              // at all once there's no future session already scheduled
+              // (there's nothing to create otherwise) and only to a sys
+              // admin (the only role that can ever create one).
               options={[
-                { key: currentSession?.session_id ?? 'current', label: currentSession?.label || 'Current' },
-                ...(profile.is_school_admin
-                  ? [{ key: futureSession ? futureSession.session_id : 'schedule-new', label: futureSession ? futureSession.label : 'New session' }]
+                ...(profile.is_school_admin && futureSession
+                  ? [{ key: futureSession.session_id, label: futureSession.label }]
                   : []),
+                { key: currentSession?.session_id ?? 'current', label: currentSession?.label || 'Current' },
                 ...pastSessions.map(sess => ({ key: sess.session_id, label: sess.label })),
+                ...(profile.is_school_admin && !futureSession
+                  ? [{ key: 'schedule-new', label: 'New session' }]
+                  : []),
               ]}
             />
           </div>
