@@ -186,16 +186,29 @@ export default function TeachLogList({
   // "Topics Covered" for the very first time, with nothing logged yet in
   // this session) — land on the subject list with that topic's questions
   // already showing. Its qa_items are eagerly attached by the
-  // subjects-taught response, so this never needs an on-demand fetch. The
-  // store is usually already loaded (fetched at login), so this typically
-  // fires on the very first render; the flag just guards against re-running
-  // it later if the store data changes while the user has already
-  // navigated around. Done directly during render (not in an effect) for
-  // the same reason as the QA sync above — it's a one-time state
-  // adjustment, not a sync with an external system.
-  const [didAutoExpand, setDidAutoExpand] = useState(Boolean(selection))
-  if (!didAutoExpand && status === 'loaded') {
-    setDidAutoExpand(true)
+  // subjects-taught response, so this never needs an on-demand fetch.
+  //
+  // Keyed on mostRecent itself, not a one-shot "already ran" boolean —
+  // Dashboard.jsx's eager, session-less fetch on login and SubjectsRoute's
+  // own session-scoped (re)fetch both write to this same store, so
+  // status can flip to 'loaded' twice in quick succession with DIFFERENT
+  // data (e.g. the eager fetch's current-session snapshot, then the real
+  // fetch for whatever session is actually active — a stale, persisted
+  // past-session selection is a common way for those to disagree). A
+  // one-shot flag would auto-select from whichever "loaded" happened to
+  // land first and then ignore the correction, leaving the sidebar
+  // pointed at a topic that no longer exists in the corrected tree. Re-
+  // keying on mostRecent's own identity re-runs the selection whenever it
+  // actually changes, while userSelected still stops it from overriding
+  // a real click. Done directly during render (not in an effect) for the
+  // same reason as the QA sync above.
+  const mostRecentKey = mostRecent ? `${mostRecent.subject_id}:${mostRecent.topic_id}:${mostRecent.grade_id}` : null
+  const [autoExpandedKey, setAutoExpandedKey] = useState(
+    selection ? `${selection.subjectId}:${selection.topicId}:${selection.gradeId}` : null
+  )
+  const [userSelected, setUserSelected] = useState(Boolean(selection))
+  if (!userSelected && status === 'loaded' && mostRecentKey !== autoExpandedKey) {
+    setAutoExpandedKey(mostRecentKey)
     if (mostRecent) {
       setExpandedSubjectId(mostRecent.subject_id)
       setSelectedTopicId(mostRecent.topic_id)
@@ -205,6 +218,7 @@ export default function TeachLogList({
   }
 
   function toggleSubject(subjectId) {
+    setUserSelected(true)
     if (expandedSubjectId === subjectId) {
       setExpandedSubjectId(null)
       setSelectedTopicId(null)
@@ -229,6 +243,7 @@ export default function TeachLogList({
   }
 
   function selectTopic(subjectId, topic) {
+    setUserSelected(true)
     setExpandedSubjectId(subjectId)
     setSelectedTopicId(topic.topic_id)
     const gradeId = topic.grades[0]?.grade_id ?? null
@@ -238,6 +253,7 @@ export default function TeachLogList({
   }
 
   function selectGrade(topicId, gradeId) {
+    setUserSelected(true)
     setSelectedGradeId(gradeId)
     ensureQaLoaded(topicId, gradeId)
     onSelectionChange?.({ subjectId: expandedSubjectId, topicId, gradeId })
