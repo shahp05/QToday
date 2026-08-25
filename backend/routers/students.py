@@ -21,15 +21,16 @@ def list_my_students(
     claims: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # session_id is for browsing a specific — current, future, or a past —
-    # session's roster, open to every role (each sees only what
+    # session_id is for browsing a specific — current, past, or (school
+    # admin only, see validate_session_readable) future — session's roster,
+    # open to every role for current/past (each sees only what
     # get_my_students already scopes them to: staff the whole school,
     # a student their own record, a parent their wards). Read-only, so
     # it's validated against the permissive readable check (any of the
     # relevant customer's own sessions), not the strict write-only one.
     if session_id is not None:
         customer_id = resolve_session_browsing_customer_id(db, claims, student_id)
-        validate_session_readable(db, customer_id, session_id)
+        validate_session_readable(db, customer_id, session_id, is_school_admin=claims.get("is_school_admin", False))
         return get_my_students(db, claims["user_id"], session_id=session_id)
     return get_my_students(db, claims["user_id"])
 

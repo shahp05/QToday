@@ -27,13 +27,13 @@ def list_my_teachers(
     claims: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # session_id is for browsing who taught in a past/current/future
-    # session — open to every role, mirrors GET /students/mine. Read-only,
-    # so it's derived from teach_logs (get_teachers_for_session), not the
-    # live roster.
+    # session_id is for browsing who taught in a past/current session (or,
+    # school admin only, the future one — see validate_session_readable) —
+    # mirrors GET /students/mine. Read-only, so it's derived from teach_logs
+    # (get_teachers_for_session), not the live roster.
     if session_id is not None:
         customer_id = resolve_session_browsing_customer_id(db, claims, student_id)
-        validate_session_readable(db, customer_id, session_id)
+        validate_session_readable(db, customer_id, session_id, is_school_admin=claims.get("is_school_admin", False))
         return get_teachers_for_session(db, customer_id, session_id)
     # A parent has no customer_id of their own — even the ordinary "current
     # teachers" view needs a selected ward to know which school. No ward

@@ -33,7 +33,7 @@ def get_subjects_taught(
     if claims.get("is_parent") or session_id is not None:
         customer_id = resolve_session_browsing_customer_id(db, claims, student_id)
         if session_id is not None:
-            validate_session_readable(db, customer_id, session_id)
+            validate_session_readable(db, customer_id, session_id, is_school_admin=claims.get("is_school_admin", False))
     return list_subjects_taught(
         db,
         customer_id=customer_id,
@@ -59,7 +59,7 @@ def get_qa_for_topic_grade(
     if claims.get("is_parent") or session_id is not None:
         customer_id = resolve_session_browsing_customer_id(db, claims, student_id)
         if session_id is not None:
-            validate_session_readable(db, customer_id, session_id)
+            validate_session_readable(db, customer_id, session_id, is_school_admin=claims.get("is_school_admin", False))
     qa_items = get_topic_grade_qa(
         db,
         customer_id=customer_id,

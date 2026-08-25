@@ -114,21 +114,27 @@ def validate_session_target(db: Session, customer_id: int, session_id: int) -> N
     raise AppError(ErrorCode.SESSION_TARGET_INVALID)
 
 
-def validate_session_readable(db: Session, customer_id: int, session_id: int) -> None:
+def validate_session_readable(db: Session, customer_id: int, session_id: int, *, is_school_admin: bool) -> None:
     """Raises SESSION_TARGET_INVALID unless session_id belongs to this
     customer at all — current, the one pending future session, or any past
     session. Deliberately more permissive than validate_session_target:
     browsing a past session's data read-only is safe for any of the
     customer's own sessions; only writes need the stricter current/future
-    only check."""
+    only check. The one further restriction: the pending future session is
+    readable by a school admin only — per spec, teachers/students/parents
+    have no legitimate use for it ("Not applicable" in every non-admin row
+    of the Future Session navigation table), so is_school_admin is a
+    required kwarg, not an optional one a caller could forget to pass."""
     row = db.execute(
         text(
-            "SELECT 1 FROM academic_sessions "
+            "SELECT is_future FROM academic_sessions "
             "WHERE customer_id = :cid AND session_id = :sid AND is_active = TRUE"
         ),
         {"cid": customer_id, "sid": session_id},
     ).fetchone()
     if row is None:
+        raise AppError(ErrorCode.SESSION_TARGET_INVALID)
+    if row.is_future and not is_school_admin:
         raise AppError(ErrorCode.SESSION_TARGET_INVALID)
 
 
