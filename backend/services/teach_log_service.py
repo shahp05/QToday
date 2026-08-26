@@ -256,6 +256,14 @@ def _learner_subjects_taught(
     }
 
 
+def _student_belongs_to_customer(db: Session, *, student_id: int, customer_id: int) -> bool:
+    row = db.execute(
+        text("SELECT 1 FROM students WHERE student_id = :sid AND customer_id = :cid AND is_active = TRUE"),
+        {"sid": student_id, "cid": customer_id},
+    ).first()
+    return row is not None
+
+
 def _qa_row_to_dict(row) -> dict:
     r = dict(row._mapping)
     return {
@@ -280,20 +288,39 @@ def list_subjects_taught(
     grades, with a QA *count* per grade — not the full QA text, which would
     mean shipping a caller's entire question history (or, for admins, the
     whole school's) on every page load even though the UI only ever shows
-    one grade's questions at a time. Only the most-recently-taught
-    (topic, grade) gets its QA eagerly attached; everything else is loaded
-    on demand via get_topic_grade_qa() as the user clicks around.
+    one grade's questions at a time. Only the most-recently-taught topic's
+    FIRST (lowest-numbered) grade gets its QA eagerly attached — matching
+    spec's "questions... displayed for the first topic grade by default",
+    not whichever grade happened to be logged most recently; everything
+    else is loaded on demand via get_topic_grade_qa() as the user clicks
+    around.
     Scope depends on caller: admins see the whole school; teachers see every
     (subject, grade) pair they've personally logged, PLUS any colleague's
     log for that same pair (substitute-teacher case — see _scope_clause);
     students/parents see topics whose retention range covers the
     learner's own grade, at any grade/session it was originally taught in
-    — see _learner_subjects_taught. student_id (the students.student_id
-    row, not a user_id) is the parent's selected ward — the router has
-    already verified it belongs to them (resolve_session_browsing_
-    customer_id) before this ever runs; ignored for every other role."""
-    if is_student or is_parent:
-        student_row_id = student_id if is_parent else _resolve_own_student_row_id(db, user_id)
+    — see _learner_subjects_taught.
+    student_id (students.student_id, not a user_id) means two different
+    things depending on caller: for a parent, their selected ward — the
+    router has already verified it belongs to them (resolve_session_
+    browsing_customer_id) before this ever runs. For staff (admin/system
+    admin/plain teacher), an explicit request to view THAT SPECIFIC
+    student's own retention-aware view instead of the caller's own taught
+    subjects — "Teachers may select a student's subject in the Students
+    page" — authorized here by a plain customer_id match, the same access
+    staff already has to the whole school's roster (students_query_
+    service.get_my_students). Ignored for a plain student caller (always
+    their own record, via user_id)."""
+    is_staff_caller = not is_student and not is_parent
+    if is_student or is_parent or (is_staff_caller and student_id is not None):
+        if is_student:
+            student_row_id = _resolve_own_student_row_id(db, user_id)
+        elif is_staff_caller:
+            student_row_id = student_id if _student_belongs_to_customer(
+                db, student_id=student_id, customer_id=customer_id,
+            ) else None
+        else:
+            student_row_id = student_id
         if student_row_id is None:
             return {"subjects": [], "most_recent": None}
         return _learner_subjects_taught(
@@ -342,19 +369,13 @@ def list_subjects_taught(
     ).fetchall()
     qa_count_by_topic_grade = {(r.topic_id, r.grade_id): r.qa_count for r in count_rows}
 
+    # Which (subject, topic) is "most recent" is still decided by date —
+    # matches spec condition 3/4/5 ("most recent subject/topic... pre-
+    # selected"). Which GRADE gets shown/QA-attached by default is a
+    # separate question, resolved below once the tree (with grades sorted
+    # ascending) exists — "the first topic grade", per spec conditions 4/5,
+    # not whichever grade that most-recent log row itself happened to be at.
     most_recent_log = max(logs, key=lambda l: l["log_date"])
-    most_recent_key = (most_recent_log["topic_id"], most_recent_log["grade_id"])
-    most_recent_qa_rows = db.execute(
-        text("""
-            SELECT qa_id, question_type, question, answer, options,
-                   difficulty_level, edited_by_name, edited_by_school
-            FROM qa
-            WHERE topic_id = :topic_id AND grade_id = :grade_id AND is_active = TRUE
-            ORDER BY qa_id
-        """),
-        {"topic_id": most_recent_key[0], "grade_id": most_recent_key[1]},
-    ).fetchall()
-    most_recent_qa_items = [_qa_row_to_dict(row) for row in most_recent_qa_rows]
 
     subjects: dict[int, dict] = {}
     topics_by_id: dict[tuple[int, int], dict] = {}
@@ -365,9 +386,11 @@ def list_subjects_taught(
             "subject_name": log["subject_name"],
             "icon_key": log["icon_key"],
             "topics": [],
-            # Most-recently-taught (topic, grade) within this subject, so the
+            # Most-recently-taught topic within this subject, so the
             # frontend can auto-select it when the subject is expanded —
             # mirrors the top-level "most_recent" but scoped per subject.
+            # grade_id filled in below, once grades are sorted, to the
+            # topic's FIRST grade rather than this log row's own grade.
             "most_recent_topic_id": None,
             "most_recent_grade_id": None,
             "_most_recent_log_date": None,
@@ -375,7 +398,6 @@ def list_subjects_taught(
         if subject_entry["_most_recent_log_date"] is None or log["log_date"] > subject_entry["_most_recent_log_date"]:
             subject_entry["_most_recent_log_date"] = log["log_date"]
             subject_entry["most_recent_topic_id"] = log["topic_id"]
-            subject_entry["most_recent_grade_id"] = log["grade_id"]
         topic_key = (log["subject_id"], log["topic_id"])
         topic_entry = topics_by_id.get(topic_key)
         if topic_entry is None:
@@ -395,10 +417,11 @@ def list_subjects_taught(
                 # only needs the deduped "sections" set above.
                 "logs": [],
                 "qa_count": qa_count_by_topic_grade.get(grade_key, 0),
-                # Only populated for the most-recently-taught grade; the
-                # frontend fetches the rest on demand and null means "not
-                # loaded yet" (as opposed to "loaded and empty").
-                "qa_items": most_recent_qa_items if grade_key == most_recent_key else None,
+                # Filled in below, after sorting, only for the grade that
+                # ends up eagerly loaded (the most-recent topic's first
+                # grade) — null means "not loaded yet" (as opposed to
+                # "loaded and empty"), for the frontend to fetch on demand.
+                "qa_items": None,
             }
             grades_by_id[grade_key] = grade_entry
             topic_entry["grades"].append(grade_entry)
@@ -414,13 +437,33 @@ def list_subjects_taught(
             for grade_entry in topic_entry["grades"]:
                 grade_entry["sections"] = sorted(grade_entry["sections"])
                 grade_entry["logs"].sort(key=lambda l: l["date"])
+        # First (lowest-numbered) grade of the subject's own most-recent
+        # topic — grades are sorted ascending above, so this is grades[0].
+        subject_most_recent_topic = topics_by_id[(subject_entry["subject_id"], subject_entry["most_recent_topic_id"])]
+        subject_entry["most_recent_grade_id"] = subject_most_recent_topic["grades"][0]["grade_id"]
+
+    most_recent_topic_entry = topics_by_id[(most_recent_log["subject_id"], most_recent_log["topic_id"])]
+    most_recent_grade_id = most_recent_topic_entry["grades"][0]["grade_id"]
+    most_recent_qa_rows = db.execute(
+        text("""
+            SELECT qa_id, question_type, question, answer, options,
+                   difficulty_level, edited_by_name, edited_by_school
+            FROM qa
+            WHERE topic_id = :topic_id AND grade_id = :grade_id AND is_active = TRUE
+            ORDER BY qa_id
+        """),
+        {"topic_id": most_recent_log["topic_id"], "grade_id": most_recent_grade_id},
+    ).fetchall()
+    grades_by_id[(most_recent_log["topic_id"], most_recent_grade_id)]["qa_items"] = [
+        _qa_row_to_dict(row) for row in most_recent_qa_rows
+    ]
 
     return {
         "subjects": sorted(subjects.values(), key=lambda s: s["subject_name"]),
         "most_recent": {
             "subject_id": most_recent_log["subject_id"],
             "topic_id": most_recent_log["topic_id"],
-            "grade_id": most_recent_log["grade_id"],
+            "grade_id": most_recent_grade_id,
         },
     }
 

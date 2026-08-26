@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
+import { useEffect, useState } from 'react'
+import { useStudentSubjectsStore } from '../../store/studentSubjectsStore'
 import { useStudentDetailProgressStore } from '../../store/studentDetailProgressStore'
 import SubjectTopicGrid, { SubjectFilterBar } from '../subjects/SubjectTopicGrid'
 import StudentQuizProgress from '../subjects/StudentQuizProgress'
@@ -33,37 +33,51 @@ function IconTopics() {
 
 // Teacher-facing mirror of StudentSubjectsHome for a single student — same
 // header actions, subject dropdown, status strip, topic cards, and Progress
-// (chart / quizzes played) toggle, scoped to one student's scores via the
-// teacher/admin branch of GET /quizzes/progress and /quizzes/history (see
-// resolve_authorized_student_id) instead of the "current user" stores the
-// student's own page reads. Read-only throughout: no quiz-start (a teacher
-// can't play as the student) and no per-quiz expand in Quizzes Played (quiz
-// detail is gated to the student themselves server-side).
+// (chart / quizzes played) toggle. Two independent per-student fetches:
+// quiz progress/history via the teacher/admin branch of GET /quizzes/
+// progress and /quizzes/history (see resolve_authorized_student_id), and
+// this student's own retention-aware subjects/topics tree via GET
+// /teach-logs/subjects-taught?student_id=... (list_subjects_taught's
+// staff-viewing-a-specific-student path — see its docstring). Not the
+// teacher's own subjects page client-side-filtered by grade_id: a topic
+// taught at an earlier grade with a retention range covering this
+// student's grade only ever appears under the LEARNER's own grade, never
+// under the grade it was originally taught at, so filtering the teacher's
+// own tree could never have surfaced it. Read-only throughout: no
+// quiz-start (a teacher can't play as the student) and no per-quiz expand
+// in Quizzes Played (quiz detail is gated to the student themselves
+// server-side).
 export default function StudentSubjectDetail({ student, initialSubjectId, onBack }) {
-  const subjectsTaught = useSubjectsTaughtStore(s => s.subjects)
-  const entry = useStudentDetailProgressStore(s => s.byStudent[student.student_id])
-  const ensureLoaded = useStudentDetailProgressStore(s => s.ensureLoaded)
-  const dismissError = useStudentDetailProgressStore(s => s.dismissError)
+  const progressEntry = useStudentDetailProgressStore(s => s.byStudent[student.student_id])
+  const ensureProgressLoaded = useStudentDetailProgressStore(s => s.ensureLoaded)
+  const dismissProgressError = useStudentDetailProgressStore(s => s.dismissError)
+  const subjectsEntry = useStudentSubjectsStore(s => s.byStudent[student.student_id])
+  const ensureSubjectsLoaded = useStudentSubjectsStore(s => s.ensureLoaded)
+  const dismissSubjectsError = useStudentSubjectsStore(s => s.dismissError)
   const [selectedSubjectId, setSelectedSubjectId] = useState(initialSubjectId ?? null)
   const [view, setView] = usePageView('topics') // 'topics' | 'progress' — coexists with ?subject=
 
-  useEffect(() => { ensureLoaded(student.student_id) }, [student.student_id, ensureLoaded])
+  useEffect(() => { ensureProgressLoaded(student.student_id) }, [student.student_id, ensureProgressLoaded])
+  useEffect(() => { ensureSubjectsLoaded(student.student_id) }, [student.student_id, ensureSubjectsLoaded])
 
-  const status = entry?.status ?? 'loading'
-  const error = entry?.error ?? ''
-  const topicStatsById = entry?.topicStatsById ?? {}
-  const quizzes = entry?.quizzes ?? []
+  const progressStatus = progressEntry?.status ?? 'loading'
+  const progressError = progressEntry?.error ?? ''
+  const topicStatsById = progressEntry?.topicStatsById ?? {}
+  const quizzes = progressEntry?.quizzes ?? []
 
-  // Same grade-scoping as StudentsList's gradeSubjects, but keeping full
-  // topic objects (not just ids) since SubjectTopicGrid needs topic_name etc.
-  const subjectsForGrade = useMemo(() => {
-    return subjectsTaught
-      .map(subject => ({
-        ...subject,
-        topics: subject.topics.filter(topic => topic.grades.some(g => g.grade_id === student.grade_id)),
-      }))
-      .filter(subject => subject.topics.length > 0)
-  }, [subjectsTaught, student.grade_id])
+  const subjectsStatus = subjectsEntry?.status ?? 'loading'
+  const subjectsError = subjectsEntry?.error ?? ''
+  const subjectsForGrade = subjectsEntry?.subjects ?? []
+
+  // Either fetch failing is a real error for this page — there's nothing
+  // useful to show without both. Only one Toast at a time; progress takes
+  // priority simply because it was checked first, not for any real reason.
+  const status = subjectsStatus === 'error' ? 'error'
+    : progressStatus === 'error' ? 'error'
+    : subjectsStatus === 'loading' || progressStatus === 'loading' ? 'loading'
+    : 'loaded'
+  const error = progressStatus === 'error' ? progressError : subjectsError
+  const dismissError = () => { dismissProgressError(student.student_id); dismissSubjectsError(student.student_id) }
 
   const activeSubjectId = subjectsForGrade.some(s => s.subject_id === selectedSubjectId)
     ? selectedSubjectId
@@ -100,7 +114,7 @@ export default function StudentSubjectDetail({ student, initialSubjectId, onBack
         )}
       />
 
-      {status === 'error' && <Toast message={error} onDismiss={() => dismissError(student.student_id)} />}
+      {status === 'error' && <Toast message={error} onDismiss={dismissError} />}
 
       {status !== 'error' && subjectsForGrade.length > 0 && (
         view === 'progress' ? (
@@ -109,9 +123,9 @@ export default function StudentSubjectDetail({ student, initialSubjectId, onBack
               subjects={subjectsForGrade}
               topicStatsById={topicStatsById}
               quizzes={quizzes}
-              quizHistoryStatus={status}
-              quizHistoryError={error}
-              onDismissQuizHistoryError={() => dismissError(student.student_id)}
+              quizHistoryStatus={progressStatus}
+              quizHistoryError={progressError}
+              onDismissQuizHistoryError={() => dismissProgressError(student.student_id)}
               readOnly
             />
           </div>
