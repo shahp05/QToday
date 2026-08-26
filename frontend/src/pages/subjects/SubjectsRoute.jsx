@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getActiveSession, useSessionsStore } from '../../store/sessionsStore'
 import { useProfileStore } from '../../store/profileStore'
+import { useParentWardStore } from '../../store/parentWardStore'
 import { useSubjectsFeatureVisible } from '../../hooks/useSubjectsFeatureVisible'
 import StudentSubjectsHome from './StudentSubjectsHome'
 import SubjectsHome from './SubjectsHome'
@@ -17,6 +18,7 @@ export default function SubjectsRoute() {
   const isStudent      = useProfileStore(s => s.is_student)
   const isParent       = useProfileStore(s => s.is_parent)
   const isSchoolAdmin  = useProfileStore(s => s.is_school_admin)
+  const wardId         = useParentWardStore(s => s.selectedStudentId)
 
   const activeSession = useSessionsStore(getActiveSession)
   const isViewingPastSession = activeSession != null && !activeSession.is_current && !activeSession.is_future
@@ -36,7 +38,7 @@ export default function SubjectsRoute() {
   if (ready && !visible) return null
 
   if (isStudent) return <StudentSubjectsHome readOnly={isViewingPastSession} />
-  if (isParent) return <StudentSubjectsHome readOnly />
+  if (isParent) return <StudentSubjectsHome readOnly studentId={wardId} />
   return (
     <SubjectsHome
       defaultView={isSchoolAdmin ? 'teachLog' : undefined}

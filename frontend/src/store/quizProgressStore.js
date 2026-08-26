@@ -8,10 +8,12 @@ export const useQuizProgressStore = create((set) => ({
   status: 'idle', // idle | loading | loaded | error
   error: null,
 
-  fetchQuizProgress: async () => {
+  // studentId: a parent's selected ward — omitted for a student (defaults
+  // to themselves server-side, see resolve_authorized_student_id).
+  fetchQuizProgress: async (studentId) => {
     set({ status: 'loading', error: null })
     try {
-      const data = await fetchQuizProgress()
+      const data = await fetchQuizProgress(studentId)
       set({
         topicStatsById: Object.fromEntries(data.topics.map(t => [t.topic_id, t])),
         status: 'loaded',

@@ -25,8 +25,9 @@ def resolve_authorized_student_id(
     optional for them (defaults to self) but must match if given. Either of
     a school's own staff (is_staff — sys admin or teacher) or a system admin
     can look up any student, but only within their own school (system
-    admin: any school). Parent access is deferred (see
-    teach_log_service._scope_clause for the same note on the read side)."""
+    admin: any school). A parent may only look up one of their own active
+    wards (requested_student_id required — there's no "self" fallback for
+    a parent, unlike a student)."""
     if claims.get("is_student"):
         own = db.execute(
             text("SELECT student_id FROM students WHERE user_id = :uid AND is_active = TRUE"),
@@ -37,6 +38,21 @@ def resolve_authorized_student_id(
         if requested_student_id is not None and requested_student_id != own.student_id:
             raise AppError(ErrorCode.AUTH_FORBIDDEN)
         return own.student_id
+
+    if claims.get("is_parent"):
+        if requested_student_id is None:
+            raise AppError(ErrorCode.VALIDATION_ERROR)
+        row = db.execute(
+            text("""
+                SELECT s.student_id FROM parents p
+                JOIN students s ON s.student_id = p.student_id
+                WHERE p.user_id = :uid AND p.student_id = :sid AND p.is_active = TRUE AND s.is_active = TRUE
+            """),
+            {"uid": claims["user_id"], "sid": requested_student_id},
+        ).first()
+        if row is None:
+            raise AppError(ErrorCode.AUTH_FORBIDDEN)
+        return requested_student_id
 
     if is_staff(claims) or claims.get("is_system_admin"):
         if requested_student_id is None:

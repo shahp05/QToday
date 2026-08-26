@@ -9,11 +9,13 @@ export const useQuizHistoryStore = create((set, get) => ({
   status: 'idle', // idle | loading | loaded | error
   error: null,
 
-  fetchQuizHistory: async () => {
+  // studentId: a parent's selected ward — omitted for a student (defaults
+  // to themselves server-side, see resolve_authorized_student_id).
+  fetchQuizHistory: async (studentId) => {
     if (get().status === 'loading') return
     set({ status: 'loading', error: null })
     try {
-      const data = await fetchQuizHistory()
+      const data = await fetchQuizHistory(studentId)
       set({ quizzes: data.quizzes, status: 'loaded' })
     } catch (err) {
       set({ status: 'error', error: err.message })
@@ -22,10 +24,13 @@ export const useQuizHistoryStore = create((set, get) => ({
 
   // Called after a quiz that scored immediately (no LLM pass pending) or
   // once background scoring finishes — refetches rather than patching in
-  // place since a fresh play-through means a brand-new quiz_id.
-  refreshQuizHistory: async () => {
+  // place since a fresh play-through means a brand-new quiz_id. studentId:
+  // same as fetchQuizHistory (only ever meaningful for a parent, since a
+  // student/read-only ward view never plays a quiz itself, but accepted
+  // for symmetry).
+  refreshQuizHistory: async (studentId) => {
     try {
-      const data = await fetchQuizHistory()
+      const data = await fetchQuizHistory(studentId)
       set({ quizzes: data.quizzes, status: 'loaded' })
     } catch (err) {
       set({ status: 'error', error: err.message })
