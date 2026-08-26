@@ -43,10 +43,12 @@ function IconTopics() {
 // taught at an earlier grade with a retention range covering this
 // student's grade only ever appears under the LEARNER's own grade, never
 // under the grade it was originally taught at, so filtering the teacher's
-// own tree could never have surfaced it. Read-only throughout: no
-// quiz-start (a teacher can't play as the student) and no per-quiz expand
-// in Quizzes Played (quiz detail is gated to the student themselves
-// server-side).
+// own tree could never have surfaced it. Read-only for quiz-play only — a
+// teacher can't play as the student, so SubjectTopicGrid gets no
+// onCardClick/onPlayClick — but per-quiz expand in Quizzes Played (question,
+// answer, student's response, score) IS available, same as the student's
+// own view, per spec; only Challenge Quiz Score stays student-only (see
+// StudentQuizQaItem's readOnly gate, keyed off studentId being passed).
 export default function StudentSubjectDetail({ student, initialSubjectId, onBack }) {
   const progressEntry = useStudentDetailProgressStore(s => s.byStudent[student.student_id])
   const ensureProgressLoaded = useStudentDetailProgressStore(s => s.ensureLoaded)
@@ -126,7 +128,7 @@ export default function StudentSubjectDetail({ student, initialSubjectId, onBack
               quizHistoryStatus={progressStatus}
               quizHistoryError={progressError}
               onDismissQuizHistoryError={() => dismissProgressError(student.student_id)}
-              readOnly
+              studentId={student.student_id}
             />
           </div>
         ) : activeSubjectId != null && (

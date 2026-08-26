@@ -54,8 +54,11 @@ export async function fetchQuizHistory(studentId) {
   return res.json() // { quizzes: [{quiz_id, subject_id, subject_name, topic_id, topic_name, grade_name, date_created, total_marks, total_score, is_scored}] }
 }
 
-export async function fetchQuizDetail(quizId) {
-  const res = await apiFetch(`/quizzes/${quizId}/detail`)
+// studentId: a parent's selected ward, or the student a teacher/admin is
+// viewing (StudentSubjectDetail) — omitted by a student viewing their own.
+export async function fetchQuizDetail(quizId, studentId) {
+  const query = studentId != null ? `?student_id=${studentId}` : ''
+  const res = await apiFetch(`/quizzes/${quizId}/detail${query}`)
   if (!res.ok) throw new Error(await apiErrorMessage(res))
   return res.json() // { quiz_id, subject_id, topic_id, grade_name, date_created, total_marks, total_score, questions: [{..., challenged}] }
 }

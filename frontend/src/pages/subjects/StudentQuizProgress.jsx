@@ -49,9 +49,12 @@ function IconTrophy() {
 // passed in rather than read from stores here, so the teacher-facing
 // single-student view (StudentSubjectDetail) can reuse this exact layout
 // with per-student data instead of the current-user-scoped stores.
-// readOnly: hides per-quiz expand (see StudentQuizList's own readOnly note).
+// studentId: a parent/teacher/admin viewing another student's progress
+// (StudentQuizList/fetchQuizDetail resolve who), null for a student viewing
+// their own — see StudentQuizList's own studentId note for what that
+// changes (Challenge Quiz Score hidden when set, quiz Q&A/scores are not).
 export default function StudentQuizProgress({
-  subjects, topicStatsById, quizzes, quizHistoryStatus, quizHistoryError, onDismissQuizHistoryError, readOnly = false,
+  subjects, topicStatsById, quizzes, quizHistoryStatus, quizHistoryError, onDismissQuizHistoryError, studentId = null,
 }) {
   const [activeView, setActiveView] = useState('quizzes') // 'chart' | 'quizzes'
   const [expandedSubjectId, setExpandedSubjectId] = useState(null)
@@ -160,7 +163,7 @@ export default function StudentQuizProgress({
               error={quizHistoryError}
               onDismissError={onDismissQuizHistoryError}
               autoExpandKey={selectedTopicId}
-              readOnly={readOnly}
+              studentId={studentId}
             />
           )}
         </div>

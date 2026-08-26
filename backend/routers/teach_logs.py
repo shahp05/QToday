@@ -52,15 +52,17 @@ def get_qa_for_topic_grade(
     topic_id: int,
     grade_id: int,
     session_id: int | None = Query(None),
-    student_id: int | None = Query(None),
     claims: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # Teacher/admin review-and-edit screen only — a student's or parent's
+    # only path to a question's answer is a quiz they've actually played
+    # (GET /quizzes/{id}/detail), never the full topic/grade question bank.
+    if claims.get("is_student") or claims.get("is_parent"):
+        raise AppError(ErrorCode.AUTH_FORBIDDEN)
     customer_id = claims.get("customer_id")
-    if claims.get("is_parent") or session_id is not None:
-        customer_id = resolve_session_browsing_customer_id(db, claims, student_id)
-        if session_id is not None:
-            validate_session_readable(db, customer_id, session_id, is_school_admin=claims.get("is_school_admin", False))
+    if session_id is not None:
+        validate_session_readable(db, customer_id, session_id, is_school_admin=claims.get("is_school_admin", False))
     qa_items = get_topic_grade_qa(
         db,
         customer_id=customer_id,
@@ -69,10 +71,7 @@ def get_qa_for_topic_grade(
         grade_id=grade_id,
         is_school_admin=claims.get("is_school_admin", False),
         is_system_admin=claims.get("is_system_admin", False),
-        is_student=claims.get("is_student", False),
-        is_parent=claims.get("is_parent", False),
         session_id=session_id,
-        student_id=student_id,
     )
     if qa_items is None:
         raise AppError(ErrorCode.TEACH_LOG_NOT_FOUND)

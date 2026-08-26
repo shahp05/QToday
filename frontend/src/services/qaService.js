@@ -40,13 +40,12 @@ export async function fetchSubjectsTaught(sessionId, studentId) {
   return res.json() // { subjects, most_recent }
 }
 
-// studentId is a parent's selected ward, same as fetchSubjectsTaught —
-// required for a parent fetching any topic/grade beyond the one
-// list_subjects_taught already eagerly attached, or the backend has no
-// way to know which ward's grade to check this against.
-export async function fetchTopicGradeQA(topicId, gradeId, sessionId, studentId) {
-  let qs = sessionId != null ? `&session_id=${sessionId}` : ''
-  if (studentId != null) qs += `&student_id=${studentId}`
+// Teacher/admin review-and-edit screen only (TeachLogList) — a student's
+// or parent's only path to a question's answer is a quiz they've actually
+// played (fetchQuizDetail), never this full topic/grade bank; the backend
+// rejects is_student/is_parent callers outright.
+export async function fetchTopicGradeQA(topicId, gradeId, sessionId) {
+  const qs = sessionId != null ? `&session_id=${sessionId}` : ''
   const res = await apiFetch(`/teach-logs/qa?topic_id=${topicId}&grade_id=${gradeId}${qs}`)
   if (!res.ok) throw new Error(await apiErrorMessage(res))
   return res.json() // { qa_items }

@@ -40,11 +40,13 @@ function IconChevron({ open }) {
 // key remounts StudentQuizAccordion with its state reset to initial values,
 // collapsing whatever was open (which belonged to the previous topic's
 // list) without a setState-in-effect render pass.
-// readOnly: teacher-viewing-a-student mode — GET /quizzes/{id}/detail is
-// gated to the student themselves (see backend's _resolve_own_student_id),
-// so expand-to-see-answers isn't available for another viewer; rows still
-// show the score/date/topic summary, just aren't clickable.
-export default function StudentQuizList({ quizzes, status, error, onDismissError, autoExpandKey, readOnly = false }) {
+// studentId: a parent or teacher/admin viewing another student's quizzes
+// (see fetchQuizDetail) — per spec they get the same quiz Q&A/score view as
+// the student, just without "Play Quiz" (handled elsewhere, in
+// SubjectTopicGrid) or "Challenge Quiz Score" (gated below, keyed off
+// studentId being set — a student reviewing their OWN past-session quizzes
+// passes no studentId and keeps the ability to challenge).
+export default function StudentQuizList({ quizzes, status, error, onDismissError, autoExpandKey, studentId = null }) {
   if (status === 'loading' || status === 'idle') {
     return (
       <div className="student-quiz-list-loading">
@@ -61,7 +63,7 @@ export default function StudentQuizList({ quizzes, status, error, onDismissError
     return null
   }
 
-  return <StudentQuizAccordion key={autoExpandKey} quizzes={quizzes} readOnly={readOnly} />
+  return <StudentQuizAccordion key={autoExpandKey} quizzes={quizzes} studentId={studentId} />
 }
 
 // Single-open accordion (matches TeachLogList.jsx's subject-row pattern) —
@@ -69,7 +71,7 @@ export default function StudentQuizList({ quizzes, status, error, onDismissError
 // opens once its detail has actually loaded — loadingQuizId drives a spinner
 // in the row header instead, so the body never expands empty and then pops
 // content in underneath the spinner.
-function StudentQuizAccordion({ quizzes, readOnly }) {
+function StudentQuizAccordion({ quizzes, studentId }) {
   const [expandedQuizId, setExpandedQuizId] = useState(null)
   const [detail, setDetail] = useState(null) // fetchQuizDetail() result for expandedQuizId
   const [loadingQuizId, setLoadingQuizId] = useState(null)
@@ -79,7 +81,7 @@ function StudentQuizAccordion({ quizzes, readOnly }) {
     setLoadingQuizId(quiz.quiz_id)
     setDetailError('')
     try {
-      const data = await fetchQuizDetail(quiz.quiz_id)
+      const data = await fetchQuizDetail(quiz.quiz_id, studentId)
       setDetail(data)
       setExpandedQuizId(quiz.quiz_id)
     } catch (err) {
@@ -99,7 +101,7 @@ function StudentQuizAccordion({ quizzes, readOnly }) {
     if (!hasPendingChallenge || expandedQuizId == null) return
     const interval = setInterval(async () => {
       try {
-        const data = await fetchQuizDetail(expandedQuizId)
+        const data = await fetchQuizDetail(expandedQuizId, studentId)
         setDetail(data)
         // A challenge resolving changes this quiz's total_score — the
         // topic-card % and quiz-history row % (both fed by these stores,
@@ -116,10 +118,10 @@ function StudentQuizAccordion({ quizzes, readOnly }) {
       }
     }, 5000)
     return () => clearInterval(interval)
-  }, [hasPendingChallenge, expandedQuizId])
+  }, [hasPendingChallenge, expandedQuizId, studentId])
 
   function toggleQuiz(quiz) {
-    if (readOnly || !quiz.is_scored || loadingQuizId) return
+    if (!quiz.is_scored || loadingQuizId) return
     if (expandedQuizId === quiz.quiz_id) {
       setExpandedQuizId(null)
       return
@@ -137,7 +139,7 @@ function StudentQuizAccordion({ quizzes, readOnly }) {
             <button
               className={`student-quiz-row ${quiz.is_scored ? '' : 'student-quiz-row--pending'}`}
               onClick={() => toggleQuiz(quiz)}
-              disabled={!quiz.is_scored || readOnly}
+              disabled={!quiz.is_scored}
             >
               {quiz.is_scored ? (
                 <span className="student-quiz-score" style={{ background: scoreColor(pct), color: scoreTextColor(pct) }}>{pct}%</span>
@@ -152,16 +154,16 @@ function StudentQuizAccordion({ quizzes, readOnly }) {
                   {!quiz.is_scored && ' · Scoring in progress'}
                 </p>
               </div>
-              {quiz.is_scored && !readOnly && <IconChevron open={isOpen} />}
+              {quiz.is_scored && <IconChevron open={isOpen} />}
             </button>
 
-            {!readOnly && loadingQuizId === quiz.quiz_id && (
+            {loadingQuizId === quiz.quiz_id && (
               <div className="student-quiz-row-overlay">
                 <span className="student-topic-spinner student-topic-spinner--lg" />
               </div>
             )}
 
-            {!readOnly && isOpen && detail && (
+            {isOpen && detail && (
               <div className="student-quiz-detail">
                 <div className="student-quiz-detail-list">
                   {detail.questions.map(q => (
@@ -169,6 +171,7 @@ function StudentQuizAccordion({ quizzes, readOnly }) {
                       key={q.qa_id}
                       q={q}
                       quizId={quiz.quiz_id}
+                      readOnly={studentId != null}
                       onChallengeResolved={result => {
                         setDetail(prev => ({
                           ...prev,

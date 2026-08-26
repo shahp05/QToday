@@ -471,57 +471,17 @@ def list_subjects_taught(
 def get_topic_grade_qa(
     db: Session, *, customer_id: int, user_id: int, topic_id: int, grade_id: int,
     is_school_admin: bool = False, is_system_admin: bool = False,
-    is_student: bool = False, is_parent: bool = False,
-    session_id: int | None = None, student_id: int | None = None,
+    session_id: int | None = None,
 ) -> list[dict] | None:
-    """QA items for one (topic, grade), fetched on demand when the user
-    clicks a topic/grade that wasn't eagerly loaded by list_subjects_taught().
+    """QA items for one (topic, grade), fetched on demand when a teacher/
+    admin clicks a topic/grade that wasn't eagerly loaded by
+    list_subjects_taught() — the review-and-edit screen (1.5.1/1.5.2).
     Returns None if the caller has no teach_logs row proving they're allowed
     to see this (topic, grade) — same scoping rules as the list endpoint.
-    student_id is the parent's selected ward (students.student_id),
-    already verified as theirs by the router; ignored otherwise."""
-    if is_student or is_parent:
-        student_row_id = student_id if is_parent else _resolve_own_student_row_id(db, user_id)
-        if student_row_id is None:
-            return None
-        learner_grade = _learner_grade(
-            db, customer_id=customer_id, student_row_id=student_row_id, session_id=session_id,
-        )
-        # grade_id must be exactly the learner's own grade for THIS
-        # session (current, or historical if session_id names a past one)
-        # — the only grade list_subjects_taught ever shows them for that
-        # session — not just any grade whose retention range covers it.
-        if learner_grade is None or learner_grade[0] != grade_id:
-            return None
-        grade_name = learner_grade[1]
-
-        visible = db.execute(
-            text("""
-                SELECT 1
-                FROM teach_logs tl
-                JOIN grades g_taught ON g_taught.grade_id = tl.grade_id
-                JOIN grades g_to ON g_to.grade_id = tl.grade_to_id
-                WHERE tl.customer_id = :cid AND tl.is_active = TRUE AND tl.topic_id = :topic_id
-                  AND g_taught.grade_name <= :grade_name AND g_to.grade_name >= :grade_name
-                LIMIT 1
-            """),
-            {"cid": customer_id, "topic_id": topic_id, "grade_name": grade_name},
-        ).first()
-        if not visible:
-            return None
-
-        qa_rows = db.execute(
-            text("""
-                SELECT qa_id, question_type, question, answer, options,
-                       difficulty_level, edited_by_name, edited_by_school
-                FROM qa
-                WHERE topic_id = :topic_id AND grade_id = :grade_id AND is_active = TRUE
-                ORDER BY qa_id
-            """),
-            {"topic_id": topic_id, "grade_id": grade_id},
-        ).fetchall()
-        return [_qa_row_to_dict(row) for row in qa_rows]
-
+    Staff-only: a student's or parent's only path to a question's answer is
+    a quiz they've actually played (quiz_service.get_quiz_detail), never
+    this full topic/grade bank — the router blocks them before this is
+    ever called."""
     scope = _scope_clause(
         db, customer_id=customer_id, user_id=user_id,
         is_school_admin=is_school_admin, is_system_admin=is_system_admin,

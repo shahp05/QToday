@@ -263,7 +263,7 @@ export default function StudentSubjectsHome({ readOnly = false, studentId = null
             quizHistoryStatus={quizHistoryStatus}
             quizHistoryError={quizHistoryError}
             onDismissQuizHistoryError={dismissQuizHistoryError}
-            readOnly={readOnly}
+            studentId={studentId}
           />
         </div>
       ) : (

@@ -5,6 +5,10 @@ import { ErrorCode } from '../errors/errorCodes'
 import { useParentWardStore } from './parentWardStore'
 import { useProfileStore } from './profileStore'
 
+// NB: ensureQaLoaded/setQaItems/mutateQaItems below back TeachLogList's
+// teacher/admin review-and-edit screen only — GET /teach-logs/qa now
+// rejects is_student/is_parent callers server-side (see qaService.js).
+
 // subjects-taught only ships qa_count + eagerly-loads the most-recently-
 // taught (topic, grade)'s qa_items — everything else is fetched on demand
 // via ensureQaLoaded() as the user clicks around, so a long teaching
@@ -62,9 +66,7 @@ export const useSubjectsTaughtStore = create((set, get) => ({
       })(),
     }))
     try {
-      const isParent = useProfileStore.getState().is_parent
-      const wardId = isParent ? useParentWardStore.getState().selectedStudentId : null
-      const data = await fetchTopicGradeQA(topicId, gradeId, sessionId, wardId)
+      const data = await fetchTopicGradeQA(topicId, gradeId, sessionId)
       set(state => ({
         subjects: state.subjects.map(s => ({
           ...s,

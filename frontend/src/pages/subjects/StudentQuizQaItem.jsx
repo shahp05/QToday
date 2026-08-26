@@ -70,7 +70,12 @@ function getRenderOptions(q) {
 // challenge form for anything short of full marks. onChallengeResolved lets
 // the parent (StudentQuizList) patch this question's score/answer and the
 // quiz's total into its own detail state once the LLM re-grades it.
-export default function StudentQuizQaItem({ q, quizId, onChallengeResolved }) {
+// readOnly: a parent or teacher/admin viewing another student's quiz —
+// they may see the score/answers but never challenge on the student's
+// behalf (backend rejects it anyway via _resolve_own_student_id-equivalent
+// checks in challenge_quiz_question; this just avoids showing a button
+// that would only ever fail).
+export default function StudentQuizQaItem({ q, quizId, onChallengeResolved, readOnly = false }) {
   const renderOptions = getRenderOptions(q)
   const isMcq = !!q.options
   const isFullMarks = q.is_scored && q.score === q.marks
@@ -81,7 +86,7 @@ export default function StudentQuizQaItem({ q, quizId, onChallengeResolved }) {
   // the periodic sweep (resolve_pending_challenges) if that first attempt
   // failed. StudentQuizList polls while this is true.
   const challengePending = alreadyChallenged && q.challenge_response == null
-  const canChallenge = q.is_scored && !isFullMarks && isAnswered && !alreadyChallenged
+  const canChallenge = !readOnly && q.is_scored && !isFullMarks && isAnswered && !alreadyChallenged
 
   const [challenging, setChallenging] = useState(false)
   const [reason, setReason] = useState('')

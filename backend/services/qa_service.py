@@ -43,6 +43,14 @@ from services.text_utils import title_case
 
 _GENERAL_AREA = "General"
 
+# Per spec: ETA is initialized to this and overwritten by whatever the LLM
+# returns — a fallback only for the rare item where the model omits 'eta'.
+_DEFAULT_ETA_SECONDS = 15
+
+
+def _eta_from_item(item: dict) -> int:
+    return item.get("eta") or _DEFAULT_ETA_SECONDS
+
 _TYPE_INSTRUCTIONS = {
     "descriptive": (
         "Each item needs a free-text 'question' and a model 'answer' (string). No 'options' field."
@@ -713,7 +721,7 @@ async def _generate_and_save_qa(
                     answer=_format_answer(item["answer"]),
                     options=item.get("options"),
                     difficulty_level=item["difficulty_level"],
-                    expected_time_seconds=item.get("eta"),
+                    expected_time_seconds=_eta_from_item(item),
                     is_verified=False,  # confirmed by _verify_qa_batch before being served
                 )
             )
@@ -1200,7 +1208,7 @@ async def poll_and_finalize_qa_batch(db: Session, job: BatchJob) -> dict:
                     answer=_format_answer(item["answer"]),
                     options=item.get("options"),
                     difficulty_level=item["difficulty_level"],
-                    expected_time_seconds=item.get("eta"),
+                    expected_time_seconds=_eta_from_item(item),
                     is_verified=False,
                 )
             )

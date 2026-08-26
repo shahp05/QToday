@@ -512,12 +512,14 @@ def get_student_quiz_history(db: Session, *, student_id: int, teacher_scope: tup
     return {"quizzes": quizzes}
 
 
-def get_quiz_detail(db: Session, *, claims: dict, quiz_id: int) -> dict:
+def get_quiz_detail(db: Session, *, claims: dict, quiz_id: int, student_id: int | None = None) -> dict:
     """Per-question breakdown of a played quiz: the frozen question/options,
     the student's response, the correct answer, and the marks awarded — for
-    the review screen a student opens from their Progress list. Only the
-    quiz's own student may view it."""
-    student_id = _resolve_own_student_id(db, claims)
+    the review screen a student opens from their Progress list. The quiz's
+    own student, their parent, or staff/admin viewing that student (see
+    resolve_authorized_student_id) may view it — student_id names which
+    student for a parent/staff caller, ignored (self) for a student."""
+    student_id = resolve_authorized_student_id(db, claims=claims, requested_student_id=student_id)
     quiz = db.get(Quiz, quiz_id)
     if quiz is None or not quiz.is_active or quiz.student_id != student_id:
         raise AppError(ErrorCode.QUIZ_NOT_FOUND)

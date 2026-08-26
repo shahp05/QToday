@@ -114,10 +114,11 @@ def get_quiz_status_route(
 @router.get("/{quiz_id}/detail", response_model=QuizDetailResponse)
 def get_quiz_detail_route(
     quiz_id: int,
+    student_id: int | None = None,
     claims: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return get_quiz_detail(db, claims=claims, quiz_id=quiz_id)
+    return get_quiz_detail(db, claims=claims, quiz_id=quiz_id, student_id=student_id)
 
 
 @router.post("/{quiz_id}/questions/{qa_id}/challenge", response_model=ChallengeQuizQuestionResponse)
