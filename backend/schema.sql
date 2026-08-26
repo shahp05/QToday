@@ -389,8 +389,10 @@ CREATE TABLE IF NOT EXISTS quiz_scores (
 --                  valid? NULL until resolved.
 --   date_closed  : NULL = open/unresolved, set = resolved. Doubles as
 --                  the closed-flag, no separate boolean needed.
---   Auto-correction of qa.answer when is_upheld=true is deferred —
---   not implemented yet.
+--   When the LLM finds the stored answer itself was wrong, qa.answer is
+--   corrected in place (quiz_service._try_resolve_challenge) — the frozen
+--   quiz_scores.answer for this quiz is updated too, so both this quiz's
+--   own record and every future quiz on that question reflect it.
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS quiz_challenges (
     challenge_id         SERIAL          PRIMARY KEY,

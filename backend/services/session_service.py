@@ -33,6 +33,22 @@ def get_current_session_id(db: Session, customer_id: int) -> int | None:
     return row.session_id if row else None
 
 
+def get_current_session_start_date(db: Session, customer_id: int) -> date | None:
+    """The customer's current session's start_date, or None if they've never
+    written anything session-tracked yet (see get_current_session_id).
+    Sessions cut over atomically with exactly one is_current=true per
+    customer at any time, so any row whose own date_created falls on or
+    after this date was necessarily created while today's session was
+    already current — no separate per-row session_id needed to answer
+    "was this from the current session" (see quiz_service.challenge_quiz_
+    question, the first caller)."""
+    row = db.execute(
+        text("SELECT start_date FROM academic_sessions WHERE customer_id = :cid AND is_current = TRUE"),
+        {"cid": customer_id},
+    ).fetchone()
+    return row.start_date if row else None
+
+
 def current_session_clause(db: Session, customer_id: int, alias: str = "sg") -> tuple[str, dict]:
     """Returns a SQL fragment + params scoping a student_grades-bearing
     query to the customer's current session — the one filter every

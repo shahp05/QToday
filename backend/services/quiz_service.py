@@ -15,7 +15,7 @@ from services.access_scope import teacher_scope_filter
 from services.auth_service import is_staff
 from services.error_log_service import log_error
 from services.quiz_scoring_service import evaluate_challenge, resolve_grading_context
-from services.session_service import get_current_session_id
+from services.session_service import get_current_session_id, get_current_session_start_date
 
 
 def resolve_authorized_student_id(
@@ -619,12 +619,21 @@ async def challenge_quiz_question(db: Session, *, claims: dict, quiz_id: int, qa
     The UI shows "awaiting response" for a pending challenge (challenge_
     reason set, challenge_response still None) rather than an error. Only
     allowed on a question that's actually the caller's, already scored,
-    answered, under full marks, and not already challenged (pending or
-    resolved — only one challenge per question ever, per spec)."""
+    answered, under full marks, from the current academic session, and not
+    already challenged (pending or resolved — only one challenge per
+    question ever, per spec)."""
     student_id = _resolve_own_student_id(db, claims)
     quiz = db.get(Quiz, quiz_id)
     if quiz is None or not quiz.is_active or quiz.student_id != student_id:
         raise AppError(ErrorCode.QUIZ_NOT_FOUND)
+
+    # Sessions cut over atomically with exactly one is_current=true per
+    # customer at any time (see get_current_session_start_date), so a quiz
+    # created before the current session's start_date was necessarily
+    # played under a since-ended session — no per-quiz session_id needed.
+    session_start = get_current_session_start_date(db, claims["customer_id"])
+    if session_start is not None and quiz.date_created.date() < session_start:
+        raise AppError(ErrorCode.QUIZ_CHALLENGE_PAST_SESSION)
 
     quiz_score = db.execute(
         select(QuizScore).where(

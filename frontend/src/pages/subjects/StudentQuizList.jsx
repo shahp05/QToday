@@ -4,6 +4,7 @@ import { Toast } from '../../components/ui/Toast'
 import { fetchQuizDetail } from '../../services/quizService'
 import { useQuizHistoryStore } from '../../store/quizHistoryStore'
 import { useQuizProgressStore } from '../../store/quizProgressStore'
+import { useSessionsStore } from '../../store/sessionsStore'
 import StudentQuizQaItem from './StudentQuizQaItem'
 import './StudentQuizList.css'
 
@@ -43,9 +44,11 @@ function IconChevron({ open }) {
 // studentId: a parent or teacher/admin viewing another student's quizzes
 // (see fetchQuizDetail) — per spec they get the same quiz Q&A/score view as
 // the student, just without "Play Quiz" (handled elsewhere, in
-// SubjectTopicGrid) or "Challenge Quiz Score" (gated below, keyed off
-// studentId being set — a student reviewing their OWN past-session quizzes
-// passes no studentId and keeps the ability to challenge).
+// SubjectTopicGrid) or "Challenge Quiz Score". Challenge is gated below on
+// two independent grounds: studentId being set (viewing someone else — a
+// student is only ever allowed to challenge their own quiz), and the quiz
+// itself predating the current academic session (per spec, challenging is
+// restricted to the current session regardless of who's viewing).
 export default function StudentQuizList({ quizzes, status, error, onDismissError, autoExpandKey, studentId = null }) {
   if (status === 'loading' || status === 'idle') {
     return (
@@ -76,6 +79,16 @@ function StudentQuizAccordion({ quizzes, studentId }) {
   const [detail, setDetail] = useState(null) // fetchQuizDetail() result for expandedQuizId
   const [loadingQuizId, setLoadingQuizId] = useState(null)
   const [detailError, setDetailError] = useState('')
+  // Sessions cut over atomically with exactly one is_current per customer
+  // at any time, so comparing this quiz's own date_created against the
+  // current session's start_date (both ISO 'YYYY-MM-DD'-prefixed, so a
+  // plain string compare is correct) is a complete test for "was this
+  // quiz played in the currently active session" — mirrors the backend's
+  // own check in challenge_quiz_question, purely to hide the Challenge
+  // button proactively; the backend remains the actual enforcement.
+  const currentSessionStartDate = useSessionsStore(s => s.sessions.find(sess => sess.is_current)?.start_date ?? null)
+  const isPastSessionQuiz = detail != null && currentSessionStartDate != null
+    && detail.date_created.slice(0, 10) < currentSessionStartDate
 
   async function openQuiz(quiz) {
     setLoadingQuizId(quiz.quiz_id)
@@ -171,7 +184,7 @@ function StudentQuizAccordion({ quizzes, studentId }) {
                       key={q.qa_id}
                       q={q}
                       quizId={quiz.quiz_id}
-                      readOnly={studentId != null}
+                      readOnly={studentId != null || isPastSessionQuiz}
                       onChallengeResolved={result => {
                         setDetail(prev => ({
                           ...prev,
