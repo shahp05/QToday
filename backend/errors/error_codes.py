@@ -30,6 +30,7 @@ class ErrorCode(str, Enum):
     INCORRECT_CODE = "INCORRECT_CODE"
     UNKNOWN_COUNTRY_CODE = "UNKNOWN_COUNTRY_CODE"
     QUIZ_NOT_FOUND = "QUIZ_NOT_FOUND"
+    QUIZ_ALREADY_PENDING = "QUIZ_ALREADY_PENDING"
     QA_NOT_FOUND = "QA_NOT_FOUND"
     DUPLICATE_ID = "DUPLICATE_ID"
     XLSX_FORMAT_INVALID = "XLSX_FORMAT_INVALID"
@@ -72,6 +73,7 @@ ERROR_DEFAULTS = {
     ErrorCode.INCORRECT_CODE: {"message": "Incorrect code. {remaining} attempt(s) remaining.", "http_status": 400},
     ErrorCode.UNKNOWN_COUNTRY_CODE: {"message": "Unknown country code: {code}", "http_status": 400},
     ErrorCode.QUIZ_NOT_FOUND: {"message": "This quiz could not be found.", "http_status": 404},
+    ErrorCode.QUIZ_ALREADY_PENDING: {"message": "You already have a quiz on this topic awaiting a score. Play again once it's scored.", "http_status": 409},
     ErrorCode.QA_NOT_FOUND: {"message": "This question could not be found.", "http_status": 404},
     ErrorCode.DUPLICATE_ID: {"message": "{id} already in use. Check all ids.", "http_status": 400},
     ErrorCode.XLSX_FORMAT_INVALID: {"message": "Incorrect xlsx format. Check column headings and values.", "http_status": 400},

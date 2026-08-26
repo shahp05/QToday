@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
 import { useQuizProgressStore } from '../../store/quizProgressStore'
@@ -80,8 +80,19 @@ export default function StudentSubjectsHome({ readOnly = false, studentId = null
   const [activeQuiz, setActiveQuiz] = useState(null) // { topicId, gradeId, subjectName, topicName, questions, totalMarks } | null
   const [loadingQuiz, setLoadingQuiz] = useState(null) // { topicId, source: 'play' | 'card' } | null
   const [quizError, setQuizError] = useState('')
-  // topic_id -> quiz_id, for topics whose LLM scoring pass hasn't finished yet
-  const [scoringTopics, setScoringTopics] = useState({})
+  // topic_id -> quiz_id, for topics whose LLM scoring pass hasn't finished
+  // yet — derived from quizHistory (not local submit-time state) so the
+  // "scoring in progress" card and the Play-block below it survive a page
+  // reload: quizHistory is always fetched fresh on mount, and a quiz whose
+  // scoring is still pending simply has is_scored=false in that data,
+  // regardless of whether this component was mounted when it was submitted.
+  const scoringTopics = useMemo(() => {
+    const map = {}
+    for (const q of quizHistory) {
+      if (!q.is_scored) map[q.topic_id] = q.quiz_id
+    }
+    return map
+  }, [quizHistory])
 
   // Quiz progress/history: self by default (studentId omitted resolves to
   // the caller server-side), or a parent's selected ward when studentId is
@@ -108,11 +119,9 @@ export default function StudentSubjectsHome({ readOnly = false, studentId = null
         try {
           const status = await fetchQuizStatus(scoringTopics[topicId])
           if (status.is_scored) {
-            setScoringTopics(prev => {
-              const next = { ...prev }
-              delete next[topicId]
-              return next
-            })
+            // scoringTopics is derived from quizHistory (above), so refetching
+            // it is what actually clears this topic's pending state — no
+            // local state to delete here.
             fetchQuizProgress()
             refreshQuizHistory()
           }
@@ -140,11 +149,12 @@ export default function StudentSubjectsHome({ readOnly = false, studentId = null
         onExit={result => {
           setActiveQuiz(null)
           if (!result) return // quit without submitting
-          if (result.pending_count > 0) {
-            setScoringTopics(prev => ({ ...prev, [activeQuiz.topicId]: result.quiz_id }))
-          } else {
+          if (result.pending_count === 0) {
             fetchQuizProgress()
           }
+          // refreshQuizHistory() is what actually surfaces "scoring in
+          // progress" for this topic now — scoringTopics is derived from
+          // quizHistory (above), not set locally here.
           refreshQuizHistory()
         }}
       />

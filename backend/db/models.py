@@ -414,10 +414,11 @@ class Quiz(Base):
 
 
 class QuizScore(Base):
-    """question/answer/options/question_type are FROZEN COPIES of the qa
-    row at quiz-creation time, not live references — if qa is corrected
-    later, already-played quizzes must still reflect what the student
-    actually saw and was scored against."""
+    """question/answer/options/question_type/marks/expected_time_seconds are
+    FROZEN COPIES of the qa row at quiz-creation time, not live references —
+    if qa is corrected later (including a later ETA correction), already-
+    played quizzes must still reflect what the student actually saw and was
+    scored/timed against."""
 
     __tablename__ = "quiz_scores"
     __table_args__ = (UniqueConstraint("quiz_id", "qa_id"),)
@@ -433,6 +434,7 @@ class QuizScore(Base):
     marks: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False)
     score: Mapped[float | None] = mapped_column(Numeric(6, 2), nullable=True)
     time_taken_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    expected_time_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_scored: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     date_created: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
     date_deleted: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

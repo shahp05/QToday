@@ -307,6 +307,26 @@ def _assert_topic_taught(db: Session, *, student_id: int, topic_id: int, grade_i
         raise AppError(ErrorCode.TEACH_LOG_NOT_FOUND)
 
 
+def _assert_no_pending_quiz(db: Session, *, student_id: int, topic_id: int) -> None:
+    """Per spec: a student may not start another quiz on a topic while a
+    previous one there is still awaiting a score. Scoped to this student and
+    topic only — other topics, and other students' quizzes on this same
+    topic, are unaffected. Checked both here (quiz-start) and again in
+    submit_quiz — a direct API call must be rejected at either boundary, not
+    just blocked by the frontend disabling Play."""
+    pending = db.execute(
+        text("""
+            SELECT 1 FROM quizzes
+            WHERE student_id = :sid AND topic_id = :topic_id
+              AND is_active = TRUE AND total_score IS NULL
+            LIMIT 1
+        """),
+        {"sid": student_id, "topic_id": topic_id},
+    ).first()
+    if pending:
+        raise AppError(ErrorCode.QUIZ_ALREADY_PENDING)
+
+
 def get_quiz_questions(db: Session, *, claims: dict, topic_id: int, grade_id: int) -> dict:
     """A random sample of verified questions for a (topic, grade) a student
     is quizzing on. Deliberately re-scoped here rather than reusing
@@ -317,6 +337,7 @@ def get_quiz_questions(db: Session, *, claims: dict, topic_id: int, grade_id: in
     actually taught to the student's own grade."""
     student_id = _resolve_own_student_id(db, claims)
     _assert_topic_taught(db, student_id=student_id, topic_id=topic_id, grade_id=grade_id, customer_id=claims["customer_id"])
+    _assert_no_pending_quiz(db, student_id=student_id, topic_id=topic_id)
 
     qa_rows = db.execute(
         text("""
@@ -365,6 +386,7 @@ def submit_quiz(db: Session, *, claims: dict, payload) -> dict:
     pending_count > 0, since deferring is async and this function isn't."""
     student_id = _resolve_own_student_id(db, claims)
     _assert_topic_taught(db, student_id=student_id, topic_id=payload.topic_id, grade_id=payload.grade_id, customer_id=claims["customer_id"])
+    _assert_no_pending_quiz(db, student_id=student_id, topic_id=payload.topic_id)
 
     if not payload.answers:
         raise AppError(ErrorCode.VALIDATION_ERROR)
@@ -440,6 +462,7 @@ def submit_quiz(db: Session, *, claims: dict, payload) -> dict:
             marks=marks_per_qa,
             score=score,
             time_taken_seconds=a.time_taken_seconds,
+            expected_time_seconds=qa.expected_time_seconds,
             is_scored=is_scored,
         ))
     db.add_all(quiz_scores)
@@ -570,13 +593,12 @@ def get_quiz_detail(db: Session, *, claims: dict, quiz_id: int, student_id: int 
                 "challenge_reason": challenge_by_qa_id[qs.qa_id].challenge_reason if qs.qa_id in challenge_by_qa_id else None,
                 "challenge_response": challenge_by_qa_id[qs.qa_id].challenge_response if qs.qa_id in challenge_by_qa_id else None,
                 # Informational only, per spec ("time taken will be matched
-                # against the ETA") — no effect on scoring. time_taken_
-                # seconds is QuizScore's own frozen value; expected_time_
-                # seconds comes from the live qa row (not itself frozen at
-                # quiz-creation time — unlike question/answer/options, a
-                # later ETA correction is fine to reflect on old quizzes).
+                # against the ETA") — no effect on scoring. Both are
+                # QuizScore's own frozen values, snapshotted at submit time —
+                # a later ETA correction must never change what an
+                # already-played quiz is shown to have been timed against.
                 "time_taken_seconds": qs.time_taken_seconds,
-                "expected_time_seconds": qs.qa.expected_time_seconds if qs.qa else None,
+                "expected_time_seconds": qs.expected_time_seconds,
             }
             for qs in scores
         ],

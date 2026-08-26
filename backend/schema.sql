@@ -349,10 +349,11 @@ CREATE TABLE IF NOT EXISTS quizzes (
 -- ------------------------------------------------------------
 -- 16. QUIZ_SCORES  (one row per question within a quiz)
 --
---   question/answer/options/question_type : FROZEN COPIES of the qa
---   row at quiz-creation time — not live references. If qa is later
---   corrected, already-played quizzes must still show what the
---   student actually saw and was scored against.
+--   question/answer/options/question_type/marks/expected_time_seconds :
+--   FROZEN COPIES of the qa row at quiz-creation time — not live
+--   references. If qa is later corrected (including a later ETA
+--   correction), already-played quizzes must still show what the
+--   student actually saw and was scored/timed against.
 --
 --   student_response : the student's submitted answer. Compared
 --   against `answer` (exact match for mcq/true_false) or, for
@@ -372,6 +373,7 @@ CREATE TABLE IF NOT EXISTS quiz_scores (
     marks               NUMERIC(6,2)    NOT NULL,
     score                NUMERIC(6,2)    NULL,
     time_taken_seconds   INTEGER         NULL,
+    expected_time_seconds INTEGER        NULL,
     is_scored            BOOLEAN         NOT NULL DEFAULT FALSE,
     date_created         TIMESTAMP       NOT NULL DEFAULT NOW(),
     date_deleted          TIMESTAMP       NULL,
