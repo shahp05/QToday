@@ -335,9 +335,11 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
             ]}
           />
         )}
-        <button className="students-empty-list-btn" onClick={onShowList}>
-          Students {viewedCount}
-        </button>
+        {viewedCount > 0 && (
+          <button className="students-empty-list-btn" onClick={onShowList}>
+            Students {viewedCount}
+          </button>
+        )}
       </div>
 
       <div className="students-format-table">

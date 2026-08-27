@@ -1,21 +1,27 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useProfileStore } from '../../store/profileStore'
 import { useStudentsStore } from '../../store/studentsStore'
 import { useStudentGradesStore } from '../../store/studentGradesStore'
 import { useStudentDetailProgressStore } from '../../store/studentDetailProgressStore'
 import { useStudentsListFilterStore } from '../../store/studentsListFilterStore'
 import { CURRENT_SESSION_KEY, getActiveSession, useSessionsStore } from '../../store/sessionsStore'
 import { usePageView } from '../../hooks/usePageView'
+import { useStudentsFeatureVisible } from '../../hooks/useStudentsFeatureVisible'
 import PageLoading from '../../components/PageLoading'
-import StudentsAwaitingUpload from './StudentsAwaitingUpload'
 import StudentsEmpty from './StudentsEmpty'
 import StudentsList from './StudentsList'
 
 export default function StudentsPage() {
   const navigate = useNavigate()
   usePageView('students') // every page-header page names itself in the URL
-  const isSchoolAdmin = useProfileStore(s => s.is_school_admin)
+  // Per spec, the Students feature is hidden (nav icon + this route) once
+  // there's nothing for the current role/session/roster state to show — see
+  // the hook's own docstring for the exact matrix. Redirected away here
+  // (not just left un-navigable from the nav icon) so a stale link, a Back
+  // navigation, or the underlying roster changing out from under an
+  // already-open page all land somewhere real instead of an empty screen.
+  // Only acts once `ready` — never redirect on a still-loading guess.
+  const { ready: studentsReady, visible: studentsVisible } = useStudentsFeatureVisible()
   // The top-level "does this school have any current students at all" gate
   // is always about the LIVE current session, regardless of what the left
   // nav's session picker happens to be browsing — that's a separate,
@@ -52,6 +58,10 @@ export default function StudentsPage() {
   useEffect(() => {
     fetchStudents(activeSessionId)
   }, [activeSessionId, fetchStudents])
+
+  useEffect(() => {
+    if (studentsReady && !studentsVisible) navigate('/dashboard', { replace: true })
+  }, [studentsReady, studentsVisible, navigate])
   const [loadingChip, setLoadingChip] = useState(null) // { studentId, subjectId } | null
   // Lifted to a store (not local state) so the teacher's grade/section
   // filter survives navigating to a student's detail (a real route now,
@@ -72,6 +82,8 @@ export default function StudentsPage() {
     setLoadingChip(null)
     navigate(`/dashboard/students/${student.student_id}${subjectId != null ? `?subject=${subjectId}` : ''}`)
   }
+
+  if (studentsReady && !studentsVisible) return null
 
   // Checked before the loading guard below — StudentsEmpty owns its own
   // loading/spinner state (including while uploadAndRefresh briefly flips
@@ -109,13 +121,10 @@ export default function StudentsPage() {
       />
     )
   }
-  // Only the sys admin can actually upload (the backend rejects anyone
-  // else's POST /students/upload) — everyone else (a teacher/admin) sees a
-  // read-only "not uploaded yet" message instead of a form they can't
-  // submit.
-  if (!isSchoolAdmin) {
-    return <StudentsAwaitingUpload />
-  }
+  // Only reachable here with studentCount === 0 if the caller is a school
+  // admin viewing the current/future session — useStudentsFeatureVisible's
+  // own branching guarantees that (anyone else would have redirected away
+  // above), so no separate isSchoolAdmin check is needed.
   return (
     <StudentsEmpty
       onUploaded={() => setShowUpload(false)}

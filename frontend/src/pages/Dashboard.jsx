@@ -52,6 +52,23 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isParent, activeSessionId])
 
+  // studentsStore kept in sync with whichever session is active too, for
+  // the same reason as subjectsTaughtStore above — useStudentsFeatureVisible
+  // (the left nav's own Students-visibility decision) needs fresh roster
+  // data for whatever session is selected regardless of which page is
+  // actually showing, not just while the Students page itself is mounted.
+  // Unlike subjectsTaughtStore's flat slot, this one is already cached
+  // per-session (bySession[key] — see studentsStore.js), so no force is
+  // needed: switching back to an already-fetched session is a no-op.
+  // Skipped for a parent — their wards come from the unconditional mount
+  // fetch above, keyed by ward via LeftNav's own ward-switch effect, not
+  // by this site-wide session picker.
+  useEffect(() => {
+    if (isParent) return
+    fetchStudents(activeSessionId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isParent, activeSessionId])
+
   return (
     <div className="dashboard">
       <LeftNav />
