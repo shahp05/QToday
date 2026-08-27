@@ -36,17 +36,24 @@
 }
 
 /* Same tile treatment (photo, padding, title/subtitle) as the Students
-   list's card (StudentsList.css) — two per row here instead of one, so the
-   card itself stays a flex row rather than a flex column. */
+   list's card (StudentsList.css) — two per row here instead of one. A
+   column now (top identity row + subjects row below), same shape as
+   StudentsList's own .students-row/.students-row-top split. */
 .teachers-row {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
   background: var(--color-white);
   border-radius: var(--radius-sm, 6px);
   margin-bottom: 2px;
   padding: 12px;
   break-inside: avoid;
+}
+
+.teachers-row-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .teachers-row-photo {
@@ -195,6 +202,38 @@
 .teachers-row-superadmin--locked {
   cursor: default;
   pointer-events: none;
+}
+
+/* ─── Per-subject chips — one per subject this teacher logged this
+   session, each showing every grade it was taught in. Grey fill (not
+   white, unlike StudentsList's equivalent chip) since .teachers-row
+   itself is already white — a white chip on a white row wouldn't read as
+   a distinct tile. ──────────────────────────────────────────────────── */
+.teachers-row-subjects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.teachers-subject-chip {
+  box-sizing: border-box;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  background: var(--color-grey-light, #f2f4f7);
+  border-radius: var(--radius-sm, 6px);
+  padding: 3px 8px;
+}
+
+.teachers-subject-chip-name {
+  font-size: var(--font-size-xs, 11px);
+  font-weight: 600;
+  color: var(--color-text, #343434);
+}
+
+.teachers-subject-chip-grades {
+  font-size: var(--font-size-xs, 11px);
+  color: var(--color-text-light, #666666);
 }
 
 @media (max-width: 900px) {

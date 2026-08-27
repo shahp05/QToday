@@ -80,38 +80,53 @@ export default function TeachersList({ onUploadNew, onBack }) {
             const locked = !isAdmin || isSelf || isPending || !isViewingCurrent
             return (
               <div className="teachers-row" key={row.org_id}>
-                <span className="teachers-row-photo">
-                  <EditablePhoto
-                    editable={isSelf}
-                    thumbClassName="teachers-thumb"
-                    placeholderClassName="teachers-thumb--placeholder"
-                    name={row.name}
-                    photoUrl={resolveFileUrl(row.photo_url)}
-                    onUpload={file => handlePhotoUpload(row, file)}
-                    onError={setError}
-                  />
-                </span>
-                <span className="teachers-row-namecell">
-                  <span className="teachers-row-titlerow">
-                    <span className="teachers-row-id">{row.org_id}</span>
-                    <span className="teachers-row-name">{row.name}</span>
-                  </span>
-                  <span className="teachers-row-email">{row.email}</span>
-                </span>
-                <label className={`teachers-row-superadmin${locked ? ' teachers-row-superadmin--locked' : ''}`}>
-                  <span className="teachers-superadmin-control">
-                    <input
-                      type="checkbox"
-                      className="teachers-superadmin-input"
-                      checked={row.is_super_admin}
-                      onChange={() => handleToggle(row, locked)}
+                <div className="teachers-row-top">
+                  <span className="teachers-row-photo">
+                    <EditablePhoto
+                      editable={isSelf}
+                      thumbClassName="teachers-thumb"
+                      placeholderClassName="teachers-thumb--placeholder"
+                      name={row.name}
+                      photoUrl={resolveFileUrl(row.photo_url)}
+                      onUpload={file => handlePhotoUpload(row, file)}
+                      onError={setError}
                     />
-                    <span className="teachers-superadmin-box">
-                      {isPending ? <IconBoxSpinner /> : <IconTick />}
-                    </span>
                   </span>
-                  Super admin
-                </label>
+                  <span className="teachers-row-namecell">
+                    <span className="teachers-row-titlerow">
+                      <span className="teachers-row-id">{row.org_id}</span>
+                      <span className="teachers-row-name">{row.name}</span>
+                    </span>
+                    <span className="teachers-row-email">{row.email}</span>
+                  </span>
+                  <label className={`teachers-row-superadmin${locked ? ' teachers-row-superadmin--locked' : ''}`}>
+                    <span className="teachers-superadmin-control">
+                      <input
+                        type="checkbox"
+                        className="teachers-superadmin-input"
+                        checked={row.is_super_admin}
+                        disabled={locked}
+                        onChange={() => handleToggle(row, locked)}
+                      />
+                      <span className="teachers-superadmin-box">
+                        {isPending ? <IconBoxSpinner /> : <IconTick />}
+                      </span>
+                    </span>
+                    Super admin
+                  </label>
+                </div>
+                {row.subjects?.length > 0 && (
+                  <div className="teachers-row-subjects">
+                    {row.subjects.map(subject => (
+                      <span className="teachers-subject-chip" key={subject.subject_id}>
+                        <span className="teachers-subject-chip-name">{subject.subject_name}</span>
+                        <span className="teachers-subject-chip-grades">
+                          {subject.grades.map(g => g.grade_name).join(', ')}
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             )
           })}

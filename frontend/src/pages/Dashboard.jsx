@@ -69,6 +69,19 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isParent, activeSessionId])
 
+  // teachersStore kept in sync with whichever session is active too, same
+  // reasoning as studentsStore above — useTeachersFeatureVisible needs
+  // fresh data for whatever session is selected regardless of which page
+  // is actually showing. Also already cached per-session, so no force
+  // needed. Skipped for a parent for the same reason as studentsStore —
+  // their view is ward-driven (LeftNav's own ward-switch effect), not
+  // by this site-wide session picker.
+  useEffect(() => {
+    if (isParent) return
+    fetchTeachers(activeSessionId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isParent, activeSessionId])
+
   return (
     <div className="dashboard">
       <LeftNav />

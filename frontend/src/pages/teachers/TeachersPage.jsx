@@ -4,6 +4,7 @@ import { useProfileStore } from '../../store/profileStore'
 import { useTeachersStore } from '../../store/teachersStore'
 import { CURRENT_SESSION_KEY, getActiveSession, useSessionsStore } from '../../store/sessionsStore'
 import { usePageView } from '../../hooks/usePageView'
+import { useTeachersFeatureVisible } from '../../hooks/useTeachersFeatureVisible'
 import PageLoading from '../../components/PageLoading'
 import TeachersEmpty from './TeachersEmpty'
 import TeachersList from './TeachersList'
@@ -11,6 +12,14 @@ import TeachersList from './TeachersList'
 export default function TeachersPage() {
   const navigate = useNavigate()
   usePageView('teachers') // every page-header page names itself in the URL
+  // Per spec, the Teachers feature is hidden (nav icon + this route) once
+  // there's nothing for the current role/session/roster state to show —
+  // see the hook's own docstring for the exact matrix. Redirected away
+  // here (not just left un-navigable from the nav icon) so a stale link,
+  // a Back navigation, or the underlying roster changing out from under
+  // an already-open page all land somewhere real instead of an empty
+  // screen. Only acts once `ready` — never redirect on a still-loading guess.
+  const { ready: teachersReady, visible: teachersVisible } = useTeachersFeatureVisible()
   // The top-level "does this school have any teachers at all" gate is
   // always about the LIVE current session, regardless of what the left
   // nav's session picker happens to be browsing — that's TeachersList's
@@ -42,6 +51,12 @@ export default function TeachersPage() {
   useEffect(() => {
     fetchTeachers(activeSessionId)
   }, [activeSessionId, fetchTeachers])
+
+  useEffect(() => {
+    if (teachersReady && !teachersVisible) navigate('/dashboard', { replace: true })
+  }, [teachersReady, teachersVisible, navigate])
+
+  if (teachersReady && !teachersVisible) return null
 
   // Checked before the loading guard below — TeachersEmpty owns its own
   // loading/spinner state (including while uploadAndRefresh briefly flips
