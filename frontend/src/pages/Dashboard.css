@@ -74,3 +74,26 @@
   font-size: var(--font-size-base);
   color: var(--color-text-light);
 }
+
+/* AccountPage's own photo tile — same 40x40 shape/placeholder treatment as
+   StudentsList/TeachersList's thumbs (StudentsList.css/TeachersList.css),
+   kept here since AccountPage has no dedicated stylesheet of its own yet. */
+.account-photo-thumb {
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.account-photo-thumb--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-grey-light, #f2f4f7);
+  color: var(--color-text-light, #666666);
+  font-size: 13px;
+  font-weight: 600;
+}

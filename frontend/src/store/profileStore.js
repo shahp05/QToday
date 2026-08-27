@@ -8,6 +8,7 @@ const EMPTY_PROFILE = {
   org_id: null,
   user_name: null,
   email_id: null,
+  photo_url: null,
   is_student: false,
   is_parent: false,
   is_school_admin: false,
@@ -31,6 +32,11 @@ export const useProfileStore = create(
 
       setProfile: (profile, token) => set({ ...profile, token }),
       clearProfile: () => set({ ...EMPTY_PROFILE }),
+      // Photo isn't session data (same reasoning as studentsStore/
+      // teachersStore's own photo updaters) — just the signed-in user's own
+      // single current value, patched locally right after a successful
+      // upload rather than refetching the whole profile.
+      updateOwnPhoto: (photoUrl) => set({ photo_url: photoUrl }),
     }),
     { name: 'qtoday-profile' }
   )

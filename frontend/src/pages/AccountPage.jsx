@@ -1,10 +1,39 @@
-// Stub — no content built yet, so it stays a plain content-card (no
-// PageHeader/back button) like the upload and quote screens.
+import { useState } from 'react'
+import { useProfileStore } from '../store/profileStore'
+import { resolveFileUrl } from '../lib/api'
+import { uploadMyPhoto } from '../services/photoService'
+import EditablePhoto from '../components/EditablePhoto'
+import { Toast } from '../components/ui/Toast'
+
+// Minimal for now — just the self-photo-upload gap (spec 1.8), the one
+// piece every role (including parents, who have no roster row anywhere
+// else to upload from) previously had no way to reach at all. The rest of
+// this page's content is deferred to when the Account page itself gets
+// built out.
 export default function AccountPage() {
+  const userName = useProfileStore(s => s.user_name)
+  const photoUrl = useProfileStore(s => s.photo_url)
+  const updateOwnPhoto = useProfileStore(s => s.updateOwnPhoto)
+  const [error, setError] = useState('')
+
+  async function handleUpload(file) {
+    const data = await uploadMyPhoto(file)
+    updateOwnPhoto(data.photo_url)
+  }
+
   return (
     <div className="content-card">
       <h2 className="content-card-title">Account</h2>
-      <p className="content-card-placeholder">Content for Account goes here.</p>
+      <EditablePhoto
+        editable
+        thumbClassName="account-photo-thumb"
+        placeholderClassName="account-photo-thumb--placeholder"
+        name={userName || ''}
+        photoUrl={resolveFileUrl(photoUrl)}
+        onUpload={handleUpload}
+        onError={setError}
+      />
+      <Toast message={error} onDismiss={() => setError('')} />
     </div>
   )
 }

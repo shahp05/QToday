@@ -88,4 +88,4 @@ def patch_super_admin(
     if not customer_id:
         raise AppError(ErrorCode.SCHOOL_NOT_ASSOCIATED)
 
-    return set_super_admin(db, customer_id, org_id, payload.is_super_admin)
+    return set_super_admin(db, customer_id, org_id, payload.is_super_admin, caller_user_id=claims["user_id"])

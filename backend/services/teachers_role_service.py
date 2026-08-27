@@ -5,11 +5,14 @@ from errors.app_error import AppError
 from errors.error_codes import ErrorCode
 
 
-def set_super_admin(db: Session, customer_id: int, org_id: str, is_super_admin: bool) -> dict:
+def set_super_admin(db: Session, customer_id: int, org_id: str, is_super_admin: bool, *, caller_user_id: int) -> dict:
     """Promotes/demotes a teacher between is_adm (ordinary admin/teacher)
     and is_sysadm (school owner/super admin) — the two are mutually
     exclusive scopes for the same customer_id (see models.py). Refuses to
-    demote the school's last remaining super admin."""
+    demote the school's last remaining super admin. Per spec, this action
+    is for designating ANOTHER teacher — a super-user may not set/reset
+    their own status through this endpoint (the frontend already locks a
+    viewer's own row; this is the server-side half of that same rule)."""
     row = db.execute(
         text(
             "SELECT user_id, is_sysadm FROM users "
@@ -20,6 +23,8 @@ def set_super_admin(db: Session, customer_id: int, org_id: str, is_super_admin: 
     ).fetchone()
     if row is None:
         raise AppError(ErrorCode.TEACHER_NOT_FOUND)
+    if row.user_id == caller_user_id:
+        raise AppError(ErrorCode.AUTH_FORBIDDEN)
 
     if not is_super_admin and row.is_sysadm:
         remaining = db.execute(

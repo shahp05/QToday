@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 def get_profile(db: Session, user_id: int) -> dict | None:
     row = db.execute(
         text(
-            "SELECT u.user_id, u.customer_id, u.org_id, u.user_name, u.email_id, "
+            "SELECT u.user_id, u.customer_id, u.org_id, u.user_name, u.email_id, u.file_url AS photo_url, "
             "       u.is_student, u.is_parent, u.is_sysadm, u.is_adm, "
             "       u.date_created, u.password_date_created, "
             "       c.customer_name, c.customer_acronym, "
@@ -29,10 +29,18 @@ def get_profile(db: Session, user_id: int) -> dict | None:
         "org_id":              row.org_id,
         "user_name":           row.user_name,
         "email_id":            row.email_id,
+        "photo_url":           row.photo_url,
         "is_student":          row.is_student,
         "is_parent":           row.is_parent,
         "is_school_admin":     has_customer and row.is_sysadm,
-        "is_school_teacher":   has_customer and row.is_adm,
+        # A super-user is a teacher WITH extra access, per spec — not a
+        # replacement for it. is_adm/is_sysadm are stored as mutually
+        # exclusive in the db (see schema.sql, and teachers_upload_service's
+        # existing.is_sysadm-skip logic, both of which depend on that
+        # invariant), so this claim is deliberately OR'd rather than
+        # changing the underlying columns: a super-user's own claims must
+        # still say "yes, I'm also a teacher."
+        "is_school_teacher":   has_customer and (row.is_adm or row.is_sysadm),
         "is_system_admin":     not has_customer and (row.is_sysadm or row.is_adm),
         "customer_name":       row.customer_name,
         "customer_acronym":    row.customer_acronym,
