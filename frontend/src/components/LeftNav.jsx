@@ -10,6 +10,7 @@ import { useDashboardQuoteStore } from '../store/dashboardQuoteStore'
 import { resetUserScopedStores } from '../store/resetUserScopedStores'
 import { useSubjectsFeatureVisible } from '../hooks/useSubjectsFeatureVisible'
 import { useStudentsFeatureVisible } from '../hooks/useStudentsFeatureVisible'
+import { useTeachersFeatureVisible } from '../hooks/useTeachersFeatureVisible'
 import Dropdown from './Dropdown'
 import ScheduleSessionDialog from './ScheduleSessionDialog'
 import WardPickerDialog from './WardPickerDialog'
@@ -97,6 +98,7 @@ export default function LeftNav() {
   const subjectsStatus = useSubjectsTaughtStore(s => s.status)
   const { visible: subjectsFeatureVisible } = useSubjectsFeatureVisible()
   const { visible: studentsFeatureVisible } = useStudentsFeatureVisible()
+  const { visible: teachersFeatureVisible } = useTeachersFeatureVisible()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -236,7 +238,8 @@ export default function LeftNav() {
           // A parent's "Students" is the unrelated ward-switcher (see
           // isWardButton below) — never gated by studentsFeatureVisible,
           // which only decides the admin/teacher roster page's visibility.
-          (item.id !== 'students' || profile.is_parent || studentsFeatureVisible)
+          (item.id !== 'students' || profile.is_parent || studentsFeatureVisible) &&
+          (item.id !== 'teachers' || teachersFeatureVisible)
         ).map(({ id, label, Icon }) => {
           // A parent's "Students" button shows the selected ward's own
           // photo/name instead of the generic icon/label — same button,
@@ -317,9 +320,23 @@ export default function LeftNav() {
       <ScheduleSessionDialog
         open={showSessionDialog}
         onClose={() => setShowSessionDialog(false)}
+        // Per spec, a newly created session (staged future, or cut over
+        // immediately if the picked date was today/earlier) is necessarily
+        // empty — send the super-user straight to the upload screen for
+        // it, same one-time nudge as the login-time auto-advance
+        // (DashboardQuote.jsx), just triggered directly by this action
+        // instead of a timer, so it can never re-fire on its own. Select
+        // whichever session is now the relevant one first — the future
+        // session if one resulted, else the new current one (an immediate
+        // cutover produces no future row at all, and without this the
+        // site-wide picker would otherwise keep pointing at the old
+        // session, now demoted to past).
         onScheduled={() => {
-          const fut = useSessionsStore.getState().sessions.find(sess => sess.is_future)
-          if (fut) setActiveSessionId(fut.session_id)
+          const sessions = useSessionsStore.getState().sessions
+          const fut = sessions.find(sess => sess.is_future)
+          const cur = sessions.find(sess => sess.is_current)
+          setActiveSessionId(fut ? fut.session_id : cur?.session_id ?? null)
+          navigate('/dashboard/students')
         }}
       />
 

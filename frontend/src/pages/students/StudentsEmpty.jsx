@@ -143,6 +143,37 @@ function validateWorkbook(workbook) {
   return { ok: true, rows: allRows }
 }
 
+// Multiple files may be dropped/selected at once — each is independently
+// parsed and validated (same per-sheet rules as a single file), then every
+// file's rows are pooled into one combined list and cross-checked for an
+// id repeated ACROSS files, not just within one file's own sheets — the
+// backend itself has no notion of "which file a row came from" (it just
+// receives one flat `students` list), so this is the only place that
+// duplication could otherwise slip through. All-or-nothing: the first
+// file/sheet that fails aborts the whole batch, same as a single file
+// always has — there's no partial-upload state to reconcile.
+async function validateFiles(files) {
+  const allRows = []
+  const allIds = []
+  for (const file of files) {
+    const buffer = await file.arrayBuffer()
+    const workbook = XLSX.read(buffer, { type: 'array' })
+    const result = validateWorkbook(workbook)
+    if (result.error) return { error: result.error }
+    allRows.push(...result.rows)
+    allIds.push(...result.rows.map(r => r.org_id))
+  }
+  const dupError = duplicateIdError(allIds)
+  if (dupError) return { error: dupError }
+  return { ok: true, rows: allRows }
+}
+
+function filesLabel(files) {
+  if (files.length === 0) return ''
+  if (files.length === 1) return files[0].name
+  return `${files.length} files selected`
+}
+
 function IconDrop() {
   return (
     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -176,7 +207,7 @@ function IconCheck() {
 }
 
 // Builds the post-upload summary shown in the drop/browse box when the
-// list already had students before this upload (see handleFile below) —
+// list already had students before this upload (see handleFiles below) —
 // staying on this screen instead of jumping straight to the list only
 // makes sense if it actually tells the teacher/admin what changed.
 function summarizeUpload(previousCount, newCount, counts) {
@@ -234,7 +265,7 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
   ]
   const fileRef = useRef(null)
   const [dragging, setDragging] = useState(false)
-  const [selectedFile, setSelectedFile] = useState(null)
+  const [selectedFiles, setSelectedFiles] = useState([])
   const [source, setSource] = useState(null) // 'drop' | 'browse'
   const [error, setError] = useState(null)
   // Validation errors (file type, xlsx format/values) render inline next to
@@ -253,22 +284,22 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
     shakeTimer.current = setTimeout(() => setShaking(false), 450)
   }
 
-  async function handleFile(file, src) {
-    if (!file || uploading) return
-    setSelectedFile(file)
+  async function handleFiles(fileList, src) {
+    const files = Array.from(fileList || [])
+    if (files.length === 0 || uploading) return
+    setSelectedFiles(files)
     setSource(src)
     setSuccessMessage('')
 
-    if (!file.name.match(/\.xlsx$/i)) {
+    const badFile = files.find(f => !f.name.match(/\.xlsx$/i))
+    if (badFile) {
       setError(FILE_TYPE_ERROR)
       shake()
       return
     }
 
     try {
-      const buffer = await file.arrayBuffer()
-      const workbook = XLSX.read(buffer, { type: 'array' })
-      const result = validateWorkbook(workbook)
+      const result = await validateFiles(files)
       if (result.error) {
         setError(result.error)
         shake()
@@ -308,7 +339,7 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
   function onDrop(e) {
     e.preventDefault()
     setDragging(false)
-    handleFile(e.dataTransfer.files[0], 'drop')
+    handleFiles(e.dataTransfer.files, 'drop')
   }
 
   const sessionTargetLabel = uploadTarget === 'future' && futureSession
@@ -364,20 +395,20 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
           onDrop={onDrop}
           role="button"
           tabIndex={0}
-          aria-label="Drop student list file here"
+          aria-label="Drop student list file(s) here"
         >
           {uploading && source === 'drop' ? <IconSpinner /> : <IconDrop />}
           <span className="students-upload-box-text">
             {uploading && source === 'drop'
               ? 'Uploading…'
-              : selectedFile && source === 'drop' ? selectedFile.name : 'Drop file here'}
+              : selectedFiles.length > 0 && source === 'drop' ? filesLabel(selectedFiles) : 'Drop file(s) here'}
           </span>
-          {selectedFile && source === 'drop' && error ? (
+          {selectedFiles.length > 0 && source === 'drop' && error ? (
             <span className="students-upload-error">{error}</span>
           ) : sessionTargetLabel ? (
             <span className="students-upload-error">{sessionTargetLabel}</span>
           ) : null}
-          {selectedFile && source === 'drop' && !error && successMessage && (
+          {selectedFiles.length > 0 && source === 'drop' && !error && successMessage && (
             <span className="students-upload-success"><IconCheck />{successMessage}</span>
           )}
         </div>
@@ -388,21 +419,21 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
           role="button"
           tabIndex={0}
           onKeyDown={e => e.key === 'Enter' && fileRef.current.click()}
-          aria-label="Browse for student list file"
+          aria-label="Browse for student list file(s)"
         >
-          <input ref={fileRef} type="file" accept=".xlsx" onChange={e => handleFile(e.target.files[0], 'browse')} hidden />
+          <input ref={fileRef} type="file" accept=".xlsx" multiple onChange={e => handleFiles(e.target.files, 'browse')} hidden />
           {uploading && source === 'browse' ? <IconSpinner /> : <IconBrowse />}
           <span className="students-upload-box-text">
             {uploading && source === 'browse'
               ? 'Uploading…'
-              : selectedFile && source === 'browse' ? selectedFile.name : 'Browse file'}
+              : selectedFiles.length > 0 && source === 'browse' ? filesLabel(selectedFiles) : 'Browse file(s)'}
           </span>
-          {selectedFile && source === 'browse' && error ? (
+          {selectedFiles.length > 0 && source === 'browse' && error ? (
             <span className="students-upload-error">{error}</span>
           ) : sessionTargetLabel ? (
             <span className="students-upload-error">{sessionTargetLabel}</span>
           ) : null}
-          {selectedFile && source === 'browse' && !error && successMessage && (
+          {selectedFiles.length > 0 && source === 'browse' && !error && successMessage && (
             <span className="students-upload-success"><IconCheck />{successMessage}</span>
           )}
         </div>
