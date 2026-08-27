@@ -144,6 +144,7 @@ def _learner_grade(
 
 def _learner_subjects_taught(
     db: Session, *, customer_id: int, student_row_id: int, session_id: int | None = None,
+    teacher_user_id: int | None = None,
 ) -> dict:
     """Student/parent view of subjects->topics: unlike the teacher/admin
     tree (grouped by wherever teach_logs actually happened), this shows
@@ -161,14 +162,39 @@ def _learner_subjects_taught(
     entry per topic (never the grade it was originally taught at), and
     fetches QA at that grade — QA is pre-generated for every grade through
     grade_to specifically so this always has content to show, not just
-    for the exact taught grade."""
+    for the exact taught grade.
+
+    teacher_user_id (a plain teacher viewing a specific student — see
+    list_subjects_taught) additionally gates this to only subjects that
+    teacher has personally taught somewhere in that same subject's own
+    retention range covering the learner's grade — a colleague's topic in
+    that same subject still shows once the subject itself qualifies (same
+    substitute-teacher carve-out as _scope_clause), but a subject this
+    teacher never touched at all, at any grade reaching this learner, does
+    not appear regardless of who else taught it. None (a school admin or
+    system admin) means unrestricted, per spec."""
     grade = _learner_grade(db, customer_id=customer_id, student_row_id=student_row_id, session_id=session_id)
     if grade is None:
         return {"subjects": [], "most_recent": None}
     grade_id, grade_name = grade
 
+    teacher_gate_sql = ""
+    params = {"cid": customer_id, "grade_name": grade_name}
+    if teacher_user_id is not None:
+        teacher_gate_sql = """
+              AND EXISTS (
+                  SELECT 1 FROM teach_logs tl2
+                  JOIN grades gt2 ON gt2.grade_id = tl2.grade_id
+                  JOIN grades gto2 ON gto2.grade_id = tl2.grade_to_id
+                  WHERE tl2.customer_id = :cid AND tl2.user_id = :teacher_uid AND tl2.is_active = TRUE
+                    AND tl2.subject_id = tl.subject_id
+                    AND gt2.grade_name <= :grade_name AND gto2.grade_name >= :grade_name
+              )
+        """
+        params["teacher_uid"] = teacher_user_id
+
     log_rows = db.execute(
-        text("""
+        text(f"""
             SELECT tl.subject_id, s.subject_name, s.icon_key, tl.topic_id, t.topic_name,
                    MAX(tl.date_created)::date AS log_date
             FROM teach_logs tl
@@ -178,9 +204,10 @@ def _learner_subjects_taught(
             JOIN topics t ON t.topic_id = tl.topic_id
             WHERE tl.customer_id = :cid AND tl.is_active = TRUE
               AND g_taught.grade_name <= :grade_name AND g_to.grade_name >= :grade_name
+              {teacher_gate_sql}
             GROUP BY tl.subject_id, s.subject_name, s.icon_key, tl.topic_id, t.topic_name
         """),
-        {"cid": customer_id, "grade_name": grade_name},
+        params,
     ).fetchall()
 
     if not log_rows:
@@ -309,7 +336,15 @@ def list_subjects_taught(
     subjects — "Teachers may select a student's subject in the Students
     page" — authorized here by a plain customer_id match, the same access
     staff already has to the whole school's roster (students_query_
-    service.get_my_students). Ignored for a plain student caller (always
+    service.get_my_students). The resulting view's FORMAT always matches
+    what the student themselves would see (topic cards grouped by
+    subject, per spec), but its CONTENT differs by role: a parent sees
+    everything the ward sees (unrestricted, same as _learner_subjects_
+    taught's default); an admin sees every subject/topic taught by any
+    teacher for that grade (also unrestricted); a plain teacher sees only
+    subjects they've personally taught somewhere in the retention range
+    covering the student's grade — see _learner_subjects_taught's
+    teacher_user_id param. Ignored for a plain student caller (always
     their own record, via user_id)."""
     is_staff_caller = not is_student and not is_parent
     if is_student or is_parent or (is_staff_caller and student_id is not None):
@@ -323,8 +358,14 @@ def list_subjects_taught(
             student_row_id = student_id
         if student_row_id is None:
             return {"subjects": [], "most_recent": None}
+        # A plain teacher viewing a specific student sees only what they've
+        # taught (see _learner_subjects_taught's teacher_user_id param) — a
+        # school/system admin, like a parent or the student themselves,
+        # gets the unrestricted view.
+        teacher_user_id = user_id if (is_staff_caller and not is_school_admin and not is_system_admin) else None
         return _learner_subjects_taught(
             db, customer_id=customer_id, student_row_id=student_row_id, session_id=session_id,
+            teacher_user_id=teacher_user_id,
         )
 
     scope = _scope_clause(
