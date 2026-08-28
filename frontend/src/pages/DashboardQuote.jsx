@@ -5,7 +5,6 @@ import { useDashboardQuoteStore } from '../store/dashboardQuoteStore'
 import { CURRENT_SESSION_KEY, getActiveSession, useSessionsStore } from '../store/sessionsStore'
 import { useStudentsStore } from '../store/studentsStore'
 import { useStudentGradesStore } from '../store/studentGradesStore'
-import { useSubjectsFeatureVisible } from '../hooks/useSubjectsFeatureVisible'
 import LoginQuote from '../components/LoginQuote'
 
 const LOGIN_QUOTE_DURATION_MS = 5000
@@ -40,14 +39,6 @@ export default function DashboardQuote() {
   const isFutureSession = activeSession?.is_future ?? false
   const isPastSession = activeSession != null && !activeSession.is_current && !activeSession.is_future
 
-  // Shared with LeftNav's own nav-icon visibility and SubjectsRoute's
-  // redirect guard — one implementation of "is there anything to show on
-  // Subjects right now" for every role/session combo, per spec. `ready`
-  // isn't specially handled here beyond the existing 5s data-loading
-  // buffer: if the underlying fetches are unusually slow, visible falls
-  // back to true (see the hook's own contract), same tradeoff every other
-  // branch here already accepts.
-  const { visible: subjectsVisible } = useSubjectsFeatureVisible()
   // Admin only: whether the CURRENT session's roster is empty — deliberately
   // always the current-session count (not activeSession's), since a past
   // session is never empty-roster-gated (see the isPastSession check below)
@@ -65,54 +56,42 @@ export default function DashboardQuote() {
       if (isSchoolAdmin) {
         // Future session: always Students (Upload Student List vs the list
         // itself is StudentsPage's own studentCount branch, not decided
-        // here) — Subjects is unconditionally hidden while a future session
-        // is active, per spec. Current session: Students only if the
-        // roster is empty; otherwise Subjects, where SubjectsRoute/
-        // SubjectsHome pick Teach Calendar Log vs Add New Subject on their
-        // own (subjectsVisible doesn't gate on subjects taught at all for
-        // the current-session admin/teacher case — only student existence
-        // does, see the hook). Past session: Subjects only if the session
-        // ever had anything taught (subjectsVisible); otherwise no
-        // alternate destination is specified for this branch, so — same as
-        // every other "hide" case below — just stay on Quotes.
+        // here) — Subjects is unreachable while a future session is
+        // active, per spec. Current session: Students only if the roster
+        // is empty; otherwise Subjects — which now always has something to
+        // show (the real form/calendar, or SubjectsRoute's own empty-state
+        // message), so no further gating is needed here. Same for past
+        // session.
         if (isFutureSession || (!isPastSession && currentStudentCount === 0)) {
           navigate('/dashboard/students')
-        } else if (subjectsVisible) {
+        } else {
           navigate('/dashboard/subjects')
         }
         return
       }
 
       if (isSchoolTeacher) {
-        // Current session: gated on the school having any student at all
-        // (subjectsVisible's admin/teacher branch — no students means
-        // nothing to teach, so stay on Quotes instead of an unusable Add
-        // New Subject form). Past session: gated on the session having had
-        // anything taught. SubjectsRoute/SubjectsHome pick Add New Subject
-        // vs the Teach Calendar Log on their own once shown.
-        if (subjectsVisible) navigate('/dashboard/subjects')
+        // Subjects always has something to show now (the real teach-log UI,
+        // or SubjectsRoute's own empty-state message), so unlike the admin
+        // branch above there's no roster/future gating to apply here.
+        navigate('/dashboard/subjects')
         return
       }
 
       if (isStudent) {
-        // Current or past session, doesn't matter here: StudentSubjectsHome
-        // already shows the most-recently-taught subject's topics purely
-        // from mounting — the one thing actually gated on session state is
-        // whether ANYTHING has been taught (current session, or retention-
-        // carried from an earlier grade/session), which decides Subjects
-        // vs staying on Quotes.
-        if (subjectsVisible) navigate('/dashboard/subjects')
+        // Same reasoning as the teacher branch — Subjects always has
+        // something to show now, empty-state message included.
+        navigate('/dashboard/subjects')
         return
       }
 
       if (isParent) {
-        // A single ward auto-navigates only if that ward actually has
-        // something to show (same current-or-retention rule as a student,
-        // per spec — a parent follows the student method for their
-        // selected ward); zero or multiple wards, or a single ward with
-        // nothing to show, stays on Quotes — LeftNav's WardPicker is how a
-        // multi-ward parent actually picks one, not this timer.
-        if (wardCount === 1 && subjectsVisible) navigate('/dashboard/subjects')
+        // A single ward auto-navigates straight to Subjects — it always has
+        // something to show now (topics, or SubjectsRoute's own empty-state
+        // message for that ward); zero or multiple wards stays on Quotes —
+        // LeftNav's WardPicker is how a multi-ward parent actually picks
+        // one, not this timer.
+        if (wardCount === 1) navigate('/dashboard/subjects')
         return
       }
 
@@ -123,7 +102,7 @@ export default function DashboardQuote() {
     return () => clearTimeout(timer)
   }, [
     hasAutoAdvanced, isStudent, isSchoolTeacher, isSchoolAdmin, isParent, navigate, markAutoAdvanced,
-    isFutureSession, isPastSession, subjectsVisible, currentStudentCount, wardCount,
+    isFutureSession, isPastSession, currentStudentCount, wardCount,
   ])
 
   return <LoginQuote />

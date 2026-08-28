@@ -1,15 +1,32 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useProfileStore } from '../../store/profileStore'
 import { useStudentsStore } from '../../store/studentsStore'
 import { useStudentGradesStore } from '../../store/studentGradesStore'
 import { useStudentDetailProgressStore } from '../../store/studentDetailProgressStore'
 import { useStudentsListFilterStore } from '../../store/studentsListFilterStore'
-import { CURRENT_SESSION_KEY, getActiveSession, useSessionsStore } from '../../store/sessionsStore'
+import { getActiveSession, getActiveSessionKey, useSessionsStore } from '../../store/sessionsStore'
 import { usePageView } from '../../hooks/usePageView'
 import { useStudentsFeatureVisible } from '../../hooks/useStudentsFeatureVisible'
 import PageLoading from '../../components/PageLoading'
+import EmptyFeatureState from '../../components/EmptyFeatureState'
 import StudentsEmpty from './StudentsEmpty'
 import StudentsList from './StudentsList'
+
+// Same path/fill as LeftNav's IconStudents, just rendered larger for the
+// empty-state message (see SubjectsRoute's IconSubjectsLarge for the same
+// pattern).
+function IconStudentsLarge() {
+  return (
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z"/>
+    </svg>
+  )
+}
+
+// Placeholder copy — real per-case wording still to come.
+const NO_STUDENTS_PAST_MESSAGE = 'No students were added in this academic session.'
+const NO_STUDENTS_CURRENT_TEACHER_MESSAGE = 'Your super-admin has not uploaded the list of students for this academic session yet.'
 
 export default function StudentsPage() {
   const navigate = useNavigate()
@@ -22,19 +39,14 @@ export default function StudentsPage() {
   // already-open page all land somewhere real instead of an empty screen.
   // Only acts once `ready` — never redirect on a still-loading guess.
   const { ready: studentsReady, visible: studentsVisible } = useStudentsFeatureVisible()
-  // The top-level "does this school have any current students at all" gate
-  // is always about the LIVE current session, regardless of what the left
-  // nav's session picker happens to be browsing — that's a separate,
-  // page-internal concern handled below via StudentsList.
-  const studentsStatus = useStudentsStore(s => s.bySession[CURRENT_SESSION_KEY]?.status ?? 'idle')
-  // NOT the raw students list length — that's every active account at the
-  // school regardless of session, so it stays non-zero across a cutover
-  // even when nobody's been uploaded into the new session yet. studentGrades
-  // is already scoped to the current session (get_my_students' default,
-  // session-filtered branch), and every active student has at most one row
-  // in it — so its length is exactly "how many students actually have a
-  // place in the current session," matching what StudentsList would show.
-  const studentCount = useStudentGradesStore(s => (s.bySession[CURRENT_SESSION_KEY] ?? []).length)
+  const isSchoolAdmin = useProfileStore(s => s.is_school_admin)
+  // The roster gate (list vs. upload vs. empty message) is for whichever
+  // session the left nav's picker is actually browsing — same source
+  // StudentsList itself reads, so the two can never disagree about whether
+  // there's anything to show for that session.
+  const activeKey = useSessionsStore(getActiveSessionKey)
+  const studentsStatus = useStudentsStore(s => s.bySession[activeKey]?.status ?? 'idle')
+  const studentCount = useStudentGradesStore(s => (s.bySession[activeKey] ?? []).length)
   const ensureStudentProgressLoaded = useStudentDetailProgressStore(s => s.ensureLoaded)
   const [showUpload, setShowUpload] = useState(false)
   const fetchStudents = useStudentsStore(s => s.fetchStudents)
@@ -121,10 +133,21 @@ export default function StudentsPage() {
       />
     )
   }
-  // Only reachable here with studentCount === 0 if the caller is a school
-  // admin viewing the current/future session — useStudentsFeatureVisible's
-  // own branching guarantees that (anyone else would have redirected away
-  // above), so no separate isSchoolAdmin check is needed.
+
+  // Empty roster for the browsed session. A past session is read-only —
+  // there's no upload to offer, for either role — so it's always the
+  // passive empty message. A current/future session still has an upload
+  // path, but only a school admin can use it; a teacher gets the same
+  // empty message instead (useStudentsFeatureVisible already guarantees
+  // no other role reaches this branch at all).
+  if (isViewingPastSession || !isSchoolAdmin) {
+    return (
+      <EmptyFeatureState
+        icon={<IconStudentsLarge />}
+        message={isViewingPastSession ? NO_STUDENTS_PAST_MESSAGE : NO_STUDENTS_CURRENT_TEACHER_MESSAGE}
+      />
+    )
+  }
   return (
     <StudentsEmpty
       onUploaded={() => setShowUpload(false)}

@@ -1,0 +1,24 @@
+/* Same layout/coloring as LoginQuote (.loginquote/.loginquote-message) —
+   icon above a centered message, no card/background. */
+.empty-feature-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px;
+  width: 100%;
+  flex: 1;
+  color: #aaaaaa;
+  text-align: center;
+}
+
+.empty-feature-state-message {
+  max-width: 420px;
+  font-family: var(--font-family);
+  font-size: var(--font-size-md, 14px);
+  font-weight: 500;
+  color: #aaaaaa;
+  line-height: 1.6;
+  margin: 0;
+}

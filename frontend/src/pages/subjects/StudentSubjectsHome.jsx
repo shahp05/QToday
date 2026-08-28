@@ -183,10 +183,6 @@ export default function StudentSubjectsHome({ readOnly = false, studentId = null
     )
   }
 
-  if (subjects.length === 0) {
-    return null
-  }
-
   const activeSubjectId = subjects.some(s => s.subject_id === selectedSubjectId)
     ? selectedSubjectId
     : subjects[0].subject_id

@@ -12,13 +12,11 @@ import { useStudentParentsStore } from './studentParentsStore'
 // them fetching on their own.
 //
 // Cached per session (bySession[key]) so switching the site-wide session
-// picker back and forth never re-fetches data already in hand. Access
-// rights are enforced here, once, not by every caller: only a school
-// admin's request for a specific (non-current) session is ever actually
-// honored — anyone else's sessionId is silently ignored and resolves to
-// current, matching what the backend independently enforces anyway (see
-// routers/students.py) — this just avoids a caller needing to remember
-// the rule or a doomed request ever going out.
+// picker back and forth never re-fetches data already in hand. Any role
+// may browse a past session read-only; only the one pending future session
+// is admin-only (see session_service.validate_session_readable) — the
+// backend is the actual authority on this, this client just passes
+// whatever sessionId the caller has on hand.
 export const useStudentsStore = create((set, get) => ({
   bySession: {}, // key -> { students: [], status, error }
 
