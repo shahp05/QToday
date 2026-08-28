@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Navigate, Outlet } from 'react-router-dom'
 import LeftNav from '../components/LeftNav'
 import { useProfileStore } from '../store/profileStore'
 import { useSessionsStore } from '../store/sessionsStore'
@@ -14,6 +14,7 @@ import './Dashboard.css'
 // / a student's detail) is now driven entirely by the URL — see App.jsx —
 // so real back-navigation is just the browser's own history.
 export default function Dashboard() {
+  const token = useProfileStore(s => s.token)
   const isParent = useProfileStore(s => s.is_parent)
   const fetchStudents       = useStudentsStore(s => s.fetchStudents)
   const fetchTeachers       = useTeachersStore(s => s.fetchTeachers)
@@ -81,6 +82,13 @@ export default function Dashboard() {
     fetchTeachers(activeSessionId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isParent, activeSessionId])
+
+  // No route guard previously existed anywhere above /dashboard/* — a
+  // cleared/expired profile (logout, apiFetch's 401 handler) left this
+  // whole layout reachable with nothing but empty data, instead of
+  // bouncing back to the Home/Login screen. Checked after every hook above
+  // (never before one), per React's rules.
+  if (!token) return <Navigate to="/" replace />
 
   return (
     <div className="dashboard">

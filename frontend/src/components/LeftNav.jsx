@@ -216,10 +216,16 @@ export default function LeftNav() {
   }
 
   function handleLogout() {
+    // Navigate away first — clearing the profile/session stores while
+    // still on a nested /dashboard/* route can otherwise cause that page's
+    // own "hide when nothing to show" effect (e.g. StudentsPage) to fire
+    // first and redirect to plain /dashboard instead, before this
+    // navigate takes effect. Dashboard.jsx's own token guard is the real
+    // backstop, but leaving first avoids the visible bounce.
+    navigate('/')
     clearProfile()
     resetUserScopedStores()
     resetQuoteAutoAdvance()
-    navigate('/')
   }
 
   return (
