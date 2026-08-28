@@ -350,12 +350,6 @@ export default function TeachersEmpty({ onUploaded, teacherCount, onShowList }) 
     handleFiles(e.dataTransfer.files, 'drop')
   }
 
-  const sessionTargetLabel = uploadTarget === 'future' && futureSession
-    ? `New Academic Session ${futureSession.label}`
-    : currentSession
-      ? `Current Academic Session ${currentSession.label}`
-      : null
-
   return (
     <div className="teachers-empty">
 
@@ -413,8 +407,6 @@ export default function TeachersEmpty({ onUploaded, teacherCount, onShowList }) 
           </span>
           {selectedFiles.length > 0 && source === 'drop' && error ? (
             <span className="teachers-upload-error">{error}</span>
-          ) : sessionTargetLabel ? (
-            <span className="teachers-upload-error">{sessionTargetLabel}</span>
           ) : null}
           {selectedFiles.length > 0 && source === 'drop' && !error && successMessage && (
             <span className="teachers-upload-success"><IconCheck />{successMessage}</span>
@@ -438,8 +430,6 @@ export default function TeachersEmpty({ onUploaded, teacherCount, onShowList }) 
           </span>
           {selectedFiles.length > 0 && source === 'browse' && error ? (
             <span className="teachers-upload-error">{error}</span>
-          ) : sessionTargetLabel ? (
-            <span className="teachers-upload-error">{sessionTargetLabel}</span>
           ) : null}
           {selectedFiles.length > 0 && source === 'browse' && !error && successMessage && (
             <span className="teachers-upload-success"><IconCheck />{successMessage}</span>

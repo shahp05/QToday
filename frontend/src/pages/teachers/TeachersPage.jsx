@@ -2,29 +2,42 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useProfileStore } from '../../store/profileStore'
 import { useTeachersStore } from '../../store/teachersStore'
-import { CURRENT_SESSION_KEY, getActiveSession, useSessionsStore } from '../../store/sessionsStore'
+import { getActiveSession, getActiveSessionKey, useSessionsStore } from '../../store/sessionsStore'
 import { usePageView } from '../../hooks/usePageView'
-import { useTeachersFeatureVisible } from '../../hooks/useTeachersFeatureVisible'
 import PageLoading from '../../components/PageLoading'
+import EmptyFeatureState from '../../components/EmptyFeatureState'
 import TeachersEmpty from './TeachersEmpty'
 import TeachersList from './TeachersList'
+
+// Same path/fill as LeftNav's IconTeachers, just rendered larger for the
+// empty-state message (see SubjectsRoute's IconSubjectsLarge for the same
+// pattern).
+function IconTeachersLarge() {
+  return (
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 11.55C9.64 9.35 6.48 8 3 8v11c3.48 0 6.64 1.35 9 3.55 2.36-2.19 5.52-3.55 9-3.55V8c-3.48 0-6.64 1.35-9 3.55z"/>
+      <path d="M12 8c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3z"/>
+    </svg>
+  )
+}
+
+// Placeholder copy — real per-case wording still to come.
+const NO_TEACHERS_PAST_MESSAGE = 'No teachers were added in this academic session.'
 
 export default function TeachersPage() {
   const navigate = useNavigate()
   usePageView('teachers') // every page-header page names itself in the URL
-  // Per spec, the Teachers feature is hidden (nav icon + this route) once
-  // there's nothing for the current role/session/roster state to show —
-  // see the hook's own docstring for the exact matrix. Redirected away
-  // here (not just left un-navigable from the nav icon) so a stale link,
-  // a Back navigation, or the underlying roster changing out from under
-  // an already-open page all land somewhere real instead of an empty
-  // screen. Only acts once `ready` — never redirect on a still-loading guess.
-  const { ready: teachersReady, visible: teachersVisible } = useTeachersFeatureVisible()
-  // The top-level "does this school have any teachers at all" gate is
-  // always about the LIVE current session, regardless of what the left
-  // nav's session picker happens to be browsing — that's TeachersList's
-  // own concern (it reads the active session directly).
-  const teachersStatus = useTeachersStore(s => s.bySession[CURRENT_SESSION_KEY]?.status ?? 'idle')
+  // Per spec, this page is reachable for every role in every session — at
+  // least one super-admin always exists for an active school account — so
+  // there's no visibility gate or redirect here, unlike Students/Subjects
+  // (excluding the viewer's own row from the count below can still leave
+  // it empty for a past session where they were the only staff member —
+  // see the branches near the bottom). The roster gate (list vs. upload
+  // vs. empty message) is for whichever session the left nav's picker is
+  // actually browsing, same source TeachersList itself reads, so the two
+  // can never disagree about whether there's anything to show.
+  const activeKey = useSessionsStore(getActiveSessionKey)
+  const teachersStatus = useTeachersStore(s => s.bySession[activeKey]?.status ?? 'idle')
   // /teachers/mine includes the signed-in admin's own row (is_sysadm counts
   // as a "teacher" server-side — see get_my_teachers) — so on a customer
   // that's never uploaded a real teacher, this would otherwise be 1, not 0,
@@ -33,7 +46,7 @@ export default function TeachersPage() {
   const selfUserId = useProfileStore(s => s.user_id)
   const isSchoolAdmin = useProfileStore(s => s.is_school_admin)
   const teacherCount = useTeachersStore(s =>
-    (s.bySession[CURRENT_SESSION_KEY]?.teachers ?? []).filter(t => t.user_id !== selfUserId).length
+    (s.bySession[activeKey]?.teachers ?? []).filter(t => t.user_id !== selfUserId).length
   )
   const [showUpload, setShowUpload] = useState(false)
   const fetchTeachers = useTeachersStore(s => s.fetchTeachers)
@@ -51,12 +64,6 @@ export default function TeachersPage() {
   useEffect(() => {
     fetchTeachers(activeSessionId)
   }, [activeSessionId, fetchTeachers])
-
-  useEffect(() => {
-    if (teachersReady && !teachersVisible) navigate('/dashboard', { replace: true })
-  }, [teachersReady, teachersVisible, navigate])
-
-  if (teachersReady && !teachersVisible) return null
 
   // Checked before the loading guard below — TeachersEmpty owns its own
   // loading/spinner state (including while uploadAndRefresh briefly flips
@@ -83,8 +90,12 @@ export default function TeachersPage() {
   // Only the sys admin can actually upload (the backend rejects anyone
   // else's POST /teachers/upload), so they're the only one who ever gets
   // the upload screen as a default — everyone else always sees the list,
-  // even when it's just the admin's own row.
-  if (isSchoolAdmin && teacherCount === 0) {
+  // even when it's just the admin's own row. Never for a past session,
+  // though — history is read-only (see Academic Sessions condition 4), so
+  // there's no upload path to offer even when the admin was the only
+  // staff member back then (excluded from their own count, same as
+  // current/future).
+  if (isSchoolAdmin && teacherCount === 0 && !isViewingPastSession) {
     return (
       <TeachersEmpty
         onUploaded={() => setShowUpload(false)}
@@ -92,6 +103,13 @@ export default function TeachersPage() {
         onShowList={() => setShowUpload(false)}
       />
     )
+  }
+  // Past session, nobody but the viewer's own (excluded) row existed back
+  // then — the one way this normally-never-empty page can still end up
+  // with nothing to list. No upload escape hatch for history, so the
+  // passive empty message is all there is to show.
+  if (teacherCount === 0 && isViewingPastSession) {
+    return <EmptyFeatureState icon={<IconTeachersLarge />} message={NO_TEACHERS_PAST_MESSAGE} />
   }
   return (
     <TeachersList

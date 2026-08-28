@@ -70,7 +70,7 @@ export default function Dashboard() {
   }, [isParent, activeSessionId])
 
   // teachersStore kept in sync with whichever session is active too, same
-  // reasoning as studentsStore above — useTeachersFeatureVisible needs
+  // reasoning as studentsStore above — TeachersPage/TeachersList need
   // fresh data for whatever session is selected regardless of which page
   // is actually showing. Also already cached per-session, so no force
   // needed. Skipped for a parent for the same reason as studentsStore —

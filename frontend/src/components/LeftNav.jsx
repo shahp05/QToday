@@ -10,7 +10,6 @@ import { useDashboardQuoteStore } from '../store/dashboardQuoteStore'
 import { resetUserScopedStores } from '../store/resetUserScopedStores'
 import { useSubjectsFeatureVisible } from '../hooks/useSubjectsFeatureVisible'
 import { useStudentsFeatureVisible } from '../hooks/useStudentsFeatureVisible'
-import { useTeachersFeatureVisible } from '../hooks/useTeachersFeatureVisible'
 import Dropdown from './Dropdown'
 import ScheduleSessionDialog from './ScheduleSessionDialog'
 import WardPickerDialog from './WardPickerDialog'
@@ -98,7 +97,6 @@ export default function LeftNav() {
   const subjectsStatus = useSubjectsTaughtStore(s => s.status)
   const { visible: subjectsFeatureVisible } = useSubjectsFeatureVisible()
   const { visible: studentsFeatureVisible } = useStudentsFeatureVisible()
-  const { visible: teachersFeatureVisible } = useTeachersFeatureVisible()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -238,8 +236,10 @@ export default function LeftNav() {
           // A parent's "Students" is the unrelated ward-switcher (see
           // isWardButton below) — never gated by studentsFeatureVisible,
           // which only decides the admin/teacher roster page's visibility.
-          (item.id !== 'students' || profile.is_parent || studentsFeatureVisible) &&
-          (item.id !== 'teachers' || teachersFeatureVisible)
+          (item.id !== 'students' || profile.is_parent || studentsFeatureVisible)
+          // Teachers has no visibility gate at all — per spec, this page
+          // can never be empty (at least one super-admin always exists),
+          // so it's unconditionally reachable for every role.
         ).map(({ id, label, Icon }) => {
           // A parent's "Students" button shows the selected ward's own
           // photo/name instead of the generic icon/label — same button,

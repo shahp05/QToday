@@ -25,7 +25,7 @@ function IconSubjectsLarge() {
 const TEACHER_NO_STUDENTS_MESSAGE =
   'Your super-admin has not uploaded the list of students for this academic session yet. Log the subjects you teach once it is done.'
 const ADMIN_NO_STUDENTS_MESSAGE =
-  'You have not uploaded the list of students for this academic session yet. Teachers will be able to log the subjects they teach after that.'
+  'You have not uploaded the list of students for this academic session. Teachers will be able to log their subjects after that.'
 const STAFF_PAST_MESSAGE = 'No subjects were logged in this academic session.'
 const STUDENT_CURRENT_MESSAGE =
   'Target to stay in green on the subjects taught in school. Your teachers have not logged any subject for you to play quizzes on.'
