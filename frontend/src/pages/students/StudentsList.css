@@ -242,6 +242,25 @@
   font-weight: 600;
 }
 
+/* Column (title row + parent-emails subtext below), same shape as
+   TeachersList's own .teachers-row-namecell/.teachers-row-titlerow split. */
+.students-row-namecell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.students-row-titlerow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
 .students-row-id,
 .students-row-name {
   display: flex;
@@ -264,107 +283,39 @@
   font-weight: 500;
 }
 
-/* ─── Contact icon + popover ──────────────────────────────────────────────── */
-.students-contact-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.students-contact-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: none;
+/* ─── Parent email(s) — clickable (mailto), same treatment as
+   TeachersList's teacher email link. A "Both" link appears alongside the
+   two individual addresses when a student has two on file. ──────────────── */
+.students-row-parentemails {
+  display: block;
+  font-size: var(--font-size-xs, 11px);
+  line-height: 1.2;
   color: var(--color-text-light, #666666);
-  padding: 2px;
-  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.students-contact-btn:hover {
-  color: var(--color-text, #343434);
-}
-
-.students-contact-popover {
-  position: fixed;
-  z-index: 100;
-  width: 220px;
-  background: #ffffff;
-  border: 1.5px solid var(--color-green-light, #8EEB65);
-  border-radius: var(--radius-sm, 6px);
-  box-shadow: var(--shadow-md);
-  padding: 8px 12px;
-  display: flex;
-  flex-direction: column;
-}
-
-.students-contact-mailto-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 0;
-}
-
-.students-contact-mailto-btn {
-  flex: 1;
-  padding: 8px 14px;
-  border: 1px solid var(--color-green-light, #8EEB65);
-  border-radius: var(--radius-sm, 6px);
-  background: var(--color-green-light, #8EEB65);
-  font-size: var(--font-size-sm, 13px);
-  font-weight: 500;
-  cursor: pointer;
-  color: var(--color-dark, #343434);
+/* Green so it reads as a link at rest, not just on hover — matches
+   TeachersList's teacher email link. Padding + matching negative margin
+   enlarges the tap target (this text is small) without shifting
+   surrounding layout or the other inline siblings (separators, "Both"). */
+.students-row-parentemail {
+  display: inline-block;
+  color: var(--color-link, #1A73E8);
   text-decoration: none;
-  text-align: center;
-  transition: border-color 0.2s, background 0.2s, color 0.2s;
-}
-
-.students-contact-mailto-btn:hover,
-.students-contact-mailto-btn:focus-visible {
-  background: none;
-  border-color: var(--color-green-light, #8EEB65);
-  color: var(--color-dark, #343434);
-}
-
-.students-contact-info-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: none;
-  padding: 2px;
   cursor: pointer;
-  color: var(--color-text-light, #666666);
-  flex-shrink: 0;
+  padding: 3px 2px;
+  margin: -3px -2px;
 }
 
-.students-contact-info-btn:hover {
-  color: var(--color-text, #343434);
+.students-row-parentemail:hover,
+.students-row-parentemail:focus-visible {
+  text-decoration: underline;
 }
 
-.students-contact-mailto-hint {
-  font-size: 11px;
-  color: rgba(0,0,0,0.5);
-  white-space: normal;
-  max-width: 200px;
-  line-height: 1.4;
-}
-
-.students-contact-email {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--font-size-md, 14px);
-  color: var(--color-dark, #343434);
-}
-
-.students-contact-email svg {
-  flex-shrink: 0;
-  vertical-align: middle;
+.students-row-parentemail-sep {
+  margin: 0 4px;
 }
 
 /* ─── Per-subject status chips — one per subject taught to this student's

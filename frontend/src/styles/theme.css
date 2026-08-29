@@ -20,6 +20,8 @@
   --color-text-muted:   #999999;
   --color-placeholder:  #999999;
   --color-text-on-green:#ffffff;   /* text / icons placed on green background     */
+  --color-link:         #1A73E8;   /* standard hyperlink blue — kept distinct from
+                                       green, which already means "good score"    */
 
   /* Typography – Desktop (default, smaller for precision) */
   --font-family:    'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;

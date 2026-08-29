@@ -26,6 +26,16 @@ function IconBoxSpinner() {
   return <span className="teachers-superadmin-spinner" role="status" aria-label="Updating" />
 }
 
+function mailtoHref(email) {
+  return `mailto:${email}?subject=${encodeURIComponent('QToday')}`
+}
+
+// No way to detect an actual mailto failure (the browser doesn't report
+// back), so this is shown proactively on every click rather than reactively
+// — same wording the removed StudentsList contact popover used to show
+// behind an extra info-icon click.
+const MAILTO_HINT = 'Opens your default email app. If nothing happens, set your email app as the default for mailto links in your browser settings.'
+
 export default function TeachersList({ onUploadNew, onBack }) {
   const isAdmin = useProfileStore(s => s.is_school_admin)
   const myOrgId = useProfileStore(s => s.org_id)
@@ -40,7 +50,11 @@ export default function TeachersList({ onUploadNew, onBack }) {
   const isViewingCurrent = activeKey === CURRENT_SESSION_KEY
 
   const [pendingOrgId, setPendingOrgId] = useState(null)
-  const [error, setError] = useState('')
+  // { message, variant } — one shared toast slot for every error/notice on
+  // this page (photo upload, super-admin toggle, the mailto hint), so only
+  // one can ever be on screen at a time.
+  const [toast, setToast] = useState({ message: '', variant: 'error' })
+  const dismissToast = () => setToast(t => ({ ...t, message: '' }))
 
   async function handleToggle(row, locked) {
     if (locked) return
@@ -48,10 +62,14 @@ export default function TeachersList({ onUploadNew, onBack }) {
     try {
       await setSuperAdmin(row.org_id, !row.is_super_admin)
     } catch (err) {
-      setError(err.message)
+      setToast({ message: err.message, variant: 'error' })
     } finally {
       setPendingOrgId(null)
     }
+  }
+
+  function handleMailtoClick() {
+    setToast({ message: MAILTO_HINT, variant: 'info' })
   }
 
   // A teacher may only ever set their own photo here — not a colleague's.
@@ -89,7 +107,7 @@ export default function TeachersList({ onUploadNew, onBack }) {
                       name={row.name}
                       photoUrl={resolveFileUrl(row.photo_url)}
                       onUpload={file => handlePhotoUpload(row, file)}
-                      onError={setError}
+                      onError={message => setToast({ message, variant: 'error' })}
                     />
                   </span>
                   <span className="teachers-row-namecell">
@@ -97,7 +115,13 @@ export default function TeachersList({ onUploadNew, onBack }) {
                       <span className="teachers-row-id">{row.org_id}</span>
                       <span className="teachers-row-name">{row.name}</span>
                     </span>
-                    <span className="teachers-row-email">{row.email}</span>
+                    {isSelf ? (
+                      <span className="teachers-row-email">{row.email}</span>
+                    ) : (
+                      <a className="teachers-row-email teachers-row-email--link" href={mailtoHref(row.email)} onClick={handleMailtoClick}>
+                        {row.email}
+                      </a>
+                    )}
                   </span>
                   <label className={`teachers-row-superadmin${locked ? ' teachers-row-superadmin--locked' : ''}`}>
                     <span className="teachers-superadmin-control">
@@ -121,7 +145,9 @@ export default function TeachersList({ onUploadNew, onBack }) {
                       <span className="teachers-subject-chip" key={subject.subject_id}>
                         <span className="teachers-subject-chip-name">{subject.subject_name}</span>
                         <span className="teachers-subject-chip-grades">
-                          {subject.grades.map(g => g.grade_name).join(', ')}
+                          {subject.grades.map(g => (
+                            <span className="teachers-grade-count" key={g.grade_id}>{g.grade_name}</span>
+                          ))}
                         </span>
                       </span>
                     ))}
@@ -133,7 +159,7 @@ export default function TeachersList({ onUploadNew, onBack }) {
         </div>
       </div>
 
-      <Toast message={error} onDismiss={() => setError('')} />
+      <Toast message={toast.message} variant={toast.variant} onDismiss={dismissToast} />
     </div>
   )
 }

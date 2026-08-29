@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useProfileStore } from '../../store/profileStore'
 import { useStudentsStore } from '../../store/studentsStore'
 import { useStudentGradesStore } from '../../store/studentGradesStore'
@@ -45,109 +45,36 @@ function StatusLegend() {
   )
 }
 
-function IconContact() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M4 4h16v16H4z" opacity="0" />
-      <path d="M3 6l9 6 9-6" />
-      <rect x="3" y="5" width="18" height="14" rx="2" />
-    </svg>
-  )
+function mailtoHref(emails) {
+  return `mailto:${emails.join(',')}?subject=${encodeURIComponent('QToday')}`
 }
 
-// Only rendered when parent emails exist — hidden entirely otherwise rather
-// than shown disabled, since there's nothing useful to click into.
-function IconInfo() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="10" />
-      <line x1="12" y1="8" x2="12" y2="8" strokeWidth="3" strokeLinecap="round" />
-      <line x1="12" y1="12" x2="12" y2="16" />
-    </svg>
-  )
-}
+// No way to detect an actual mailto failure (the browser doesn't report
+// back), so this is shown proactively on every click rather than reactively
+// — same wording the removed contact popover used to show behind an extra
+// info-icon click.
+const MAILTO_HINT = 'Opens your default email app. If nothing happens, set your email app as the default for mailto links in your browser settings.'
 
-function ParentsPopover({ emails }) {
-  const [open, setOpen] = useState(false)
-  const [showHint, setShowHint] = useState(false)
-  const [popoverPos, setPopoverPos] = useState({ top: 0, right: 0 })
-  const btnRef = useRef(null)
-  const popoverRef = useRef(null)
-
-  useEffect(() => {
-    if (!open) return
-    function handleOutsideClick(e) {
-      if (
-        btnRef.current && !btnRef.current.contains(e.target) &&
-        popoverRef.current && !popoverRef.current.contains(e.target)
-      ) {
-        setOpen(false)
-        setShowHint(false)
-      }
-    }
-    document.addEventListener('mousedown', handleOutsideClick)
-    return () => document.removeEventListener('mousedown', handleOutsideClick)
-  }, [open])
-
+// One clickable link per parent email, plus a "Both" link to mail both at
+// once when there are two — same pattern as TeachersList's teacher email
+// link. Renders nothing when there are no parent emails on file.
+function ParentEmailLinks({ emails, onMailtoClick }) {
   if (emails.length === 0) return null
-
-  const mailtoHref = `mailto:${emails.join(',')}?subject=${encodeURIComponent('QToday')}`
-
-  function handleOpen() {
-    if (open) { setOpen(false); setShowHint(false); return }
-    const rect = btnRef.current.getBoundingClientRect()
-    setPopoverPos({
-      top: rect.bottom + 4,
-      right: window.innerWidth - rect.right,
-    })
-    setOpen(true)
+  if (emails.length === 1) {
+    return (
+      <a className="students-row-parentemail" href={mailtoHref(emails)} onClick={onMailtoClick}>
+        {emails[0]}
+      </a>
+    )
   }
-
   return (
-    <span className="students-contact-wrap">
-      <button
-        ref={btnRef}
-        type="button"
-        className="students-contact-btn"
-        onClick={handleOpen}
-        aria-label="Show parent emails"
-      >
-        <IconContact />
-      </button>
-      {open && (
-        <div
-          ref={popoverRef}
-          className="students-contact-popover"
-          style={{ top: popoverPos.top, right: popoverPos.right }}
-        >
-          {emails.map(email => (
-            <span key={email} className="students-contact-email">
-              <span>{email}</span>
-            </span>
-          ))}
-          <div className="students-contact-mailto-row">
-            <a className="students-contact-mailto-btn" href={mailtoHref}>
-              Send Email
-            </a>
-            <button
-              type="button"
-              className="students-contact-info-btn"
-              onClick={() => setShowHint(h => !h)}
-              aria-label="How to set default email app"
-            >
-              <IconInfo />
-            </button>
-          </div>
-          {showHint && (
-            <span className="students-contact-mailto-hint">
-              Opens your default email app. If nothing happens, set your email app as the default for mailto links in your browser settings.
-            </span>
-          )}
-        </div>
-      )}
-    </span>
+    <>
+      <a className="students-row-parentemail" href={mailtoHref([emails[0]])} onClick={onMailtoClick}>{emails[0]}</a>
+      <span className="students-row-parentemail-sep">·</span>
+      <a className="students-row-parentemail" href={mailtoHref([emails[1]])} onClick={onMailtoClick}>{emails[1]}</a>
+      <span className="students-row-parentemail-sep">·</span>
+      <a className="students-row-parentemail" href={mailtoHref(emails)} onClick={onMailtoClick}>Both</a>
+    </>
   )
 }
 
@@ -227,7 +154,14 @@ export default function StudentsList({
   // needed here (see studentsStore.updateStudentPhoto).
   const updateStudentPhoto = useStudentsStore(s => s.updateStudentPhoto)
 
-  const [photoError, setPhotoError] = useState('')
+  // { message, variant } — one shared toast slot for every error/notice on
+  // this page (photo upload, the mailto hint), so only one can ever be on
+  // screen at a time.
+  const [toast, setToast] = useState({ message: '', variant: 'error' })
+  const dismissToast = () => setToast(t => ({ ...t, message: '' }))
+  function handleMailtoClick() {
+    setToast({ message: MAILTO_HINT, variant: 'info' })
+  }
   // Per spec, photos are self-upload only — a teacher/admin may never set a
   // student's photo on their behalf. A student viewer only ever sees their
   // own single row (students_query_service.py scopes it that way
@@ -358,12 +292,18 @@ export default function StudentsList({
                       name={row.name}
                       photoUrl={resolveFileUrl(row.photo_url)}
                       onUpload={file => handlePhotoUpload(row.student_id, file)}
-                      onError={setPhotoError}
+                      onError={message => setToast({ message, variant: 'error' })}
                     />
                   </span>
-                  <span className="students-row-id">{row.org_id}</span>
-                  <span className="students-row-name">{row.name}</span>
-                  <ParentsPopover emails={row.parent_emails} />
+                  <span className="students-row-namecell">
+                    <span className="students-row-titlerow">
+                      <span className="students-row-id">{row.org_id}</span>
+                      <span className="students-row-name">{row.name}</span>
+                    </span>
+                    <span className="students-row-parentemails">
+                      <ParentEmailLinks emails={row.parent_emails} onMailtoClick={handleMailtoClick} />
+                    </span>
+                  </span>
                 </div>
                 {subjectChips.length > 0 && (
                   <div className="students-row-status">
@@ -399,7 +339,7 @@ export default function StudentsList({
         </div>
       </div>
 
-      <Toast message={photoError} onDismiss={() => setPhotoError('')} />
+      <Toast message={toast.message} variant={toast.variant} onDismiss={dismissToast} />
     </div>
   )
 }

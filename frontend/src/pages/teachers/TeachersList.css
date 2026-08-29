@@ -25,29 +25,29 @@
   color: var(--color-white);
 }
 
-/* ─── Rows — two adjacent columns, bare-minimum gap, white cards ─────────── */
+/* ─── Rows — one per row, full width, white cards — same layout as
+   StudentsList.css's own .students-rows/.students-row. ─────────────────── */
 .teachers-list-body {
   padding: 0 24px 24px;
 }
 
 .teachers-rows {
-  column-count: 2;
-  column-gap: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 /* Same tile treatment (photo, padding, title/subtitle) as the Students
-   list's card (StudentsList.css) — two per row here instead of one. A
-   column now (top identity row + subjects row below), same shape as
-   StudentsList's own .students-row/.students-row-top split. */
+   list's card (StudentsList.css) — a column (top identity row + subjects
+   row below), same shape as StudentsList's own .students-row/
+   .students-row-top split. */
 .teachers-row {
   display: flex;
   flex-direction: column;
   gap: 8px;
   background: var(--color-white);
   border-radius: var(--radius-sm, 6px);
-  margin-bottom: 2px;
   padding: 12px;
-  break-inside: avoid;
 }
 
 .teachers-row-top {
@@ -121,12 +121,30 @@
 }
 
 .teachers-row-email {
+  display: block;
   font-size: var(--font-size-xs, 11px);
   line-height: 1.2;
   color: var(--color-text-light, #666666);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Clickable (mailto) — every teacher except the viewer's own row. Green so
+   it reads as a link at rest, not just on hover. Padding + matching
+   negative margin enlarges the tap target (this text is small) without
+   shifting surrounding layout. */
+.teachers-row-email--link {
+  color: var(--color-link, #1A73E8);
+  text-decoration: none;
+  cursor: pointer;
+  padding: 4px 0;
+  margin: -4px 0;
+}
+
+.teachers-row-email--link:hover,
+.teachers-row-email--link:focus-visible {
+  text-decoration: underline;
 }
 
 .teachers-row-superadmin {
@@ -205,10 +223,10 @@
 }
 
 /* ─── Per-subject chips — one per subject this teacher logged this
-   session, each showing every grade it was taught in. Grey fill (not
-   white, unlike StudentsList's equivalent chip) since .teachers-row
-   itself is already white — a white chip on a white row wouldn't read as
-   a distinct tile. ──────────────────────────────────────────────────── */
+   session, each showing every grade it was taught in. Same white-with-
+   border treatment as StudentsList's equivalent chip, not a grey fill —
+   the border alone is enough to read as a distinct tile against the
+   card's white background. ────────────────────────────────────────────── */
 .teachers-row-subjects {
   display: flex;
   flex-wrap: wrap;
@@ -218,26 +236,41 @@
 .teachers-subject-chip {
   box-sizing: border-box;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 4px;
-  background: var(--color-grey-light, #f2f4f7);
+  background: var(--color-white, #ffffff);
+  border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: var(--radius-sm, 6px);
-  padding: 3px 8px;
+  padding: 3px 4px;
 }
 
 .teachers-subject-chip-name {
   font-size: var(--font-size-xs, 11px);
   font-weight: 600;
   color: var(--color-text, #343434);
+  padding: 0 4px 0 2px;
 }
 
 .teachers-subject-chip-grades {
-  font-size: var(--font-size-xs, 11px);
-  color: var(--color-text-light, #666666);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
-@media (max-width: 900px) {
-  .teachers-rows {
-    column-count: 1;
-  }
+/* Same shape/sizing as StudentsList's status-count pills (green/amber/red/
+   none), but a grade isn't a score — always this same neutral dark fill,
+   never color-coded. */
+.teachers-grade-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 3px;
+  border-radius: 4px;
+  font-size: var(--font-size-xs, 11px);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background: var(--color-dark, #343434);
+  color: var(--color-white, #ffffff);
 }
