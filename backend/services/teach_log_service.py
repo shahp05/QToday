@@ -22,7 +22,7 @@ def _session_clause(db: Session, *, customer_id: int, session_id: int | None, al
         session_id = get_current_session_id(db, customer_id)
     if session_id == LEGACY_SESSION_SENTINEL or session_id is None:
         return f"{alias}.session_id IS NULL", {}
-    return f"{alias}.session_id = :sid", {"sid": session_id}
+    return f"{alias}.session_id = :session_clause_id", {"session_clause_id": session_id}
 
 
 def _scope_clause(db: Session, *, customer_id, user_id, is_school_admin, is_system_admin,
