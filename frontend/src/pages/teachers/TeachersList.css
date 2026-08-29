@@ -38,13 +38,17 @@
 }
 
 /* Same tile treatment (photo, padding, title/subtitle) as the Students
-   list's card (StudentsList.css) — a column (top identity row + subjects
-   row below), same shape as StudentsList's own .students-row/
-   .students-row-top split. */
+   list's card (StudentsList.css) — identity and the super-admin/subjects
+   column sit side by side on a wide row, vertically centered against each
+   other, same shape as StudentsList's own .students-row/.students-row-top
+   split. flex-wrap lets the second block drop to its own full-width line
+   below identity once the row gets too narrow (tablet/mobile) instead of
+   squeezing both into one line. */
 .teachers-row {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
   background: var(--color-white);
   border-radius: var(--radius-sm, 6px);
   padding: 12px;
@@ -54,6 +58,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .teachers-row-photo {
@@ -147,17 +153,32 @@
   text-decoration: underline;
 }
 
+/* Same chip container as .teachers-subject-chip (white, subtle border,
+   same radius/padding/font) so it reads as part of the same family of
+   pills — differentiated from a subject chip by the checkbox itself
+   (signals "interactive") and by a green border/tint once checked, the
+   app's existing "on" color everywhere else. */
 .teachers-row-superadmin {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-  padding-left: 8px;
-  padding-right: 4px;
-  font-size: var(--font-size-sm, 13px);
-  color: var(--color-text-light, #666666);
+  background: var(--color-white, #ffffff);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-sm, 6px);
+  padding: 3px 8px 3px 4px;
+  font-size: var(--font-size-xs, 11px);
+  font-weight: 600;
+  color: var(--color-text, #343434);
   white-space: nowrap;
   cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.teachers-row-superadmin--checked {
+  background: rgba(142, 235, 101, 0.16);
+  border-color: var(--color-green-light, #8EEB65);
 }
 
 .teachers-superadmin-control {
@@ -222,15 +243,34 @@
   pointer-events: none;
 }
 
-/* ─── Per-subject chips — one per subject this teacher logged this
-   session, each showing every grade it was taught in. Same white-with-
-   border treatment as StudentsList's equivalent chip, not a grey fill —
-   the border alone is enough to read as a distinct tile against the
-   card's white background. ────────────────────────────────────────────── */
+/* ─── Right-hand column — super-admin toggle above subjects, both
+   right-aligned as a unit. margin-left: auto pushes this whole column to
+   the right of .teachers-row-top, and keeps it flush right even once it
+   wraps to its own line below identity (rather than relying on
+   justify-content on the row, which would only right-align it while it's
+   still sharing a line with identity). ───────────────────────────────── */
+.teachers-row-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: auto;
+  max-width: 100%;
+}
+
+/* Per-subject chips — one per subject this teacher logged this session,
+   each showing every grade it was taught in. Same white-with-border
+   treatment as StudentsList's equivalent chip, not a grey fill — the
+   border alone is enough to read as a distinct tile against the card's
+   white background. */
 .teachers-row-subjects {
   display: flex;
   flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
+  max-width: 100%;
 }
 
 .teachers-subject-chip {

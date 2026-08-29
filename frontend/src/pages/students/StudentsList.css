@@ -170,12 +170,18 @@
 }
 
 /* Standard card padding lives here, once — every child below sizes off this
-   instead of carrying its own one-off padding. */
+   instead of carrying its own one-off padding. Identity and subjects sit
+   side by side on a wide row, vertically centered against each other,
+   same shape as TeachersList's own .teachers-row/.teachers-row-top split.
+   flex-wrap lets subjects drop to their own full-width line below
+   identity once the row gets too narrow (tablet/mobile) instead of
+   squeezing both into one line. */
 .students-row {
   position: relative;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
   background: var(--color-white);
   border-radius: var(--radius-sm, 6px);
   padding: 12px;
@@ -212,6 +218,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .students-row-photo {
@@ -319,13 +327,20 @@
 }
 
 /* ─── Per-subject status chips — one per subject taught to this student's
-   grade, each showing green/amber/red/not-played topic counts. No container
-   background of its own — each white chip already reads as a distinct tile
-   against the card's light-grey background. ──────────────────────────────── */
+   grade, each showing green/amber/red/not-played topic counts. No
+   container background — each white chip already reads as a distinct
+   tile against the card's own white. margin-left: auto right-aligns the
+   whole group within the row, and keeps it flush right even once it
+   wraps to its own line below identity (rather than relying on
+   justify-content on the row, which would only right-align it while it's
+   still sharing a line with identity). ───────────────────────────────── */
 .students-row-status {
   display: flex;
   flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
+  margin-left: auto;
+  max-width: 100%;
 }
 
 .students-subject-chip {

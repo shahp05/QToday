@@ -123,7 +123,9 @@ export default function TeachersList({ onUploadNew, onBack }) {
                       </a>
                     )}
                   </span>
-                  <label className={`teachers-row-superadmin${locked ? ' teachers-row-superadmin--locked' : ''}`}>
+                </div>
+                <div className="teachers-row-side">
+                  <label className={`teachers-row-superadmin${locked ? ' teachers-row-superadmin--locked' : ''}${row.is_super_admin ? ' teachers-row-superadmin--checked' : ''}`}>
                     <span className="teachers-superadmin-control">
                       <input
                         type="checkbox"
@@ -138,21 +140,21 @@ export default function TeachersList({ onUploadNew, onBack }) {
                     </span>
                     Super admin
                   </label>
-                </div>
-                {row.subjects?.length > 0 && (
-                  <div className="teachers-row-subjects">
-                    {row.subjects.map(subject => (
-                      <span className="teachers-subject-chip" key={subject.subject_id}>
-                        <span className="teachers-subject-chip-name">{subject.subject_name}</span>
-                        <span className="teachers-subject-chip-grades">
-                          {subject.grades.map(g => (
-                            <span className="teachers-grade-count" key={g.grade_id}>{g.grade_name}</span>
-                          ))}
+                  {row.subjects?.length > 0 && (
+                    <div className="teachers-row-subjects">
+                      {row.subjects.map(subject => (
+                        <span className="teachers-subject-chip" key={subject.subject_id}>
+                          <span className="teachers-subject-chip-name">{subject.subject_name}</span>
+                          <span className="teachers-subject-chip-grades">
+                            {subject.grades.map(g => (
+                              <span className="teachers-grade-count" key={g.grade_id}>{g.grade_name}</span>
+                            ))}
+                          </span>
                         </span>
-                      </span>
-                    ))}
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )
           })}
