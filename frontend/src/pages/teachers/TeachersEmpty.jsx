@@ -5,7 +5,6 @@ import { useTeachersStore } from '../../store/teachersStore'
 import { CURRENT_SESSION_KEY, getActiveSession, useSessionsStore } from '../../store/sessionsStore'
 import { resolveApiError } from '../../lib/api'
 import { ErrorCode } from '../../errors/errorCodes'
-import Dropdown from '../../components/Dropdown'
 import { Toast } from '../../components/ui/Toast'
 import './TeachersEmpty.css'
 
@@ -250,18 +249,14 @@ export default function TeachersEmpty({ onUploaded, teacherCount, onShowList }) 
   const selfUserId = useProfileStore(s => s.user_id)
   const uploadAndRefresh = useTeachersStore(s => s.uploadAndRefresh)
   const futureSession = useSessionsStore(s => s.sessions.find(sess => sess.is_future))
-  const currentSession = useSessionsStore(s => s.sessions.find(sess => sess.is_current))
   // 'current' | 'future' — this screen only ever uploads into one of those
   // two, never a past session. The shared site-wide selection can be a
   // past session (browsed read-only elsewhere), which this screen has no
   // use for — clamped to 'current' here, same pattern as StudentsEmpty.
+  // Switching between current/future happens via the left panel's own
+  // session picker (which this derives from) — no local control for it here.
   const activeSession = useSessionsStore(getActiveSession)
   const uploadTarget = activeSession?.is_future ? 'future' : 'current'
-  const setActiveSessionId = useSessionsStore(s => s.setActiveSessionId)
-  function setUploadTarget(target) {
-    const session = target === 'future' ? futureSession : currentSession
-    if (session) setActiveSessionId(session.session_id)
-  }
   // teachers[].length, not the raw prop — the prop is always the current
   // session's count (see TeachersPage.jsx); this screen needs whichever
   // target is actually being viewed, same reasoning as StudentsEmpty's
@@ -356,18 +351,13 @@ export default function TeachersEmpty({ onUploaded, teacherCount, onShowList }) 
       <Toast message={uploadError} onDismiss={() => setUploadError('')} />
 
       <div className="teachers-empty-header">
-        <p className="teachers-empty-label">Upload teachers xlsx in the format below:</p>
-        {futureSession && (
-          <Dropdown
-            className="teachers-empty-session-dropdown"
-            value={uploadTarget}
-            onChange={setUploadTarget}
-            options={[
-              { key: 'current', label: currentSession ? `Current — ${currentSession.label}` : 'Current session' },
-              { key: 'future', label: `New session — starts ${futureSession.label}` },
-            ]}
-          />
-        )}
+        <p className="teachers-empty-label">
+          {uploadTarget === 'future' ? (
+            <>Upload teachers xlsx for <span className="teachers-empty-label-highlight">new session</span> in the format below:</>
+          ) : (
+            'Upload teachers xlsx in the format below:'
+          )}
+        </p>
         {teacherCount > 0 && (
           <button className="teachers-empty-list-btn" onClick={onShowList}>
             Teachers {teacherCount}

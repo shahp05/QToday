@@ -29,14 +29,8 @@
   margin: 0;
 }
 
-.teachers-empty-session-dropdown {
-  width: 210px;
-  flex-shrink: 0;
-}
-
-.teachers-empty-session-dropdown .dropdown-trigger {
-  height: 34px;
-  box-sizing: border-box;
+.teachers-empty-label-highlight {
+  color: var(--color-green-light, #8EEB65);
 }
 
 .teachers-empty-list-btn {
