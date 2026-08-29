@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useStudentSubjectsStore } from '../../store/studentSubjectsStore'
+import { useStudentSubjectsStore, studentSubjectsCacheKey } from '../../store/studentSubjectsStore'
 import { useStudentDetailProgressStore } from '../../store/studentDetailProgressStore'
+import { useSessionsStore } from '../../store/sessionsStore'
 import SubjectTopicGrid, { SubjectFilterBar } from '../subjects/SubjectTopicGrid'
 import StudentQuizProgress from '../subjects/StudentQuizProgress'
 import PageHeader from '../../components/PageHeader'
@@ -50,17 +51,31 @@ function IconTopics() {
 // own view, per spec; only Challenge Quiz Score stays student-only (see
 // StudentQuizQaItem's readOnly gate, keyed off studentId being passed).
 export default function StudentSubjectDetail({ student, initialSubjectId, onBack }) {
+  // The session being browsed (site-wide picker) — this student's
+  // subjects/topics tree differs per session (retention range, what was
+  // taught when), unlike quiz progress/history below, which is inherently
+  // cross-session and always fetched the same way regardless.
+  const activeSessionId = useSessionsStore(s => s.activeSessionId)
   const progressEntry = useStudentDetailProgressStore(s => s.byStudent[student.student_id])
   const ensureProgressLoaded = useStudentDetailProgressStore(s => s.ensureLoaded)
   const dismissProgressError = useStudentDetailProgressStore(s => s.dismissError)
-  const subjectsEntry = useStudentSubjectsStore(s => s.byStudent[student.student_id])
+  const subjectsKey = studentSubjectsCacheKey(student.student_id, activeSessionId)
+  const subjectsEntry = useStudentSubjectsStore(s => s.byStudent[subjectsKey])
   const ensureSubjectsLoaded = useStudentSubjectsStore(s => s.ensureLoaded)
   const dismissSubjectsError = useStudentSubjectsStore(s => s.dismissError)
-  const [selectedSubjectId, setSelectedSubjectId] = useState(initialSubjectId ?? null)
+  // initialSubjectId arrives as a URL search-param string (see
+  // StudentDetailRoute); subject_id from the API is a number, so the
+  // straight comparison against it below (activeSubjectId) would always
+  // miss without this.
+  const [selectedSubjectId, setSelectedSubjectId] = useState(
+    initialSubjectId != null ? Number(initialSubjectId) : null
+  )
   const [view, setView] = usePageView('topics') // 'topics' | 'progress' — coexists with ?subject=
 
   useEffect(() => { ensureProgressLoaded(student.student_id) }, [student.student_id, ensureProgressLoaded])
-  useEffect(() => { ensureSubjectsLoaded(student.student_id) }, [student.student_id, ensureSubjectsLoaded])
+  useEffect(() => {
+    ensureSubjectsLoaded(student.student_id, activeSessionId)
+  }, [student.student_id, activeSessionId, ensureSubjectsLoaded])
 
   const progressStatus = progressEntry?.status ?? 'loading'
   const progressError = progressEntry?.error ?? ''
@@ -79,7 +94,7 @@ export default function StudentSubjectDetail({ student, initialSubjectId, onBack
     : subjectsStatus === 'loading' || progressStatus === 'loading' ? 'loading'
     : 'loaded'
   const error = progressStatus === 'error' ? progressError : subjectsError
-  const dismissError = () => { dismissProgressError(student.student_id); dismissSubjectsError(student.student_id) }
+  const dismissError = () => { dismissProgressError(student.student_id); dismissSubjectsError(student.student_id, activeSessionId) }
 
   const activeSubjectId = subjectsForGrade.some(s => s.subject_id === selectedSubjectId)
     ? selectedSubjectId

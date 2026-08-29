@@ -196,7 +196,8 @@ def _learner_subjects_taught(
     log_rows = db.execute(
         text(f"""
             SELECT tl.subject_id, s.subject_name, s.icon_key, tl.topic_id, t.topic_name,
-                   MAX(tl.date_created)::date AS log_date
+                   MAX(tl.date_created)::date AS log_date,
+                   MIN(tl.date_created)::date AS first_taught_date
             FROM teach_logs tl
             JOIN grades g_taught ON g_taught.grade_id = tl.grade_id
             JOIN grades g_to ON g_to.grade_id = tl.grade_to_id
@@ -263,7 +264,14 @@ def _learner_subjects_taught(
                 "grade_id": grade_id,
                 "grade_name": grade_name,
                 "sections": [],
-                "logs": [],
+                # A single synthetic entry for the earliest date this topic
+                # was taught (across every grade in its retention range
+                # reaching this learner) — not the full per-date log this
+                # staff caller's own tree carries (see the general branch
+                # below), just enough for StudentProgressChart to anchor its
+                # line at the taught date instead of only the first quiz
+                # attempt's date.
+                "logs": [{"date": log["first_taught_date"].isoformat(), "section": None}],
                 "qa_count": qa_count_by_topic.get(log["topic_id"], 0),
                 "qa_items": most_recent_qa_items if log["topic_id"] == most_recent_topic_id else None,
             }],

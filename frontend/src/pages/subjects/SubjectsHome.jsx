@@ -11,15 +11,24 @@ function initialCalendarMonth() {
   return d
 }
 
-export default function SubjectsHome({ defaultView, isViewingPastSession = false }) {
+export default function SubjectsHome({ defaultView, isViewingPastSession = false, initialSubjectId = null, initialGradeId = null }) {
   const navigate = useNavigate()
   // Past session (either role, not just admin) defaults to the Teach
   // Calendar Log's calendar tab too — per spec, a teacher browsing history
   // sees "Teach Calendar Log ... for the last session month," the same
-  // default an admin already got, just previously only wired for them.
-  const [view, setView] = usePageView(defaultView === 'teachLog' || isViewingPastSession ? 'log' : 'subjects')
+  // default an admin already got, just previously only wired for them. A
+  // deep-linked subject overrides both of those — it always lands on the
+  // subject/topic list (with that subject's QA already showing), never
+  // the calendar, regardless of role or session.
+  const [view, setView] = usePageView(
+    initialSubjectId != null ? 'subjects' : (defaultView === 'teachLog' || isViewingPastSession ? 'log' : 'subjects')
+  )
   const showCalendar = view === 'log'
-  const [showList, setShowList] = useState(defaultView === 'teachLog')
+  // A deep-linked subject (TeachersList's "click a subject chip" action)
+  // must land on the subject/topic list — same as defaultView === 'teachLog'
+  // forces for an admin — regardless of role, since a plain teacher would
+  // otherwise default to the empty "Add New Subject" form instead.
+  const [showList, setShowList] = useState(defaultView === 'teachLog' || initialSubjectId != null)
   const [logDate, setLogDate] = useState(null)
 
   // A sys admin may teach subjects too (e.g. a principal) — if nothing's
@@ -33,10 +42,13 @@ export default function SubjectsHome({ defaultView, isViewingPastSession = false
   // there's no flash between the two screens. Never applies while browsing
   // a past session — that form logs a NEW subject, a write action history
   // must never expose, regardless of how many (or few) were logged then.
+  // Also never applies to a deep-linked subject (initialSubjectId) — that
+  // subject is known to exist (it came from an actual teacher's roster of
+  // taught subjects), so there's nothing to correct here.
   const subjectsStatus = useSubjectsTaughtStore(s => s.status)
   const subjectsExist = useSubjectsTaughtStore(s => s.subjects.length > 0)
   const [didSyncEmptyDefault, setDidSyncEmptyDefault] = useState(false)
-  if (!didSyncEmptyDefault && defaultView === 'teachLog' && subjectsStatus === 'loaded') {
+  if (!didSyncEmptyDefault && defaultView === 'teachLog' && initialSubjectId == null && subjectsStatus === 'loaded') {
     setDidSyncEmptyDefault(true)
     if (!subjectsExist && !isViewingPastSession) setShowList(false)
   }
@@ -72,6 +84,8 @@ export default function SubjectsHome({ defaultView, isViewingPastSession = false
         onShowCalendarChange={next => setView(next ? 'log' : 'subjects')}
         calendarMonth={calendarMonth}
         onCalendarMonthChange={setCalendarMonth}
+        initialSubjectId={initialSubjectId}
+        initialGradeId={initialGradeId}
       />
     )
   }

@@ -56,6 +56,16 @@ export default function TeachersPage() {
   // history (see the permission matrix design).
   const isViewingPastSession = activeSession != null && !activeSession.is_current && !activeSession.is_future
 
+  // Opens the shared Subjects page with this subject (and, if known, this
+  // teacher's own first grade for it — see TeachersList) preselected.
+  // SubjectsRoute reads these query params and resolves them to a real
+  // topic/grade once the subjects-taught tree is loaded (see TeachLogList).
+  function openSubject(subjectId, gradeId) {
+    const params = new URLSearchParams({ subject: subjectId })
+    if (gradeId != null) params.set('grade', gradeId)
+    navigate(`/dashboard/subjects?${params.toString()}`)
+  }
+
   // Kept fetched here, not inside TeachersEmpty — TeachersEmpty doesn't
   // mount at all when the current roster is non-empty, so an eager fetch
   // there would miss that (common) path. fetchTeachers itself resolves
@@ -115,6 +125,7 @@ export default function TeachersPage() {
     <TeachersList
       onUploadNew={isViewingPastSession ? undefined : () => setShowUpload(true)}
       onBack={() => navigate(-1)}
+      onSubjectClick={openSubject}
     />
   )
 }

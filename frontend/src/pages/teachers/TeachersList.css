@@ -284,6 +284,19 @@
   padding: 3px 4px;
 }
 
+/* Clickable — opens the Subjects page with this subject/grade preselected.
+   Same hover/focus treatment as StudentsList's equivalent clickable chip. */
+.teachers-subject-chip--clickable {
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+}
+
+.teachers-subject-chip--clickable:hover,
+.teachers-subject-chip--clickable:focus-visible {
+  box-shadow: 0 0 0 1.5px var(--color-green-light, #8EEB65);
+  outline: none;
+}
+
 .teachers-subject-chip-name {
   font-size: var(--font-size-xs, 11px);
   font-weight: 600;

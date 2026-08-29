@@ -36,7 +36,7 @@ function mailtoHref(email) {
 // behind an extra info-icon click.
 const MAILTO_HINT = 'Opens your default email app. If nothing happens, set your email app as the default for mailto links in your browser settings.'
 
-export default function TeachersList({ onUploadNew, onBack }) {
+export default function TeachersList({ onUploadNew, onBack, onSubjectClick }) {
   const isAdmin = useProfileStore(s => s.is_school_admin)
   const myOrgId = useProfileStore(s => s.org_id)
   const activeKey = useSessionsStore(getActiveSessionKey)
@@ -142,16 +142,29 @@ export default function TeachersList({ onUploadNew, onBack }) {
                   </label>
                   {row.subjects?.length > 0 && (
                     <div className="teachers-row-subjects">
-                      {row.subjects.map(subject => (
-                        <span className="teachers-subject-chip" key={subject.subject_id}>
-                          <span className="teachers-subject-chip-name">{subject.subject_name}</span>
-                          <span className="teachers-subject-chip-grades">
-                            {subject.grades.map(g => (
-                              <span className="teachers-grade-count" key={g.grade_id}>{g.grade_name}</span>
-                            ))}
+                      {row.subjects.map(subject => {
+                        // The subject's own first grade for THIS teacher —
+                        // not "most recently taught school-wide" — is the
+                        // default landing grade, per spec.
+                        const firstGradeId = subject.grades[0]?.grade_id ?? null
+                        return (
+                          <span
+                            className="teachers-subject-chip teachers-subject-chip--clickable"
+                            key={subject.subject_id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => onSubjectClick?.(subject.subject_id, firstGradeId)}
+                            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSubjectClick?.(subject.subject_id, firstGradeId) } }}
+                          >
+                            <span className="teachers-subject-chip-name">{subject.subject_name}</span>
+                            <span className="teachers-subject-chip-grades">
+                              {subject.grades.map(g => (
+                                <span className="teachers-grade-count" key={g.grade_id}>{g.grade_name}</span>
+                              ))}
+                            </span>
                           </span>
-                        </span>
-                      ))}
+                        )
+                      })}
                     </div>
                   )}
                 </div>

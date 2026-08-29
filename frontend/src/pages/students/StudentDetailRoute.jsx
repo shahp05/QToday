@@ -1,6 +1,6 @@
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { useStudentsStore } from '../../store/studentsStore'
-import { CURRENT_SESSION_KEY } from '../../store/sessionsStore'
+import { getActiveSessionKey, useSessionsStore } from '../../store/sessionsStore'
 import PageHeader from '../../components/PageHeader'
 import PageLoading from '../../components/PageLoading'
 import { useStudentRow } from './useStudentRow'
@@ -15,7 +15,10 @@ export default function StudentDetailRoute() {
   const { studentId } = useParams()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const studentsStatus = useStudentsStore(s => s.bySession[CURRENT_SESSION_KEY]?.status ?? 'idle')
+  // Whichever session is actually browsed — see useStudentRow for why this
+  // can't be hard-coded to the live current session.
+  const activeKey = useSessionsStore(getActiveSessionKey)
+  const studentsStatus = useStudentsStore(s => s.bySession[activeKey]?.status ?? 'idle')
   const student = useStudentRow(studentId)
 
   if (!student) {

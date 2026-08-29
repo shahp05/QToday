@@ -80,6 +80,7 @@ export default function TeachLogList({
   selection, onSelectionChange,
   showCalendar, onShowCalendarChange,
   calendarMonth, onCalendarMonthChange,
+  initialSubjectId = null, initialGradeId = null, // deep link from TeachersList's "click a subject chip" action
 }) {
   // The exact session subjectsTaughtStore's tree was fetched for (see
   // Dashboard.jsx's fetchSubjectsTaught(activeSessionId, true)) — every
@@ -208,7 +209,32 @@ export default function TeachLogList({
     selection ? `${selection.subjectId}:${selection.topicId}:${selection.gradeId}` : null
   )
   const [userSelected, setUserSelected] = useState(Boolean(selection))
-  if (!userSelected && status === 'loaded' && mostRecentKey !== autoExpandedKey) {
+
+  // Deep-linked subject (TeachersList's "click a subject chip" action) —
+  // same derived-state-during-render pattern as the most-recent auto-expand
+  // below, but takes priority over it (guarded out of that block via
+  // initialSubjectId == null, so the two can never race on the same
+  // render). Resolves the requested subject/grade to a real topic once the
+  // tree is loaded, preferring a topic actually taught in the requested
+  // grade, falling back to the subject's first topic/grade otherwise (e.g.
+  // a stale deep link pointing at a grade no longer taught).
+  const [didApplyInitialSubject, setDidApplyInitialSubject] = useState(false)
+  if (!didApplyInitialSubject && initialSubjectId != null && status === 'loaded') {
+    setDidApplyInitialSubject(true)
+    const subject = subjects.find(s => s.subject_id === initialSubjectId)
+    const topic = subject?.topics.find(t => t.grades.some(g => g.grade_id === initialGradeId)) ?? subject?.topics[0]
+    const gradeId = topic?.grades.find(g => g.grade_id === initialGradeId)?.grade_id ?? topic?.grades[0]?.grade_id ?? null
+    if (subject && topic && gradeId != null) {
+      setUserSelected(true)
+      setExpandedSubjectId(subject.subject_id)
+      setSelectedTopicId(topic.topic_id)
+      setSelectedGradeId(gradeId)
+      ensureQaLoaded(topic.topic_id, gradeId, activeSessionId)
+      onSelectionChange?.({ subjectId: subject.subject_id, topicId: topic.topic_id, gradeId })
+    }
+  }
+
+  if (!userSelected && initialSubjectId == null && status === 'loaded' && mostRecentKey !== autoExpandedKey) {
     setAutoExpandedKey(mostRecentKey)
     if (mostRecent) {
       setExpandedSubjectId(mostRecent.subject_id)

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { CURRENT_SESSION_KEY, getActiveSession, useSessionsStore } from '../../store/sessionsStore'
 import { useProfileStore } from '../../store/profileStore'
 import { useParentWardStore } from '../../store/parentWardStore'
@@ -44,6 +44,12 @@ const PARENT_PAST_MESSAGE =
 // component only ever reads it.
 export default function SubjectsRoute() {
   const navigate = useNavigate()
+  // Deep-link from TeachersList's "click a subject chip" action — resolved
+  // to a real topic/grade inside TeachLogList once its tree is loaded (only
+  // meaningful for the teacher/admin teach-log view below).
+  const [searchParams] = useSearchParams()
+  const initialSubjectId = searchParams.has('subject') ? Number(searchParams.get('subject')) : null
+  const initialGradeId = searchParams.has('grade') ? Number(searchParams.get('grade')) : null
   const isStudent       = useProfileStore(s => s.is_student)
   const isParent        = useProfileStore(s => s.is_parent)
   const isSchoolAdmin   = useProfileStore(s => s.is_school_admin)
@@ -107,6 +113,8 @@ export default function SubjectsRoute() {
     <SubjectsHome
       defaultView={isSchoolAdmin ? 'teachLog' : undefined}
       isViewingPastSession={isViewingPastSession}
+      initialSubjectId={initialSubjectId}
+      initialGradeId={initialGradeId}
     />
   )
 }

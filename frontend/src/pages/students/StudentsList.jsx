@@ -179,13 +179,20 @@ export default function StudentsList({
 
   // Default to the first grade/section once data is available, and re-pick
   // if the previously selected grade disappears (e.g. after a re-upload).
-  // Done directly during render (not in an effect) since the guard clauses
-  // above already make repeated calls a no-op — a state adjustment, not a
-  // sync with an external system.
-  if (grades.length > 0 && !(selectedGrade != null && grades.some(g => g.gradeName === selectedGrade))) {
-    onSelectedGradeChange(grades[0].gradeName)
-    onSelectedSectionChange(grades[0].sections[0]?.section ?? null)
-  }
+  // Must be an effect, not a during-render adjustment — selectedGrade/
+  // onSelectedGradeChange live in studentsListFilterStore, owned by the
+  // parent (StudentsPage), not this component's own local state, so
+  // setting it synchronously during this component's render is exactly
+  // the "Cannot update a component while rendering a different component"
+  // case React warns about (the safe during-render adjustment pattern only
+  // applies to a component's own state).
+  useEffect(() => {
+    if (grades.length > 0 && !(selectedGrade != null && grades.some(g => g.gradeName === selectedGrade))) {
+      onSelectedGradeChange(grades[0].gradeName)
+      onSelectedSectionChange(grades[0].sections[0]?.section ?? null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grades, selectedGrade])
 
   const hasSections = grades.some(g => g.sections.some(s => s.section !== NO_SECTION))
   const currentGrade = grades.find(g => g.gradeName === selectedGrade)
