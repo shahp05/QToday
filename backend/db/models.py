@@ -152,10 +152,12 @@ class AcademicSession(Base):
 
 
 class User(Base):
-    """password_date_created == date_created means the password set at
-    account creation has never been changed (both default to NOW() in the
-    same INSERT, so Postgres resolves them to the same transaction
-    timestamp). A password-change flow must bump password_date_created.
+    """is_default_password is the authoritative "still on the
+    auto-generated password" flag: TRUE at account creation, and must be
+    set explicitly by any flow that touches password_hash — FALSE on a
+    user-chosen change, TRUE again when a reset restores the default
+    password. (password_date_created records when the password was last
+    set, independent of whether that value was the default.)
 
     email_id is unique only among parent accounts (see uidx_users_email_parent
     below) — a parent and an admin/teacher can share the same email address,
@@ -180,6 +182,7 @@ class User(Base):
     login_key:     Mapped[str]           = mapped_column(String(200), nullable=False, unique=True)
     password_hash: Mapped[str]           = mapped_column(String(255), nullable=False)
     password_date_created: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+    is_default_password: Mapped[bool]    = mapped_column(Boolean, nullable=False, server_default=expression.true())
     user_name:     Mapped[str]           = mapped_column(String(200), nullable=False)
     email_id:      Mapped[str | None]    = mapped_column(String(200))
     country_id:    Mapped[int | None]    = mapped_column(ForeignKey("countries.country_id"))

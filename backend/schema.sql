@@ -77,10 +77,14 @@ CREATE TABLE IF NOT EXISTS customers (
 -- ------------------------------------------------------------
 -- 5. USERS
 --
+--   is_default_password : the authoritative "still on the auto-generated
+--   password" flag — TRUE at account creation, and must be set explicitly
+--   by any flow that touches password_hash: FALSE on a user-chosen change,
+--   TRUE again when a reset restores the default password.
+--
 --   password_date_created : defaults to NOW() at signup, same INSERT as
---   date_created, so they share one transaction timestamp. Equal values
---   means the password has never been changed — any password-change flow
---   must bump this column independently of date_created/date_modified.
+--   date_created. Records when the password was last set, independent of
+--   whether that value is the default (see is_default_password above).
 --
 --   email_id is unique only among parent accounts (see uidx_users_email_parent
 --   below) — a parent and an admin/teacher can share the same email, since
@@ -100,6 +104,7 @@ CREATE TABLE IF NOT EXISTS users (
     login_key       VARCHAR(200)    NOT NULL UNIQUE,
     password_hash   VARCHAR(255)    NOT NULL,
     password_date_created TIMESTAMP NOT NULL DEFAULT NOW(),
+    is_default_password BOOLEAN     NOT NULL DEFAULT TRUE,
     user_name       VARCHAR(200)    NOT NULL,
     email_id        VARCHAR(200)    NULL,
     country_id      INTEGER         NULL REFERENCES countries(country_id),

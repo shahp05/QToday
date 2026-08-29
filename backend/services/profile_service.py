@@ -7,7 +7,7 @@ def get_profile(db: Session, user_id: int) -> dict | None:
         text(
             "SELECT u.user_id, u.customer_id, u.org_id, u.user_name, u.email_id, u.file_url AS photo_url, "
             "       u.is_student, u.is_parent, u.is_sysadm, u.is_adm, "
-            "       u.date_created, u.password_date_created, "
+            "       u.is_default_password, "
             "       c.customer_name, c.customer_acronym, "
             "       b.board_code, b.board_name, co.country_code, co.country_name "
             "FROM users u "
@@ -48,7 +48,7 @@ def get_profile(db: Session, user_id: int) -> dict | None:
         "board_name":          row.board_name,
         "country_code":        row.country_code,
         "country_name":        row.country_name,
-        "is_default_password": row.password_date_created == row.date_created,
+        "is_default_password": row.is_default_password,
     }
 
     if row.customer_id is not None:
