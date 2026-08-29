@@ -5,6 +5,7 @@ import { useDashboardQuoteStore } from '../store/dashboardQuoteStore'
 import { CURRENT_SESSION_KEY, getActiveSession, useSessionsStore } from '../store/sessionsStore'
 import { useStudentsStore } from '../store/studentsStore'
 import { useStudentGradesStore } from '../store/studentGradesStore'
+import { useSubjectsTaughtStore } from '../store/subjectsTaughtStore'
 import LoginQuote from '../components/LoginQuote'
 
 const LOGIN_QUOTE_DURATION_MS = 5000
@@ -47,6 +48,13 @@ export default function DashboardQuote() {
   // Parent only: how many wards (children) they have — same source LeftNav
   // reads for its own auto-select-first-ward behavior.
   const wardCount = useStudentsStore(s => s.bySession[CURRENT_SESSION_KEY]?.students?.length ?? 0)
+  // Student/parent only: whether the selected session actually has any
+  // subjects to show them — unlike teacher/admin, their Subjects page is
+  // purely informational/quiz-play, so per spec they stay on Quotes
+  // instead of auto-navigating to an empty page (current or past session).
+  const subjectsStatus = useSubjectsTaughtStore(s => s.status)
+  const subjectsCount = useSubjectsTaughtStore(s => s.subjects.length)
+  const hasSubjectsToShow = subjectsStatus === 'loaded' && subjectsCount > 0
 
   useEffect(() => {
     if (hasAutoAdvanced) return
@@ -79,19 +87,20 @@ export default function DashboardQuote() {
       }
 
       if (isStudent) {
-        // Same reasoning as the teacher branch — Subjects always has
-        // something to show now, empty-state message included.
-        navigate('/dashboard/subjects')
+        // Current or past session, doesn't matter here — either way, only
+        // navigate if there's actually something taught to show; otherwise
+        // stay on Quotes, per spec.
+        if (hasSubjectsToShow) navigate('/dashboard/subjects')
         return
       }
 
       if (isParent) {
-        // A single ward auto-navigates straight to Subjects — it always has
-        // something to show now (topics, or SubjectsRoute's own empty-state
-        // message for that ward); zero or multiple wards stays on Quotes —
-        // LeftNav's WardPicker is how a multi-ward parent actually picks
-        // one, not this timer.
-        if (wardCount === 1) navigate('/dashboard/subjects')
+        // A single ward auto-navigates to Subjects only if that ward
+        // actually has something to show (same rule as a student, above);
+        // zero or multiple wards, or a single ward with nothing to show,
+        // stays on Quotes — LeftNav's WardPicker is how a multi-ward
+        // parent actually picks one, not this timer.
+        if (wardCount === 1 && hasSubjectsToShow) navigate('/dashboard/subjects')
         return
       }
 
@@ -102,7 +111,7 @@ export default function DashboardQuote() {
     return () => clearTimeout(timer)
   }, [
     hasAutoAdvanced, isStudent, isSchoolTeacher, isSchoolAdmin, isParent, navigate, markAutoAdvanced,
-    isFutureSession, isPastSession, currentStudentCount, wardCount,
+    isFutureSession, isPastSession, currentStudentCount, wardCount, hasSubjectsToShow,
   ])
 
   return <LoginQuote />

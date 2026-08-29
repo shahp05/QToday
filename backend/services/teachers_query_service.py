@@ -108,27 +108,37 @@ def get_my_teachers(
         if student_id is None:
             return {"teachers": []}
         grade_id = _learner_grade_id(db, student_id=student_id, session_id=current_session_id)
-        if grade_id is None:
-            return {"teachers": []}
 
         session_sql = "tl.session_id IS NULL" if current_session_id is None else "tl.session_id = :sid"
-        params = {"cid": customer_id, "gid": grade_id}
+        params = {"cid": customer_id}
         if current_session_id is not None:
             params["sid"] = current_session_id
+
+        if grade_id is None:
+            # No resolvable grade for this student/session (e.g. their
+            # roster row is staged for a different session) — there's
+            # nothing to match a grade-taught teacher against, but every
+            # super-user is still a school-wide contact and must still show
+            # (see the docstring above) — never fall back to an empty list.
+            grade_clause = "u.is_sysadm = TRUE"
+        else:
+            params["gid"] = grade_id
+            grade_clause = f"""
+                u.is_sysadm = TRUE
+                OR EXISTS (
+                    SELECT 1 FROM teach_logs tl
+                    WHERE tl.customer_id = :cid AND tl.user_id = u.user_id AND tl.is_active = TRUE
+                      AND tl.grade_id = :gid AND {session_sql}
+                )
+            """
+
         rows = db.execute(
             text(f"""
                 SELECT DISTINCT {_TEACHER_COLUMNS}
                 FROM users u
                 WHERE u.customer_id = :cid AND (u.is_adm = TRUE OR u.is_sysadm = TRUE) AND u.is_active = TRUE
                   AND (u.start_date IS NULL OR u.start_date <= CURRENT_DATE)
-                  AND (
-                      u.is_sysadm = TRUE
-                      OR EXISTS (
-                          SELECT 1 FROM teach_logs tl
-                          WHERE tl.customer_id = :cid AND tl.user_id = u.user_id AND tl.is_active = TRUE
-                            AND tl.grade_id = :gid AND {session_sql}
-                      )
-                  )
+                  AND ({grade_clause})
                 ORDER BY name
             """),
             params,
@@ -169,16 +179,15 @@ def get_teachers_for_session(
     so "super-user" here means "is one right now," not "was one back then."
     Also attaches each teacher's subjects/grades for this session — see
     _attach_subjects_taught."""
+    is_learner = is_student or is_parent
     grade_id = None
-    if is_student or is_parent:
+    if is_learner:
         student_id = ward_student_id if is_parent else _resolve_own_student_id(db, user_id)
         if student_id is None:
             return {"teachers": []}
         grade_id = _learner_grade_id(db, student_id=student_id, session_id=session_id)
-        if grade_id is None:
-            return {"teachers": []}
 
-    if grade_id is not None:
+    if is_learner and grade_id is not None:
         rows = db.execute(
             text(f"""
                 SELECT * FROM (
@@ -194,6 +203,20 @@ def get_teachers_for_session(
                 ORDER BY name
             """),
             {"cid": customer_id, "sid": session_id, "gid": grade_id},
+        ).fetchall()
+    elif is_learner:
+        # No resolvable grade for this student/session (e.g. their roster
+        # row is staged for a different session) — there's nothing to
+        # match a grade-taught teacher against, but every super-user is
+        # still a school-wide contact and must still show (see the
+        # docstring above) — never fall back to an empty list.
+        rows = db.execute(
+            text(
+                f"SELECT {_TEACHER_COLUMNS} "
+                "FROM users u WHERE u.customer_id = :cid AND u.is_sysadm = TRUE AND u.is_active = TRUE "
+                "ORDER BY name"
+            ),
+            {"cid": customer_id},
         ).fetchall()
     else:
         rows = db.execute(

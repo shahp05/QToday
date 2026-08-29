@@ -260,6 +260,9 @@
 }
 
 /* ─── Toast shown when an on-demand QA fetch fails ───────────────────────── */
+/* Light surface (not the app's dark chrome) so it stands out against the
+   dark page background it floats over — see the "reusable white content
+   card" pattern in Dashboard.css, and Toast.css's shared toast. */
 .teach-log-toast {
   position: fixed;
   right: 24px;
@@ -270,17 +273,17 @@
   gap: 10px;
   max-width: 380px;
   padding: 10px 12px;
-  background: #1f1f1f;
-  border: 1px solid rgba(255,255,255,0.14);
+  background: var(--color-surface);
+  border-left: 3px solid var(--color-red);
   border-radius: var(--radius-sm, 6px);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.35);
-  color: rgba(255,255,255,0.5);
+  box-shadow: var(--shadow-lg);
+  color: var(--color-text-muted);
 }
 
 .teach-log-toast-message {
   flex: 1;
   font-size: var(--font-size-sm, 13px);
-  color: rgba(255,255,255,0.85);
+  color: var(--color-text);
 }
 
 .teach-log-toast-retry {
@@ -290,7 +293,7 @@
   padding: 4px 6px;
   font-size: var(--font-size-sm, 13px);
   font-weight: 500;
-  color: var(--color-green-light, #8EEB65);
+  color: var(--color-green-dark, #0F8911);
   cursor: pointer;
 }
 
@@ -300,10 +303,10 @@
   border: none;
   background: none;
   padding: 2px;
-  color: rgba(255,255,255,0.4);
+  color: var(--color-text-muted);
   cursor: pointer;
 }
 
 .teach-log-toast-close:hover {
-  color: var(--color-white);
+  color: var(--color-text);
 }

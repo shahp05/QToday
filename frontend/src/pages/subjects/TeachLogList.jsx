@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSubjectsTaughtStore } from '../../store/subjectsTaughtStore'
+import { useSessionsStore } from '../../store/sessionsStore'
 import QaCard from './QaCard'
 import { getSubjectIcon } from './subjectIconMatch'
 import TeachLogCalendar from './TeachLogCalendar'
@@ -80,6 +81,13 @@ export default function TeachLogList({
   showCalendar, onShowCalendarChange,
   calendarMonth, onCalendarMonthChange,
 }) {
+  // The exact session subjectsTaughtStore's tree was fetched for (see
+  // Dashboard.jsx's fetchSubjectsTaught(activeSessionId, true)) — every
+  // on-demand ensureQaLoaded() call below must pass this same id, or it
+  // silently falls back to the LIVE current session server-side and fails
+  // to find a topic/grade that only exists in whatever past session is
+  // actually being browsed.
+  const activeSessionId = useSessionsStore(s => s.activeSessionId)
   const subjects = useSubjectsTaughtStore(s => s.subjects)
   const mostRecent = useSubjectsTaughtStore(s => s.mostRecent)
   const status = useSubjectsTaughtStore(s => s.status)
@@ -100,7 +108,8 @@ export default function TeachLogList({
   const [displayedTopicId, setDisplayedTopicId] = useState(selection?.topicId ?? null)
   const [displayedGradeId, setDisplayedGradeId] = useState(selection?.gradeId ?? null)
   // { key, topicId, gradeId, topicName, message } | null — set once when a
-  // fetch fails, cleared on dismiss/retry/auto-timeout.
+  // fetch fails, cleared only on explicit dismiss or retry — stays up
+  // until the user acts on it, never auto-dismisses.
   const [toast, setToast] = useState(null)
   const qaScrollRef = useRef(null)
 
@@ -143,14 +152,6 @@ export default function TeachLogList({
     }
   }
 
-  // Auto-dismiss the toast so a failure notice doesn't linger indefinitely
-  // if the user ignores it.
-  useEffect(() => {
-    if (!toast) return
-    const timer = setTimeout(() => setToast(null), 6000)
-    return () => clearTimeout(timer)
-  }, [toast])
-
   function retryToast() {
     if (!toast) return
     const { topicId, gradeId } = toast
@@ -159,7 +160,7 @@ export default function TeachLogList({
     setSelectedGradeId(gradeId)
     const subj = subjects.find(s => s.topics.some(t => t.topic_id === topicId))
     if (subj) setExpandedSubjectId(subj.subject_id)
-    ensureQaLoaded(topicId, gradeId)
+    ensureQaLoaded(topicId, gradeId, activeSessionId)
   }
 
   // Switching to a topic/grade whose QA is actually displayed shows an
@@ -176,7 +177,7 @@ export default function TeachLogList({
   // loaded, same as any other topic/grade the user might click into.
   useEffect(() => {
     if (selection?.topicId != null && selection?.gradeId != null) {
-      ensureQaLoaded(selection.topicId, selection.gradeId)
+      ensureQaLoaded(selection.topicId, selection.gradeId, activeSessionId)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -232,7 +233,7 @@ export default function TeachLogList({
       if (topicId != null && gradeId != null) {
         setSelectedTopicId(topicId)
         setSelectedGradeId(gradeId)
-        ensureQaLoaded(topicId, gradeId)
+        ensureQaLoaded(topicId, gradeId, activeSessionId)
         onSelectionChange?.({ subjectId, topicId, gradeId })
       } else {
         setSelectedTopicId(null)
@@ -248,14 +249,14 @@ export default function TeachLogList({
     setSelectedTopicId(topic.topic_id)
     const gradeId = topic.grades[0]?.grade_id ?? null
     setSelectedGradeId(gradeId)
-    if (gradeId != null) ensureQaLoaded(topic.topic_id, gradeId)
+    if (gradeId != null) ensureQaLoaded(topic.topic_id, gradeId, activeSessionId)
     onSelectionChange?.({ subjectId, topicId: topic.topic_id, gradeId })
   }
 
   function selectGrade(topicId, gradeId) {
     setUserSelected(true)
     setSelectedGradeId(gradeId)
-    ensureQaLoaded(topicId, gradeId)
+    ensureQaLoaded(topicId, gradeId, activeSessionId)
     onSelectionChange?.({ subjectId: expandedSubjectId, topicId, gradeId })
   }
 

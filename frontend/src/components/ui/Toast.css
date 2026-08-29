@@ -3,8 +3,11 @@
   bottom: 24px;
   right: 24px;
   transform: translateY(20px);
-  background: #1a1a1a;
-  color: #fff;
+  /* Light surface (not the app's dark chrome) so it stands out against the
+     dark page background it floats over — see the "reusable white content
+     card" pattern in Dashboard.css. */
+  background: var(--color-surface);
+  color: var(--color-text);
   padding: 12px 16px 12px 20px;
   border-radius: 10px;
   display: flex;
@@ -12,7 +15,7 @@
   gap: 12px;
   font-family: var(--font-family);
   font-size: var(--font-size-sm);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  box-shadow: var(--shadow-lg);
   z-index: 1000;
   width: min(360px, calc(100vw - 32px));
   opacity: 0;
@@ -34,7 +37,7 @@
 .ui-toast__close {
   background: none;
   border: none;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--color-text-muted);
   font-size: 14px;
   cursor: pointer;
   padding: 2px 4px;
@@ -44,7 +47,7 @@
 }
 
 .ui-toast__close:hover {
-  color: #fff;
+  color: var(--color-text);
 }
 
 /* Error variant — left accent */
