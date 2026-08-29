@@ -91,11 +91,47 @@
   to { transform: rotate(360deg); }
 }
 
-.leftnav-item-ward-photo {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  object-fit: cover;
+/* A parent's ward picker — the sole "Students" nav slot for them, in place
+   of a button (there's no single-ward page to link to). Same trigger/list
+   format as .leftnav-session-dropdown below, just without its "Session"
+   label above (nothing to caption it with here), borderless, and with
+   dark instead of light trigger text: this sits near the top of the rail,
+   over the gradient's light-green end, where .leftnav-item's own text is
+   dark for the same reason. */
+.leftnav-ward-dropdown {
+  width: 100%;
+}
+
+.leftnav-ward-dropdown .dropdown-trigger {
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  background: rgba(0,0,0,0.08);
+  color: rgba(0,0,0,0.70);
+}
+
+.leftnav-ward-dropdown .dropdown-trigger:hover,
+.leftnav-ward-dropdown .dropdown-trigger--open {
+  background: rgba(0,0,0,0.15);
+  color: rgba(0,0,0,0.90);
+}
+
+.leftnav-ward-dropdown .dropdown-trigger-placeholder {
+  color: rgba(0,0,0,0.70);
+}
+
+.leftnav-ward-dropdown .dropdown-trigger-value {
+  font-size: 10px;
+  font-weight: var(--font-weight-medium);
+}
+
+.leftnav-ward-dropdown .dropdown-caret {
+  width: 11px;
+  height: 11px;
+}
+
+.leftnav-ward-dropdown .dropdown-option {
+  font-size: 11px;
 }
 
 .leftnav-item-label {

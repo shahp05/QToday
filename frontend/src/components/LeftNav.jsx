@@ -12,7 +12,6 @@ import { useSubjectsFeatureVisible } from '../hooks/useSubjectsFeatureVisible'
 import { useStudentsFeatureVisible } from '../hooks/useStudentsFeatureVisible'
 import Dropdown from './Dropdown'
 import ScheduleSessionDialog from './ScheduleSessionDialog'
-import WardPickerDialog from './WardPickerDialog'
 import logo from '../assets/logo_48.webp'
 import './LeftNav.css'
 
@@ -67,15 +66,15 @@ function IconLogout() {
 const EMPTY_ARRAY = []
 
 const NAV_ITEMS = [
-  // A parent's Subjects view lives under the repurposed "Students" button
-  // instead (see the parent ward button below) — the site subjects nav
-  // item itself (teach-log browsing) has no meaning for them.
-  { id: 'subjects',  label: 'Subjects',  Icon: IconSubjects, visible: p => !p.is_parent },
+  // A parent reaches the same Subjects page as everyone else (read-only,
+  // scoped to whichever ward is selected — see SubjectsRoute.jsx) via this
+  // same icon now, same as any other role.
+  { id: 'subjects',  label: 'Subjects',  Icon: IconSubjects },
   // Only the customer's sys admin (uploads/manages the roster) and its
   // teachers (view it) have any use for the roster page itself — a student
-  // only has their own row. A parent gets this same button repurposed as
-  // their selected ward's photo/name (see the render loop below) rather
-  // than the roster page, so it's visible to them too.
+  // only has their own row. A parent gets this same slot repurposed as a
+  // ward dropdown (see the render loop below) rather than the roster page,
+  // so it's visible to them too.
   { id: 'students',  label: 'Students',  Icon: IconStudents, visible: p => p.is_school_admin || p.is_school_teacher || p.is_parent },
   { id: 'teachers',  label: 'Teachers',  Icon: IconTeachers },
   { id: 'account',   label: 'Account',   Icon: IconAccount  },
@@ -132,9 +131,10 @@ export default function LeftNav() {
 
   // A parent has no customer_id of their own — "which session"/"which
   // school" is meaningless until a ward (child) is selected, since each can
-  // be at a different school. A single ward auto-selects silently; more than
-  // one opens a picker popup from the repurposed "Students" button (see the
-  // render loop and WardPickerDialog below) instead of navigating anywhere.
+  // be at a different school. A single ward auto-selects silently; the
+  // repurposed "Students" nav slot is the dropdown itself (see the render
+  // loop below) regardless of ward count, so a lone ward still shows up
+  // there, just with nothing else to pick.
   const isParent = profile.is_parent
   const wards = useStudentsStore(s => s.bySession[CURRENT_SESSION_KEY]?.students ?? EMPTY_ARRAY)
   const selectedWardId = useParentWardStore(s => s.selectedStudentId)
@@ -144,7 +144,6 @@ export default function LeftNav() {
   const fetchTeachersForWard = useTeachersStore(s => s.fetchTeachers)
   const clearSubjectsCache = useSubjectsTaughtStore(s => s.clearSubjectsTaught)
   const fetchSubjectsForWard = useSubjectsTaughtStore(s => s.fetchSubjectsTaught)
-  const [showWardPicker, setShowWardPicker] = useState(false)
 
   // Done directly during render (not an effect) — a one-time derived-state
   // adjustment, same pattern used elsewhere in this codebase (e.g.
@@ -203,16 +202,18 @@ export default function LeftNav() {
   }
 
   function handleNav(id) {
-    // The "Students" button is repurposed for a parent into a ward
-    // display/switcher, not a link to the (admin-only) roster page — it
-    // opens the picker when there's an actual choice, otherwise does
-    // nothing (a single ward has nothing to switch to).
-    if (isParent && id === 'students') {
-      if (wards.length > 1) setShowWardPicker(true)
-      return
-    }
     if (isActive(id)) return
     navigate(`/dashboard/${id}`)
+  }
+
+  // The ward dropdown's onChange (a parent's sole "Students" nav slot,
+  // replacing that button entirely) — just switches which ward is
+  // selected. No navigation: every ward-scoped page (Subjects, Teachers)
+  // already re-fetches for the new selectedWardId on its own (see the
+  // effect above and each page's own studentId-keyed fetches), so
+  // whatever the parent is currently looking at updates in place.
+  function handleWardSelect(wardId) {
+    setSelectedWardId(wardId)
   }
 
   function handleLogout() {
@@ -239,35 +240,49 @@ export default function LeftNav() {
         {NAV_ITEMS.filter(item =>
           (!item.visible || item.visible(profile)) &&
           (item.id !== 'subjects' || subjectsFeatureVisible) &&
-          // A parent's "Students" is the unrelated ward-switcher (see
-          // isWardButton below) — never gated by studentsFeatureVisible,
+          // A parent's "Students" is the unrelated ward dropdown (see
+          // isWardSlot below) — never gated by studentsFeatureVisible,
           // which only decides the admin/teacher roster page's visibility.
           (item.id !== 'students' || profile.is_parent || studentsFeatureVisible)
           // Teachers has no visibility gate at all — per spec, this page
           // can never be empty (at least one super-admin always exists),
           // so it's unconditionally reachable for every role.
-        ).map(({ id, label, Icon }) => {
-          // A parent's "Students" button shows the selected ward's own
-          // photo/name instead of the generic icon/label — same button,
-          // same size, just standing in for a page this role doesn't have.
-          const isWardButton = isParent && id === 'students'
-          const buttonLabel = isWardButton ? (selectedWard?.name || label) : label
+        // NAV_ITEMS' own order (Subjects, then Students) is right for every
+        // other role, but a parent needs the ward dropdown to lead — it's
+        // what every other item below it (Subjects, Teachers) is scoped
+        // to — so it's the one case that gets reordered to the front here.
+        ).sort((a, b) => {
+          if (!isParent) return 0
+          if (a.id === 'students') return -1
+          if (b.id === 'students') return 1
+          return 0
+        }).map(({ id, label, Icon }) => {
+          // A parent's "Students" slot is the ward dropdown itself, not a
+          // button — there's no single-ward page to link to, just a
+          // selection to make (see isWardSlot below).
+          const isWardSlot = isParent && id === 'students'
+          if (isWardSlot) {
+            return (
+              <Dropdown
+                key={id}
+                className="leftnav-ward-dropdown"
+                value={selectedWardId}
+                placeholder=""
+                onChange={handleWardSelect}
+                options={wards.map(ward => ({ key: ward.student_id, label: ward.name }))}
+              />
+            )
+          }
           return (
             <button
               key={id}
               className={`leftnav-item ${isActive(id) ? 'leftnav-item--active' : ''}`}
               onClick={() => handleNav(id)}
-              aria-label={buttonLabel}
+              aria-label={label}
               aria-current={isActive(id) ? 'page' : undefined}
             >
-              {isWardButton ? (
-                selectedWard?.photo_url
-                  ? <img src={selectedWard.photo_url} alt="" className="leftnav-item-ward-photo" />
-                  : <IconStudents />
-              ) : (
-                isLoadingById[id] ? <IconSpinner /> : <Icon />
-              )}
-              <span className="leftnav-item-label">{buttonLabel}</span>
+              {isLoadingById[id] ? <IconSpinner /> : <Icon />}
+              <span className="leftnav-item-label">{label}</span>
             </button>
           )
         })}
@@ -345,16 +360,6 @@ export default function LeftNav() {
           navigate('/dashboard/students')
         }}
       />
-
-      {isParent && (
-        <WardPickerDialog
-          open={showWardPicker}
-          wards={wards}
-          selectedWardId={selectedWardId}
-          onSelect={setSelectedWardId}
-          onClose={() => setShowWardPicker(false)}
-        />
-      )}
 
       <button
         className="leftnav-item leftnav-item--logout"

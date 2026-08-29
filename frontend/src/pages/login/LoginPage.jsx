@@ -4,6 +4,8 @@ import { apiFetch } from '../../lib/api'
 import { useProfileStore } from '../../store/profileStore'
 import { useDashboardQuoteStore } from '../../store/dashboardQuoteStore'
 import { resetUserScopedStores } from '../../store/resetUserScopedStores'
+import { fetchMyStudents } from '../../services/studentsService'
+import { Toast } from '../../components/ui/Toast'
 import logo512 from '../../assets/logo_512.webp'
 import './LoginPage.css'
 
@@ -30,10 +32,12 @@ export default function LoginPage() {
   const [isShaking, setShaking]       = useState(false)
   const [loginKeyError, setLoginKeyError] = useState(false)
   const [passwordError, setPasswordError] = useState(false)
+  const [toast, setToast]             = useState('')
   const firstRef                      = useRef(null)
   const shakeTimer                    = useRef(null)
   const navigate                      = useNavigate()
   const setProfile                    = useProfileStore(s => s.setProfile)
+  const clearProfile                  = useProfileStore(s => s.clearProfile)
   const resetQuoteAutoAdvance         = useDashboardQuoteStore(s => s.reset)
 
   useEffect(() => {
@@ -59,6 +63,7 @@ export default function LoginPage() {
       return
     }
     setBusy(true)
+    setToast('')
     try {
       const res = await apiFetch('/auth/login', {
         method: 'POST',
@@ -78,9 +83,23 @@ export default function LoginPage() {
       // a genuinely clean slate, not a stale activeSessionId.
       resetUserScopedStores()
       setProfile(j.profile, j.access_token)
+      // A parent with no linked wards has nothing this app can show them
+      // (every parent-facing page is ward-scoped) — checked here, before
+      // ever landing on /dashboard, rather than leaving it to whichever
+      // page happens to notice the empty roster first.
+      if (j.profile.is_parent) {
+        const { students } = await fetchMyStudents()
+        if (students.length === 0) {
+          clearProfile()
+          setToast('No student wards found')
+          shake(true)
+          return
+        }
+      }
       resetQuoteAutoAdvance()
       navigate('/dashboard')
     } catch {
+      clearProfile()
       shake(true)
     } finally {
       setBusy(false)
@@ -135,6 +154,8 @@ export default function LoginPage() {
           New here?{' '}
           <button className="btn btn-link" onClick={() => navigate('/signup')}>Create an account</button>
         </p>
+
+        <Toast message={toast} onDismiss={() => setToast('')} />
       </div>
 
       <div className="su-bg-decoration" aria-hidden="true">
