@@ -100,6 +100,10 @@
    dark for the same reason. */
 .leftnav-ward-dropdown {
   width: 100%;
+  /* Same gap below it as .leftnav's own logo→nav gap above it (--pg-gap),
+     so it reads as its own block leading the rail rather than one more
+     item in .leftnav-items' tighter 2px row-to-row spacing. */
+  margin-bottom: var(--pg-gap);
 }
 
 .leftnav-ward-dropdown .dropdown-trigger {
