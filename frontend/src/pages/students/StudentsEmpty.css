@@ -29,6 +29,10 @@
   margin: 0;
 }
 
+.students-empty-label-highlight {
+  color: var(--color-green-light, #8EEB65);
+}
+
 .students-empty-list-btn {
   flex-shrink: 0;
   border: 1px solid var(--color-green-light, #8EEB65);
@@ -47,16 +51,6 @@
 .students-empty-list-btn:focus-visible {
   background: none;
   color: var(--color-white, #ffffff);
-}
-
-.students-empty-session-dropdown {
-  width: 210px;
-  flex-shrink: 0;
-}
-
-.students-empty-session-dropdown .dropdown-trigger {
-  height: 34px;
-  box-sizing: border-box;
 }
 
 /* ─── Format table (header + sample row) ─────────────────────────────────── */

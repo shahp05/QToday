@@ -6,7 +6,6 @@ import { useStudentGradesStore } from '../../store/studentGradesStore'
 import { CURRENT_SESSION_KEY, getActiveSession, useSessionsStore } from '../../store/sessionsStore'
 import { resolveApiError } from '../../lib/api'
 import { ErrorCode } from '../../errors/errorCodes'
-import Dropdown from '../../components/Dropdown'
 import { Toast } from '../../components/ui/Toast'
 import './StudentsEmpty.css'
 
@@ -236,19 +235,15 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
   const acronym = useProfileStore(s => s.customer_acronym)
   const uploadAndRefresh = useStudentsStore(s => s.uploadAndRefresh)
   const futureSession = useSessionsStore(s => s.sessions.find(sess => sess.is_future))
-  const currentSession = useSessionsStore(s => s.sessions.find(sess => sess.is_current))
   // 'current' | 'future' — this screen only ever uploads into one of those
   // two, never a past session (uploading must never target history). The
   // shared site-wide selection can be a past session (browsed read-only
   // elsewhere), which this screen has no use for — clamped to 'current'
-  // here so its own dropdown/upload target never lands on it.
+  // here so its own upload target never lands on it. Switching between
+  // current/future happens via the left panel's own session picker (which
+  // this derives from) — no local control for it here anymore.
   const activeSession = useSessionsStore(getActiveSession)
   const uploadTarget = activeSession?.is_future ? 'future' : 'current'
-  const setActiveSessionId = useSessionsStore(s => s.setActiveSessionId)
-  function setUploadTarget(target) {
-    const session = target === 'future' ? futureSession : currentSession
-    if (session) setActiveSessionId(session.session_id)
-  }
   // studentGrades.length, not students.length — the latter is every active
   // account at the school regardless of session (see StudentsPage.jsx's
   // studentCount comment); studentGrades is the future session's actual
@@ -348,18 +343,13 @@ export default function StudentsEmpty({ onUploaded, studentCount, onShowList }) 
       <Toast message={uploadError} onDismiss={() => setUploadError('')} />
 
       <div className="students-empty-header">
-        <p className="students-empty-label">Upload students xlsx in the format below:</p>
-        {futureSession && (
-          <Dropdown
-            className="students-empty-session-dropdown"
-            value={uploadTarget}
-            onChange={setUploadTarget}
-            options={[
-              { key: 'current', label: currentSession ? `Current — ${currentSession.label}` : 'Current session' },
-              { key: 'future', label: `New session — starts ${futureSession.label}` },
-            ]}
-          />
-        )}
+        <p className="students-empty-label">
+          {uploadTarget === 'future' ? (
+            <>Upload students xlsx for <span className="students-empty-label-highlight">new session</span> in the format below:</>
+          ) : (
+            'Upload students xlsx in the format below:'
+          )}
+        </p>
         {viewedCount > 0 && (
           <button className="students-empty-list-btn" onClick={onShowList}>
             Students {viewedCount}
