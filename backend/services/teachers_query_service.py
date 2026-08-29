@@ -166,17 +166,27 @@ def get_teachers_for_session(
     db: Session, customer_id: int, session_id: int, *,
     is_student: bool = False, is_parent: bool = False, ward_student_id: int | None = None, user_id: int | None = None,
 ) -> dict:
-    """Teachers who logged at least one subject in this (past, or future for
-    a school admin) session, derived from teach_logs rather than the current
-    live roster. Unlike get_my_teachers, this correctly includes someone who
-    has since left (deactivated) and excludes someone who joined afterward —
-    teachers themselves carry no session_id (only teach_logs rows do), so
-    "who taught in session X" can only ever be answered from the log, not
-    from who's an active account today. A student/parent caller is scoped
-    to teachers who taught their (or their ward's) grade AS OF THAT SESSION
-    (see _learner_grade_id), plus every current super-user regardless of
-    grade — is_sysadm is a live/current-only attribute (see TeachersList.jsx),
-    so "super-user" here means "is one right now," not "was one back then."
+    """Teachers are never session-tagged themselves (only teach_logs rows
+    are) — a teacher belongs to every session from their own start_date
+    onward, the same roster get_my_teachers shows for the live current
+    session, just anchored to this session's own start_date instead of
+    today. A staff (non-learner) caller gets that full roster, with
+    'subjects' legitimately empty/null for anyone who logged nothing this
+    session — not omitted just because they didn't log anything (that was
+    this function's bug before: it used to derive the whole list from
+    teach_logs, so a brand new session with nothing logged yet showed
+    almost no one). Someone who has since been deactivated but
+    demonstrably taught something in this exact session is still included,
+    since is_active alone can't distinguish "never existed" from "existed,
+    now gone" without a join-date-only signal; there's no deactivation-date
+    column to do this precisely for every case (a teacher deactivated
+    without ever logging in this specific session is a known gap). A
+    student/parent caller is scoped to teachers who taught their (or their
+    ward's) grade AS OF THAT SESSION (see _learner_grade_id — this part
+    IS correctly log-derived, since "taught my grade" only ever means
+    someone logged it), plus every current super-user regardless of grade —
+    is_sysadm is a live/current-only attribute (see TeachersList.jsx), so
+    "super-user" here means "is one right now," not "was one back then."
     Also attaches each teacher's subjects/grades for this session — see
     _attach_subjects_taught."""
     is_learner = is_student or is_parent
@@ -219,15 +229,30 @@ def get_teachers_for_session(
             {"cid": customer_id},
         ).fetchall()
     else:
+        # Roster as of this session's start date — joined on/before it AND
+        # (still active today OR proven active then by an actual log entry
+        # this session). See the docstring above for the one remaining gap.
+        session_start = db.execute(
+            text("SELECT start_date FROM academic_sessions WHERE session_id = :sid"),
+            {"sid": session_id},
+        ).scalar_one()
         rows = db.execute(
-            text(
-                f"SELECT DISTINCT {_TEACHER_COLUMNS} "
-                "FROM teach_logs tl "
-                "JOIN users u ON u.user_id = tl.user_id "
-                "WHERE tl.customer_id = :cid AND tl.session_id = :sid AND tl.is_active = TRUE "
-                "ORDER BY name"
-            ),
-            {"cid": customer_id, "sid": session_id},
+            text(f"""
+                SELECT DISTINCT {_TEACHER_COLUMNS}
+                FROM users u
+                WHERE u.customer_id = :cid AND (u.is_adm = TRUE OR u.is_sysadm = TRUE)
+                  AND (u.start_date IS NULL OR u.start_date <= :session_start)
+                  AND (
+                      u.is_active = TRUE
+                      OR EXISTS (
+                          SELECT 1 FROM teach_logs tl
+                          WHERE tl.customer_id = :cid AND tl.user_id = u.user_id AND tl.is_active = TRUE
+                            AND tl.session_id = :sid
+                      )
+                  )
+                ORDER BY name
+            """),
+            {"cid": customer_id, "sid": session_id, "session_start": session_start},
         ).fetchall()
 
     teachers = [dict(row._mapping) for row in rows]
