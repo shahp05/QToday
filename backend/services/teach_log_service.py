@@ -217,11 +217,16 @@ def _learner_subjects_taught(
     logs = [dict(row._mapping) for row in log_rows]
     topic_ids = list({row["topic_id"] for row in logs})
 
+    # is_verified = TRUE only — this count is what the topic card uses to
+    # decide whether a quiz can actually be started (see SubjectTopicGrid's
+    # "Generating questions to play..." state); an unverified row can't be
+    # served by get_quiz_questions, so counting it here would make a topic
+    # look playable when clicking it would just come back empty.
     count_rows = db.execute(
         text("""
             SELECT topic_id, COUNT(*) AS qa_count
             FROM qa
-            WHERE topic_id = ANY(:topic_ids) AND grade_id = :grade_id AND is_active = TRUE
+            WHERE topic_id = ANY(:topic_ids) AND grade_id = :grade_id AND is_active = TRUE AND is_verified = TRUE
             GROUP BY topic_id
         """),
         {"topic_ids": topic_ids, "grade_id": grade_id},

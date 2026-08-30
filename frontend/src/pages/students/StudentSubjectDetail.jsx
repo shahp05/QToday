@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useStudentSubjectsStore, studentSubjectsCacheKey } from '../../store/studentSubjectsStore'
 import { useStudentDetailProgressStore } from '../../store/studentDetailProgressStore'
 import { useSessionsStore } from '../../store/sessionsStore'
+import { fetchQuizStatus } from '../../services/quizService'
 import SubjectTopicGrid, { SubjectFilterBar } from '../subjects/SubjectTopicGrid'
 import StudentQuizProgress from '../subjects/StudentQuizProgress'
 import PageHeader from '../../components/PageHeader'
@@ -46,10 +47,12 @@ function IconTopics() {
 // under the grade it was originally taught at, so filtering the teacher's
 // own tree could never have surfaced it. Read-only for quiz-play only — a
 // teacher can't play as the student, so SubjectTopicGrid gets no
-// onCardClick/onPlayClick — but per-quiz expand in Quizzes Played (question,
-// answer, student's response, score) IS available, same as the student's
-// own view, per spec; only Challenge Quiz Score stays student-only (see
-// StudentQuizQaItem's readOnly gate, keyed off studentId being passed).
+// onCardClick/onPlayClick, just onViewProgress (a card click opens that
+// topic's own Progress view instead of starting a quiz) — but per-quiz
+// expand in Quizzes Played (question, answer, student's response, score) IS
+// available, same as the student's own view, per spec; only Challenge Quiz
+// Score stays student-only (see StudentQuizQaItem's readOnly gate, keyed
+// off studentId being passed).
 export default function StudentSubjectDetail({ student, initialSubjectId, onBack }) {
   // The session being browsed (site-wide picker) — this student's
   // subjects/topics tree differs per session (retention range, what was
@@ -58,6 +61,7 @@ export default function StudentSubjectDetail({ student, initialSubjectId, onBack
   const activeSessionId = useSessionsStore(s => s.activeSessionId)
   const progressEntry = useStudentDetailProgressStore(s => s.byStudent[student.student_id])
   const ensureProgressLoaded = useStudentDetailProgressStore(s => s.ensureLoaded)
+  const refreshProgress = useStudentDetailProgressStore(s => s.refresh)
   const dismissProgressError = useStudentDetailProgressStore(s => s.dismissError)
   const subjectsKey = studentSubjectsCacheKey(student.student_id, activeSessionId)
   const subjectsEntry = useStudentSubjectsStore(s => s.byStudent[subjectsKey])
@@ -71,6 +75,7 @@ export default function StudentSubjectDetail({ student, initialSubjectId, onBack
     initialSubjectId != null ? Number(initialSubjectId) : null
   )
   const [view, setView] = usePageView('topics') // 'topics' | 'progress' — coexists with ?subject=
+  const [progressInitialTopicId, setProgressInitialTopicId] = useState(null)
 
   useEffect(() => { ensureProgressLoaded(student.student_id) }, [student.student_id, ensureProgressLoaded])
   useEffect(() => {
@@ -81,6 +86,46 @@ export default function StudentSubjectDetail({ student, initialSubjectId, onBack
   const progressError = progressEntry?.error ?? ''
   const topicStatsById = progressEntry?.topicStatsById ?? {}
   const quizzes = progressEntry?.quizzes ?? []
+
+  // topic_id -> quiz_id, for topics whose LLM scoring pass hasn't finished
+  // yet — same derivation StudentSubjectsHome uses for the student's own
+  // view, so a teacher sees "Scoring quiz..." on the topic card too.
+  const scoringTopics = useMemo(() => {
+    const map = {}
+    for (const q of quizzes) {
+      if (!q.is_scored) map[q.topic_id] = q.quiz_id
+    }
+    return map
+  }, [quizzes])
+
+  // Every topic with at least one quiz in history, scored or still pending
+  // — this readOnly view never has a Play button, so a card click always
+  // falls back to opening this topic's Progress view, but only when
+  // there's actually something there to show.
+  const playedTopicIds = useMemo(() => new Set(quizzes.map(q => q.topic_id)), [quizzes])
+
+  // Polls every scoring-in-progress quiz until the background LLM pass
+  // finishes, then refetches this student's progress/history so the card
+  // flips from "Scoring quiz..." to the real score without the teacher
+  // having to leave and reopen the page — mirrors StudentSubjectsHome's
+  // own poll effect.
+  useEffect(() => {
+    const topicIds = Object.keys(scoringTopics)
+    if (topicIds.length === 0) return
+    const interval = setInterval(async () => {
+      for (const topicId of topicIds) {
+        try {
+          const status = await fetchQuizStatus(scoringTopics[topicId])
+          if (status.is_scored) {
+            refreshProgress(student.student_id)
+          }
+        } catch {
+          // transient network/poll failure — try again next tick
+        }
+      }
+    }, 4000)
+    return () => clearInterval(interval)
+  }, [scoringTopics, refreshProgress, student.student_id])
 
   const subjectsStatus = subjectsEntry?.status ?? 'loading'
   const subjectsError = subjectsEntry?.error ?? ''
@@ -100,6 +145,13 @@ export default function StudentSubjectDetail({ student, initialSubjectId, onBack
     ? selectedSubjectId
     : subjectsForGrade[0]?.subject_id ?? null
 
+  // A topic card here never has a Play button (teacher, always readOnly) —
+  // clicking it opens straight to that topic's own Progress view instead.
+  function openTopicProgress(topic) {
+    setProgressInitialTopicId(topic.topic_id)
+    setView('progress')
+  }
+
   return (
     <div className="student-subjects">
       <PageHeader
@@ -110,7 +162,7 @@ export default function StudentSubjectDetail({ student, initialSubjectId, onBack
             // Same rule as the student's own header (StudentSubjectsHome):
             // nothing to show until at least one quiz has been played.
             quizzes.length > 0 && (
-              <button className="student-subjects-progress-btn" onClick={() => setView('progress')}>
+              <button className="student-subjects-progress-btn" onClick={() => { setProgressInitialTopicId(null); setView('progress') }}>
                 <IconProgress /> Progress
                 <span className="student-subjects-progress-count">{quizzes.length}</span>
               </button>
@@ -144,6 +196,7 @@ export default function StudentSubjectDetail({ student, initialSubjectId, onBack
               quizHistoryError={progressError}
               onDismissQuizHistoryError={() => dismissProgressError(student.student_id)}
               studentId={student.student_id}
+              initialTopicId={progressInitialTopicId}
             />
           </div>
         ) : activeSubjectId != null && (
@@ -152,6 +205,9 @@ export default function StudentSubjectDetail({ student, initialSubjectId, onBack
             activeSubjectId={activeSubjectId}
             topicStatsById={topicStatsById}
             readOnly
+            onViewProgress={openTopicProgress}
+            scoringTopics={scoringTopics}
+            playedTopicIds={playedTopicIds}
           />
         )
       )}

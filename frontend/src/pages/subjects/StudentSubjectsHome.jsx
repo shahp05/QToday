@@ -76,6 +76,7 @@ export default function StudentSubjectsHome({ readOnly = false, studentId = null
   const fetchQuizHistory = useQuizHistoryStore(s => s.fetchQuizHistory)
   const refreshQuizHistory = useQuizHistoryStore(s => s.refreshQuizHistory)
   const [progressLoading, setProgressLoading] = useState(false)
+  const [progressInitialTopicId, setProgressInitialTopicId] = useState(null)
   const [selectedSubjectId, setSelectedSubjectId] = useState(null)
   const [activeQuiz, setActiveQuiz] = useState(null) // { topicId, gradeId, subjectName, topicName, questions, totalMarks } | null
   const [loadingQuiz, setLoadingQuiz] = useState(null) // { topicId, source: 'play' | 'card' } | null
@@ -93,6 +94,12 @@ export default function StudentSubjectsHome({ readOnly = false, studentId = null
     }
     return map
   }, [quizHistory])
+
+  // Every topic with at least one quiz in history, scored or still pending
+  // — a topic card with no Play button (readOnly, or a student mid-generate/
+  // mid-scoring) falls back to opening this topic's Progress view on click,
+  // but only when there's actually something there to show.
+  const playedTopicIds = useMemo(() => new Set(quizHistory.map(q => q.topic_id)), [quizHistory])
 
   // Quiz progress/history: self by default (studentId omitted resolves to
   // the caller server-side), or a parent's selected ward when studentId is
@@ -199,6 +206,16 @@ export default function StudentSubjectsHome({ readOnly = false, studentId = null
       waitForStatus(useQuizProgressStore),
     ])
     setProgressLoading(false)
+    setProgressInitialTopicId(null)
+    setView('progress')
+  }
+
+  // A topic card with no Play button (readOnly, or blocked mid-generate/
+  // mid-scoring) opens straight to that topic's own Progress view instead —
+  // both stores are already loaded by now (the card itself is rendering
+  // stats from them), so no waitForStatus gate is needed here.
+  function openTopicProgress(topic) {
+    setProgressInitialTopicId(topic.topic_id)
     setView('progress')
   }
 
@@ -270,6 +287,7 @@ export default function StudentSubjectsHome({ readOnly = false, studentId = null
             quizHistoryError={quizHistoryError}
             onDismissQuizHistoryError={dismissQuizHistoryError}
             studentId={studentId}
+            initialTopicId={progressInitialTopicId}
           />
         </div>
       ) : (
@@ -280,8 +298,10 @@ export default function StudentSubjectsHome({ readOnly = false, studentId = null
           readOnly={readOnly}
           onCardClick={topic => startQuiz(topic, 'card')}
           onPlayClick={topic => startQuiz(topic, 'play')}
+          onViewProgress={openTopicProgress}
           loadingQuiz={loadingQuiz}
           scoringTopics={scoringTopics}
+          playedTopicIds={playedTopicIds}
         />
       )}
     </div>

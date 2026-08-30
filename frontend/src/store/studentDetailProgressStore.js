@@ -18,8 +18,16 @@ export const useStudentDetailProgressStore = create((set, get) => ({
   ensureLoaded: async (studentId) => {
     const existing = get().byStudent[studentId]
     if (existing?.status === 'loaded' || existing?.status === 'loading') return
+    return get().refresh(studentId)
+  },
+
+  // Unconditional refetch — unlike ensureLoaded, always hits the network.
+  // Used by StudentSubjectDetail's scoring-poll effect once a pending
+  // quiz's LLM pass finishes, so the "Scoring quiz..." card flips to the
+  // real score without the teacher having to leave and reopen the page.
+  refresh: async (studentId) => {
     set(state => ({
-      byStudent: { ...state.byStudent, [studentId]: { topicStatsById: {}, quizzes: [], status: 'loading', error: null } },
+      byStudent: { ...state.byStudent, [studentId]: { topicStatsById: {}, quizzes: [], ...state.byStudent[studentId], status: 'loading', error: null } },
     }))
     try {
       const [progress, history] = await Promise.all([

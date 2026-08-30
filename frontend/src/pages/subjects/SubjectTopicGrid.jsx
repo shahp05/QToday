@@ -71,8 +71,10 @@ export default function SubjectTopicGrid({
   readOnly = false, // teacher view: no quiz-start is possible for another student, so hide Play entirely
   onCardClick,
   onPlayClick,
+  onViewProgress, // topic => void — where a card click lands when there's no Play button to trigger instead
   loadingQuiz, // {topicId, source: 'play' | 'card'} | null
   scoringTopics, // topic_id -> quiz_id
+  playedTopicIds, // Set<topic_id> — every topic with at least one quiz in history, scored or not
 }) {
   const activeSubject = subjects.find(s => s.subject_id === activeSubjectId)
   if (!activeSubject) return null
@@ -83,16 +85,27 @@ export default function SubjectTopicGrid({
         {activeSubject.topics.map((topic, index) => {
             const stats = topicStatsById[topic.topic_id] ?? NOT_ATTEMPTED
             const isLoadingThis = !readOnly && loadingQuiz?.topicId === topic.topic_id
-            const isScoringThis = !readOnly && !!scoringTopics?.[topic.topic_id]
+            const isScoringThis = !!scoringTopics?.[topic.topic_id]
+            const isGeneratingThis = !((topic.grades[0]?.qa_count ?? 0) > 0)
+            const isBlocked = isGeneratingThis || isScoringThis
+            // Play button shows only here — same condition SubjectTopicGrid's
+            // actions row below uses. Whenever it's absent (readOnly for a
+            // parent/teacher, or a student mid-generate/mid-scoring), the
+            // card click falls back to opening this topic's Progress view
+            // instead — but only if there's actually a quiz to show there.
+            const canPlay = !readOnly && !isBlocked
+            const canViewProgress = !canPlay && !!playedTopicIds?.has(topic.topic_id)
+            const cardInteractive = canPlay || canViewProgress
+            const handleCardActivate = () => (canPlay ? onCardClick?.(topic) : onViewProgress?.(topic))
             return (
               <div
                 key={topic.topic_id}
                 className="student-topic-card"
-                role={readOnly ? undefined : 'button'}
-                tabIndex={readOnly ? undefined : 0}
-                onClick={readOnly ? undefined : () => onCardClick?.(topic)}
-                onKeyDown={readOnly ? undefined : e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCardClick?.(topic) } }}
-                style={readOnly ? { cursor: 'default' } : undefined}
+                role={cardInteractive ? 'button' : undefined}
+                tabIndex={cardInteractive ? 0 : undefined}
+                onClick={cardInteractive ? handleCardActivate : undefined}
+                onKeyDown={cardInteractive ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCardActivate() } } : undefined}
+                style={cardInteractive ? undefined : { cursor: 'default' }}
               >
                 <div className="student-topic-card-header">
                   <span className="student-topic-seq" style={topicSeqColors(stats)}>{index + 1}</span>
@@ -127,37 +140,35 @@ export default function SubjectTopicGrid({
                   </div>
                 </div>
 
-                {!readOnly && (
-                  <div className="student-topic-actions">
-                    <button
-                      className={`student-topic-play-btn${isRepeatDue(stats) ? ' student-topic-play-btn--repeat' : ''}`}
-                      onClick={e => { e.stopPropagation(); onPlayClick?.(topic) }}
-                      aria-label={`Play ${topic.topic_name} quiz`}
-                      disabled={!!loadingQuiz || isScoringThis}
-                    >
-                      {isLoadingThis && loadingQuiz.source === 'play' ? (
-                        <span className="student-topic-spinner" />
-                      ) : (
-                        <>
-                          {isRepeatDue(stats) && <span className="student-topic-play-btn-label">Repeat</span>}
-                          <IconPlay />
-                        </>
-                      )}
-                    </button>
+                {(!readOnly || isBlocked) && (
+                  <div className={`student-topic-actions${isBlocked ? ' student-topic-actions--start' : ''}`}>
+                    {isGeneratingThis ? (
+                      <span className="student-topic-status-msg">Generating questions to play...</span>
+                    ) : isScoringThis ? (
+                      <span className="student-topic-status-msg">Scoring quiz...</span>
+                    ) : !readOnly ? (
+                      <button
+                        className={`student-topic-play-btn${isRepeatDue(stats) ? ' student-topic-play-btn--repeat' : ''}`}
+                        onClick={e => { e.stopPropagation(); onPlayClick?.(topic) }}
+                        aria-label={`Play ${topic.topic_name} quiz`}
+                        disabled={!!loadingQuiz}
+                      >
+                        {isLoadingThis && loadingQuiz.source === 'play' ? (
+                          <span className="student-topic-spinner" />
+                        ) : (
+                          <>
+                            {isRepeatDue(stats) && <span className="student-topic-play-btn-label">Repeat</span>}
+                            <IconPlay />
+                          </>
+                        )}
+                      </button>
+                    ) : null}
                   </div>
                 )}
 
                 {isLoadingThis && loadingQuiz.source === 'card' && (
                   <div className="student-topic-card-overlay">
                     <span className="student-topic-spinner student-topic-spinner--lg" />
-                  </div>
-                )}
-
-                {isScoringThis && (
-                  <div className="student-topic-card-overlay">
-                    <span className="student-topic-scoring-label">
-                      <span className="student-topic-spinner" /> Scoring…
-                    </span>
                   </div>
                 )}
               </div>

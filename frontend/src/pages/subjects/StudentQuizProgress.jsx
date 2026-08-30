@@ -55,16 +55,22 @@ function IconTrophy() {
 // changes (Challenge Quiz Score hidden when set, quiz Q&A/scores are not).
 export default function StudentQuizProgress({
   subjects, topicStatsById, quizzes, quizHistoryStatus, quizHistoryError, onDismissQuizHistoryError, studentId = null,
+  initialTopicId = null, // a specific topic to open straight to (e.g. from a topic-card click) — overrides the most-recent-quiz auto-select below
 }) {
   const [activeView, setActiveView] = useState('quizzes') // 'chart' | 'quizzes'
-  const [expandedSubjectId, setExpandedSubjectId] = useState(null)
-  const [selectedTopicId, setSelectedTopicId] = useState(null)
+  const initialSubjectId = initialTopicId == null
+    ? null
+    : subjects.find(s => s.topics.some(t => t.topic_id === initialTopicId))?.subject_id ?? null
+  const [expandedSubjectId, setExpandedSubjectId] = useState(initialSubjectId)
+  const [selectedTopicId, setSelectedTopicId] = useState(initialSubjectId != null ? initialTopicId : null)
 
   // Auto-select the subject+topic of the most recently played quiz, once
   // both the subjects list and the (already newest-first) quiz history have
   // loaded. quizHistoryStatus only ever settles once per mount, so this
-  // can't clobber a later manual selection.
-  const [didAutoSelect, setDidAutoSelect] = useState(false)
+  // can't clobber a later manual selection. Skipped when initialTopicId
+  // already picked one — a topic-card click names its own topic, not
+  // whichever was most recently played.
+  const [didAutoSelect, setDidAutoSelect] = useState(initialSubjectId != null)
   if (!didAutoSelect && quizHistoryStatus === 'loaded') {
     setDidAutoSelect(true)
     const mostRecent = quizzes[0]
