@@ -143,7 +143,7 @@ export default function SubjectTopicGrid({
                 {(!readOnly || isBlocked) && (
                   <div className={`student-topic-actions${isBlocked ? ' student-topic-actions--start' : ''}`}>
                     {isGeneratingThis ? (
-                      <span className="student-topic-status-msg">Generating questions to play...</span>
+                      <span className="student-topic-status-msg">Generating questions...</span>
                     ) : isScoringThis ? (
                       <span className="student-topic-status-msg">Scoring quiz...</span>
                     ) : !readOnly ? (
