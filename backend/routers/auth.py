@@ -6,10 +6,11 @@ from sqlalchemy.orm import Session
 from db.database import get_db
 from errors.app_error import AppError
 from errors.error_codes import ErrorCode
-from schemas.auth import LoginRequest
+from schemas.auth import LoginRequest, ChangePasswordRequest
 from services.auth_service import login, get_current_user
 from services.error_log_service import log_error
 from services.jwt_service import create_access_token
+from services.password_service import change_own_password
 from services.profile_service import get_profile
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -49,6 +50,25 @@ def auth_login(payload: LoginRequest, db: Session = Depends(get_db)):
 
 @router.get("/me")
 def auth_me(claims: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    profile = get_profile(db, claims["user_id"])
+    if profile is None:
+        raise AppError(ErrorCode.ACCOUNT_INACTIVE)
+    return profile
+
+
+@router.put("/password")
+def auth_change_password(
+    payload: ChangePasswordRequest,
+    claims: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    change_own_password(
+        db,
+        user_id=claims["user_id"],
+        current_password=payload.current_password,
+        new_password=payload.new_password,
+        is_student=claims.get("is_student", False),
+    )
     profile = get_profile(db, claims["user_id"])
     if profile is None:
         raise AppError(ErrorCode.ACCOUNT_INACTIVE)

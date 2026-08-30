@@ -23,6 +23,7 @@ const EMPTY_PROFILE = {
   admin_count: null,
   student_count: null,
   is_default_password: false,
+  password_date_created: null,
 }
 
 export const useProfileStore = create(
@@ -37,6 +38,13 @@ export const useProfileStore = create(
       // single current value, patched locally right after a successful
       // upload rather than refetching the whole profile.
       updateOwnPhoto: (photoUrl) => set({ photo_url: photoUrl }),
+      // Same local-patch-after-mutation pattern as updateOwnPhoto — the
+      // change-password endpoint returns the full profile, but only these
+      // two fields actually changed as a result of it.
+      applyPasswordChange: (profile) => set({
+        is_default_password: profile.is_default_password,
+        password_date_created: profile.password_date_created,
+      }),
     }),
     { name: 'qtoday-profile' }
   )

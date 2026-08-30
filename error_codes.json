@@ -15,6 +15,8 @@
   "AUTH_REQUIRED":              { "message": "You must be signed in to do this.",                              "http_status": 401 },
   "AUTH_FORBIDDEN":             { "message": "You do not have permission to do this.",                         "http_status": 403 },
   "INVALID_CREDENTIALS":        { "message": "Incorrect login ID or password.",                                "http_status": 401 },
+  "INCORRECT_CURRENT_PASSWORD": { "message": "Your current password is incorrect.",                             "http_status": 400 },
+  "PASSWORD_POLICY_VIOLATION":  { "message": "Your new password does not meet the password policy.",            "http_status": 400 },
   "ACCOUNT_INACTIVE":           { "message": "This account is no longer active.",                              "http_status": 401 },
   "SCHOOL_NOT_ASSOCIATED":      { "message": "No school is associated with this account.",                     "http_status": 400 },
   "LAST_SUPER_ADMIN":           { "message": "At least one super admin must remain for this school.",          "http_status": 400 },

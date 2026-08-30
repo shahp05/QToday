@@ -19,6 +19,8 @@ class ErrorCode(str, Enum):
     AUTH_REQUIRED = "AUTH_REQUIRED"
     AUTH_FORBIDDEN = "AUTH_FORBIDDEN"
     INVALID_CREDENTIALS = "INVALID_CREDENTIALS"
+    INCORRECT_CURRENT_PASSWORD = "INCORRECT_CURRENT_PASSWORD"
+    PASSWORD_POLICY_VIOLATION = "PASSWORD_POLICY_VIOLATION"
     ACCOUNT_INACTIVE = "ACCOUNT_INACTIVE"
     SCHOOL_NOT_ASSOCIATED = "SCHOOL_NOT_ASSOCIATED"
     LAST_SUPER_ADMIN = "LAST_SUPER_ADMIN"
@@ -63,6 +65,8 @@ ERROR_DEFAULTS = {
     ErrorCode.AUTH_REQUIRED: {"message": "You must be signed in to do this.", "http_status": 401},
     ErrorCode.AUTH_FORBIDDEN: {"message": "You do not have permission to do this.", "http_status": 403},
     ErrorCode.INVALID_CREDENTIALS: {"message": "Incorrect login ID or password.", "http_status": 401},
+    ErrorCode.INCORRECT_CURRENT_PASSWORD: {"message": "Your current password is incorrect.", "http_status": 400},
+    ErrorCode.PASSWORD_POLICY_VIOLATION: {"message": "Your new password does not meet the password policy.", "http_status": 400},
     ErrorCode.ACCOUNT_INACTIVE: {"message": "This account is no longer active.", "http_status": 401},
     ErrorCode.SCHOOL_NOT_ASSOCIATED: {"message": "No school is associated with this account.", "http_status": 400},
     ErrorCode.LAST_SUPER_ADMIN: {"message": "At least one super admin must remain for this school.", "http_status": 400},

@@ -54,3 +54,8 @@
 .ui-toast--error {
   border-left: 3px solid var(--color-red);
 }
+
+/* Success variant — left accent */
+.ui-toast--success {
+  border-left: 3px solid var(--color-green-dark);
+}

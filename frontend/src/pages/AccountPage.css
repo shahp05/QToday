@@ -1,9 +1,150 @@
+/* su-field / su-label / su-input / su-required / ui-shake come from here —
+   same reuse as LoginPage.css importing SignupPage.css for its form fields. */
+@import './signup/SignupPage.css';
+
 .account-page {
   display: flex;
   flex-direction: column;
   width: 100%;
   flex: 1;
   min-height: 0;
+}
+
+.account-page-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+/* ─── Change Password — styled to match StudentsEmpty/TeachersEmpty's
+   upload screen and QuizPage's quiz-play screen: a bare centered column
+   directly on the dashboard's dark background, no white card. ──────────── */
+.account-password-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 32px;
+  overflow-y: auto;
+}
+
+.account-password-label {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #aaaaaa;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.account-password-status {
+  margin: 0;
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  color: #aaaaaa;
+}
+
+.account-password-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* su-label/su-input default to the light-background auth-card palette —
+   this section sits on the dark dashboard background instead. */
+.account-password-form .su-label {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.account-password-form .su-input {
+  box-shadow: var(--shadow-md);
+}
+
+.account-password-policy {
+  margin: 0;
+  width: 100%;
+  font-size: var(--font-size-md, 14px);
+  color: #aaaaaa;
+  line-height: 1.6;
+}
+
+.account-password-policy code {
+  font-family: 'Consolas', 'Menlo', monospace;
+  color: var(--color-green-light, #8EEB65);
+}
+
+.account-password-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+/* Same lime-fill / hover-to-outline pill as students-empty-list-btn and
+   quiz-intro-start-btn. */
+.account-password-save-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 128px;
+  border: 1px solid var(--color-green-light, #8EEB65);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-green-light, #8EEB65);
+  color: var(--color-dark, #343434);
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm, 13px);
+  font-weight: 500;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+.account-password-save-btn:hover:not(:disabled),
+.account-password-save-btn:focus-visible:not(:disabled) {
+  background: none;
+  color: var(--color-white, #ffffff);
+}
+
+.account-password-save-btn:disabled {
+  cursor: not-allowed;
+}
+
+/* Same ring spinner as students-upload-spinner/quiz-btn-spinner, swapped in
+   for the button's contents while busy — no label text swap. */
+.account-password-spinner {
+  width: 15px;
+  height: 15px;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: account-password-spin 0.8s linear infinite;
+}
+
+@keyframes account-password-spin {
+  to { transform: rotate(360deg); }
+}
+
+.account-password-error {
+  font-size: var(--font-size-sm, 11px);
+  color: var(--color-red, #D32F2F);
+}
+
+/* Tick + light text (not red) — same "here's what changed" idiom as
+   students-upload-success. */
+.account-password-success {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--font-size-sm, 11px);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.account-password-success-icon {
+  flex-shrink: 0;
+  color: var(--color-green-light, #8EEB65);
 }
 
 /* AccountPage's own photo tile — same 40x40 shape/placeholder treatment as
