@@ -53,6 +53,13 @@ CREATE TABLE IF NOT EXISTS grades (
 
 -- ------------------------------------------------------------
 -- 4. CUSTOMERS  (schools / tuition groups)
+--
+--   modified_by_user_id : who last changed this row (paired with
+--   date_modified). Declared here without its REFERENCES clause — users
+--   isn't created until section 5, and users.customer_id already
+--   references customers, so this is a genuine circular dependency. The FK
+--   constraint itself is added via ALTER TABLE right after the USERS
+--   table below, the one place in this file that needs it.
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS customers (
     customer_id       SERIAL          PRIMARY KEY,
@@ -69,6 +76,7 @@ CREATE TABLE IF NOT EXISTS customers (
     customer_phone    VARCHAR(20)     NULL,
     date_created      TIMESTAMP       NOT NULL DEFAULT NOW(),
     date_modified     TIMESTAMP       NOT NULL DEFAULT NOW(),
+    modified_by_user_id INTEGER       NULL,
     date_deleted      TIMESTAMP       NULL,
     is_active         BOOLEAN         NOT NULL DEFAULT TRUE
 );
@@ -121,6 +129,10 @@ CREATE TABLE IF NOT EXISTS users (
     is_active       BOOLEAN         NOT NULL DEFAULT TRUE
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uidx_users_email_parent ON users(email_id) WHERE is_parent = TRUE;
+
+-- Deferred from CUSTOMERS above — see the comment on that table.
+ALTER TABLE customers ADD CONSTRAINT fk_customers_modified_by_user_id
+    FOREIGN KEY (modified_by_user_id) REFERENCES users(user_id);
 
 
 -- ------------------------------------------------------------

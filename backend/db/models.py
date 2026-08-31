@@ -106,14 +106,24 @@ class Customer(Base):
     customer_phone:    Mapped[str | None]    = mapped_column(String(20))
     date_created:      Mapped[datetime]      = mapped_column(DateTime, nullable=False, server_default=func.now())
     date_modified:     Mapped[datetime]      = mapped_column(DateTime, nullable=False, server_default=func.now())
+    # Who made the change reflected in date_modified — nullable because rows
+    # created before this column existed (and the signup INSERT itself)
+    # have no editor to attribute. Any update to this row must set both
+    # together.
+    modified_by_user_id: Mapped[int | None]  = mapped_column(ForeignKey("users.user_id"), nullable=True)
     date_deleted:      Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     is_active:         Mapped[bool]          = mapped_column(Boolean, nullable=False, default=True)
 
     country:           Mapped["Country"]            = relationship(back_populates="customers")
     board:             Mapped["Board"]              = relationship(back_populates="customers")
-    users:             Mapped[list["User"]]          = relationship(back_populates="customer")
+    # foreign_keys pinned to User.customer_id — modified_by_user_id above is
+    # a second, unrelated FK path from customers to users (who edited this
+    # row, not which users belong to it), which otherwise leaves SQLAlchemy
+    # unable to infer which column this relationship should join on.
+    users:             Mapped[list["User"]]          = relationship(back_populates="customer", foreign_keys="User.customer_id")
     students:          Mapped[list["Student"]]       = relationship(back_populates="customer")
     parents:           Mapped[list["Parent"]]        = relationship(back_populates="customer")
+    modified_by:       Mapped["User | None"]         = relationship(foreign_keys=[modified_by_user_id])
 
 
 class AcademicSession(Base):
@@ -199,7 +209,7 @@ class User(Base):
     is_active:     Mapped[bool]          = mapped_column(Boolean, nullable=False, default=True)
 
     country:         Mapped["Country | None"]    = relationship(back_populates="users")
-    customer:        Mapped["Customer | None"]   = relationship(back_populates="users")
+    customer:        Mapped["Customer | None"]   = relationship(back_populates="users", foreign_keys=[customer_id])
     student:         Mapped["Student | None"]    = relationship(back_populates="user", uselist=False)
     parent:          Mapped["Parent | None"]     = relationship(back_populates="user", uselist=False)
 

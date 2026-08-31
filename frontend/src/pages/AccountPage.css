@@ -10,24 +10,117 @@
   min-height: 0;
 }
 
+/* The one scroll container for both columns together (replaces the
+   earlier attempt at giving .account-col--main its own independent
+   scroll) — .account-section (padding-bearing) sits inside this, not the
+   other way around, so the padding is never on the element that itself
+   has overflow:auto. container-type is what lets .account-section's
+   own @container rule below key off this element's rendered width. */
 .account-page-body {
+  container-type: inline-size;
   flex: 1;
   min-height: 0;
   display: flex;
+  overflow-y: auto;
 }
 
-/* ─── Change Password — styled to match StudentsEmpty/TeachersEmpty's
-   upload screen and QuizPage's quiz-play screen: a bare centered column
-   directly on the dashboard's dark background, no white card. ──────────── */
-.account-password-section {
+/* ─── Tab row (super-admin only), in PageHeader's filter slot — same
+   muted-pill/lime-active recipe as .quiz-nav-btn / .quiz-nav-btn--submit-
+   ready ("same interaction language as .leftnav-item"), just an auto-width
+   text-tab variant instead of a fixed circular pill. ───────────────────── */
+.account-tabs {
   display: flex;
-  flex-direction: column;
-  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.account-tab {
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 6px);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.65);
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm, 13px);
+  font-weight: 500;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+.account-tab:hover:not(.account-tab--active):not(:disabled) {
+  background: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.90);
+}
+
+.account-tab--active {
+  background: var(--color-green-light, #8EEB65);
+  border-color: var(--color-green-light, #8EEB65);
+  color: var(--color-dark, #343434);
+}
+
+/* Reset Password / Billing — visible per spec's access matrix, but their
+   content is deferred; disabled (not a "coming soon" placeholder screen)
+   says that on its own. */
+.account-tab:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ─── Change Password — same left-aligned positioning as
+   StudentsList/TeachersList/TeachLogList's own content body (24px sides/
+   bottom padding) rather than the earlier centered-column treatment.
+   Generic layout primitives (.account-section/-col--summary/-col--main/
+   -box/-status-box/-actions/-save-btn/-spinner/-error/-success) are shared
+   verbatim by both ChangePasswordSection and AccountDataSection below —
+   named without "password" on purpose, since redesigning either section's
+   own content shouldn't mean touching classes the other one also relies
+   on. Anything still prefixed .account-password- past this point is
+   genuinely password-specific text/content, only ChangePasswordSection
+   uses it. ───────────────────────────────────────────────────────────── */
+
+/* This IS the row — left column (status/summary + rules boxes) and right
+   column (the form, in its own matching box) — not a heading plus a
+   separate wrapper div. The "Change your password" heading lives inside
+   the left column instead of floating above as a 3rd sibling, so this
+   only ever needs exactly 2 layout children regardless of section.
+   flex-direction is switched explicitly by the @container rule below, not
+   left to flex-wrap: wrap — flex-wrap's multi-line layout brings in
+   align-content, whose default behavior is exactly where this used to go
+   wrong (the section's own bottom padding stopped rendering once a second
+   wrapped line appeared). A row/column toggle has none of that — single
+   axis, one line, always. align-items: stretch does double duty: equal
+   height for the two columns side by side, and (once toggled to column)
+   full width for each since width becomes the cross axis. No overflow or
+   flex:1/min-height:0 here — .account-page-body is the one scroll
+   container for both columns together now (see its own comment), and
+   since this section isn't the thing with overflow:auto, its own
+   padding-bottom can't get clipped by it. */
+.account-section {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: var(--pg-gap, 20px);
   width: 100%;
-  max-width: 460px;
-  margin: 0 auto;
-  padding: 32px;
-  overflow-y: auto;
+  padding: 0 24px 24px;
+}
+
+/* Below this width, .account-col--summary (300) + gap (20) +
+   .account-col--main (420) — their combined basis in row mode — no longer
+   fits comfortably; switch to a single stacked column instead of letting
+   them squeeze. flex: none on both resets their row-mode flex-basis
+   (which would otherwise apply to height, not width, once the main axis
+   turns vertical) back to natural content sizing. */
+@container (max-width: 760px) {
+  .account-section {
+    flex-direction: column;
+  }
+
+  .account-col--summary,
+  .account-col--main {
+    flex: none;
+    min-width: 0;
+  }
 }
 
 .account-password-label {
@@ -39,43 +132,142 @@
   letter-spacing: 0.05em;
 }
 
+/* flex-grow: 1 out of a 1:10 ratio against .account-col--main — in row
+   mode it takes only a sliver of whatever's left over past its 300px
+   basis (10x more of any spare width goes to the main column instead), so
+   it stays close to its natural width on wide screens rather than
+   visibly ballooning. Reset to flex:none by the @container rule above
+   once stacked — there's no "reach 100%" concern to solve with grow
+   ratios anymore now that column mode is explicit (align-items: stretch
+   on .account-section gives it full width directly). */
+.account-col--summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pg-gap, 20px);
+  flex: 1 1 300px;
+  min-width: 300px;
+}
+
+/* Border-radius matches TeachLogList's .teach-log-subjects and
+   SubjectsPage's inputs/buttons (--radius-sm) rather than QuizPage's
+   --radius-md — the Subjects page is the reference here, not the quiz. Same
+   translucent background/border idiom as .quiz-qa-panel; --alert switches
+   it to the app's standard --color-red for the default-password warning. */
+.account-status-box,
+.account-box,
+.account-col--main {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* .account-col--summary itself stretches to the row's full height
+   (align-items: stretch above), but that's an invisible wrapper —
+   without this, the visible box(es) inside it would just sit at their
+   own content height, leaving blank space below rather than actually
+   reaching the bottom. The status/alert box (a short, one-line statement)
+   stays its natural height; this is the one that grows to take up the
+   rest. */
+.account-box {
+  flex: 1;
+}
+
+.account-status-box--alert {
+  border-color: var(--color-red, #D32F2F);
+  background: var(--color-red, #D32F2F);
+}
+
+/* Font sizes matched to StudentsEmpty/TeachersEmpty's own text: the policy
+   copy plays the same role as their .students-note explanatory paragraph
+   (font-size-md, 14px), not their small print (font-size-sm, 11px, which
+   is reserved here for the same kind of small inline caption they use it
+   for — the Save row's result text below). */
+.account-password-default-msg {
+  margin: 0;
+  font-family: var(--font-family);
+  font-size: var(--font-size-md, 14px);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-white, #ffffff);
+}
+
 .account-password-status {
   margin: 0;
   font-family: var(--font-family);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-md, 14px);
   color: #aaaaaa;
 }
 
+.account-password-policy-title {
+  margin: 0 0 10px;
+  font-family: var(--font-family);
+  font-size: var(--font-size-md, 14px);
+  font-weight: var(--font-weight-semibold);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.account-password-policy-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* --font-size-sm (11px), not -md — matches .teach-log-subjects' own
+   two-tier sizing: subject names at -md, nested topic rows at -sm. These
+   bullets are the nested tier under the title above, same relationship. */
+.account-password-policy-list li {
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm, 11px);
+  color: #aaaaaa;
+  line-height: 1.5;
+}
+
+.account-password-policy-list code {
+  font-family: 'Consolas', 'Menlo', monospace;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* Grows 10x as fast as .account-col--summary in row mode — it absorbs
+   almost all of the row's spare width, not an even split. Reset to
+   flex:none by the @container rule above once stacked (its 420px basis
+   would otherwise apply to height, not width, in column mode). */
+.account-col--main {
+  display: flex;
+  flex-direction: column;
+  flex: 10 1 420px;
+  min-width: 420px;
+}
+
+/* Wider than the old 280px-ish effective width, but still well short of
+   the now-full-width .account-col--main around it. */
 .account-password-form {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  max-width: 420px;
 }
 
-/* su-label/su-input default to the light-background auth-card palette —
-   this section sits on the dark dashboard background instead. */
+/* su-label defaults to the auth-card style (semibold, --font-size-sm, not
+   uppercase) — overridden here to fully match the dashboard's own eyebrow
+   label style (.teach-today-label/.students-empty-label/.teachers-empty-
+   label): 0.85rem, weight 500, #aaaaaa, uppercase. su-input just needs its
+   light-background assumption corrected for this dark section. */
 .account-password-form .su-label {
-  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #aaaaaa;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .account-password-form .su-input {
   box-shadow: var(--shadow-md);
 }
 
-.account-password-policy {
-  margin: 0;
-  width: 100%;
-  font-size: var(--font-size-md, 14px);
-  color: #aaaaaa;
-  line-height: 1.6;
-}
-
-.account-password-policy code {
-  font-family: 'Consolas', 'Menlo', monospace;
-  color: var(--color-green-light, #8EEB65);
-}
-
-.account-password-actions {
+.account-actions {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -84,7 +276,7 @@
 
 /* Same lime-fill / hover-to-outline pill as students-empty-list-btn and
    quiz-intro-start-btn. */
-.account-password-save-btn {
+.account-save-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -102,39 +294,39 @@
   transition: border-color 0.2s, background 0.2s, color 0.2s;
 }
 
-.account-password-save-btn:hover:not(:disabled),
-.account-password-save-btn:focus-visible:not(:disabled) {
+.account-save-btn:hover:not(:disabled),
+.account-save-btn:focus-visible:not(:disabled) {
   background: none;
   color: var(--color-white, #ffffff);
 }
 
-.account-password-save-btn:disabled {
+.account-save-btn:disabled {
   cursor: not-allowed;
 }
 
 /* Same ring spinner as students-upload-spinner/quiz-btn-spinner, swapped in
    for the button's contents while busy — no label text swap. */
-.account-password-spinner {
+.account-spinner {
   width: 15px;
   height: 15px;
   border: 2px solid rgba(0, 0, 0, 0.2);
   border-top-color: currentColor;
   border-radius: 50%;
-  animation: account-password-spin 0.8s linear infinite;
+  animation: account-spin 0.8s linear infinite;
 }
 
-@keyframes account-password-spin {
+@keyframes account-spin {
   to { transform: rotate(360deg); }
 }
 
-.account-password-error {
+.account-error {
   font-size: var(--font-size-sm, 11px);
   color: var(--color-red, #D32F2F);
 }
 
 /* Tick + light text (not red) — same "here's what changed" idiom as
    students-upload-success. */
-.account-password-success {
+.account-success {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -142,9 +334,84 @@
   color: rgba(255, 255, 255, 0.85);
 }
 
-.account-password-success-icon {
+.account-success-icon {
   flex-shrink: 0;
   color: var(--color-green-light, #8EEB65);
+}
+
+/* ─── Account Data tab ───────────────────────────────────────────────────
+   Same generic layout primitives as ChangePasswordSection
+   (.account-section/-col--summary/-col--main/-box) — one combined summary
+   panel on the left, the editable form on the right. */
+.account-data-facts {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.account-data-fact {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.account-data-fact dt,
+.account-data-fact dd {
+  margin: 0;
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm, 11px);
+}
+
+.account-data-fact dt {
+  color: #aaaaaa;
+}
+
+.account-data-fact dd {
+  color: rgba(255, 255, 255, 0.85);
+  text-align: right;
+}
+
+/* Field label/input style is left exactly as SignupPage.css/LoginPage.css
+   define it (.su-label/.su-input, imported above) rather than the eyebrow
+   style Change Password's form uses — only the label color is corrected
+   for this dark background, since su-label's own default (var(--color-
+   text)) assumes the white auth-card it's normally shown on. No max-width
+   here — fields grow organically with whatever width .account-col--main
+   ends up being, same as everything else on this page. */
+.account-data-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.account-data-form .su-label {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* Organic column count — no @container breakpoint, no cap on the form
+   itself. auto-fit/minmax is the CSS Grid equivalent of flex-wrap's own
+   judgment: as many 170px+ columns as actually fit, collapsing on its own
+   as the available width changes, same "no magic pixel thresholds" spirit
+   as the row above — the minmax floor is structural (auto-fit has no way
+   to decide when to wrap without one), not a width cap in itself. Every
+   field is one unit wide, except Address (2-unit/2x). Name and Address
+   are each alone on their own row — --row-start forces Address to
+   grid-column-start:1, and since the grid's default (sparse) auto-
+   placement never backfills a row it's already moved past, that also
+   stops anything from creeping into Name's row afterwards. */
+.account-data-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px;
+}
+
+.account-data-field--wide {
+  grid-column: span 2;
+}
+
+.account-data-field--row-start {
+  grid-column-start: 1;
 }
 
 /* AccountPage's own photo tile — same 40x40 shape/placeholder treatment as
