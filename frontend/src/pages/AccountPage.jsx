@@ -187,14 +187,20 @@ function ChangePasswordSection() {
   }
 
   return (
-    <div className="account-section">
+    // .account-scroll-content is always flex-column (unconditionally, not
+    // dependent on the row/column toggle inside it) so the bottom spacer
+    // always lands below .account-section regardless of that toggle's
+    // state — see the spacer's own comment for why it's a real element
+    // rather than padding-bottom on the scrolling ancestor.
+    <div className="account-scroll-content">
       <Toast message={networkError} onDismiss={() => setNetworkError('')} />
 
-      {/* .account-section is itself the row (flex-row/wrap on desktop,
-          collapses to flex-column once the two children can't fit side by
-          side) — no separate wrapper div. The heading lives inside the
-          left column instead of floating above the row as a 3rd sibling,
-          so the row only ever has exactly 2 layout children. */}
+      {/* .account-section is itself the row (row on desktop, column once
+          the two children can't fit side by side — see the @container
+          rule). The heading lives inside the left column instead of
+          floating above the row as a 3rd sibling, so the row only ever
+          has exactly 2 layout children. */}
+      <div className="account-section">
       <div className="account-col--summary">
         <p className="account-password-label">Change your password</p>
 
@@ -268,6 +274,13 @@ function ChangePasswordSection() {
             </div>
           </form>
         </div>
+      </div>
+      {/* Real bottom space, not padding-bottom on the scrolling ancestor —
+          padding-bottom on an element that scrolls (or sits inside one
+          whose scrollHeight it contributes to) has proven unreliable here
+          across a few different container/overflow combinations; a plain
+          in-flow element's own height is not. */}
+      <div className="account-bottom-spacer" aria-hidden="true" />
     </div>
   )
 }
@@ -361,16 +374,21 @@ function AccountDataSection() {
   }
 
   return (
-    <div className="account-section">
+    // .account-scroll-content is always flex-column (unconditionally, not
+    // dependent on the row/column toggle inside .account-section) so the
+    // bottom spacer always lands below it regardless of that toggle's
+    // state — see the spacer's own comment for why it's a real element
+    // rather than padding-bottom on the scrolling ancestor.
+    <div className="account-scroll-content">
       <Toast message={networkError} onDismiss={() => setNetworkError('')} />
 
-      {/* .account-section is itself the row (flex-row/wrap on desktop,
-          collapses to flex-column once the two children can't fit side by
-          side) — a Fragment, not an extra wrapper div, is what the
+      {/* .account-section is itself the row (row on desktop, column once
+          the two children can't fit side by side — see the @container
+          rule). A Fragment, not an extra wrapper div, is what the
           customer-loaded condition needs here since it's just gating
           which 2 children render, same system as ChangePasswordSection. */}
       {customer && (
-        <>
+        <div className="account-section">
           <div className="account-col--summary">
             <div className="account-box">
               <dl className="account-data-facts">
@@ -493,8 +511,14 @@ function AccountDataSection() {
               </div>
             </form>
           </div>
-        </>
+        </div>
       )}
+      {/* Real bottom space, not padding-bottom on the scrolling ancestor —
+          padding-bottom on an element that scrolls (or sits inside one
+          whose scrollHeight it contributes to) has proven unreliable here
+          across a few different container/overflow combinations; a plain
+          in-flow element's own height is not. */}
+      <div className="account-bottom-spacer" aria-hidden="true" />
     </div>
   )
 }

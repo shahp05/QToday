@@ -12,10 +12,10 @@
 
 /* The one scroll container for both columns together (replaces the
    earlier attempt at giving .account-col--main its own independent
-   scroll) — .account-section (padding-bearing) sits inside this, not the
-   other way around, so the padding is never on the element that itself
-   has overflow:auto. container-type is what lets .account-section's
-   own @container rule below key off this element's rendered width. */
+   scroll) — .account-scroll-content sits inside this, not the other way
+   around, so no padding-bearing element is itself the one with
+   overflow:auto. container-type is what lets .account-section's own
+   @container rule below key off this element's rendered width. */
 .account-page-body {
   container-type: inline-size;
   flex: 1;
@@ -79,6 +79,26 @@
    genuinely password-specific text/content, only ChangePasswordSection
    uses it. ───────────────────────────────────────────────────────────── */
 
+/* Always flex-column (unconditionally — not the thing that toggles
+   between row/column below), so the bottom spacer always ends up below
+   .account-section regardless of that toggle's state. Holds the left/
+   right padding directly; bottom space comes from .account-bottom-spacer
+   instead of padding-bottom — padding-bottom on (or contributing to the
+   scrollHeight of) an actually-scrolling ancestor proved unreliable here
+   across several different container/overflow arrangements, in a way a
+   plain in-flow element's own height isn't. */
+.account-scroll-content {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 0 24px;
+}
+
+.account-bottom-spacer {
+  flex-shrink: 0;
+  height: 24px;
+}
+
 /* This IS the row — left column (status/summary + rules boxes) and right
    column (the form, in its own matching box) — not a heading plus a
    separate wrapper div. The "Change your password" heading lives inside
@@ -91,18 +111,13 @@
    wrapped line appeared). A row/column toggle has none of that — single
    axis, one line, always. align-items: stretch does double duty: equal
    height for the two columns side by side, and (once toggled to column)
-   full width for each since width becomes the cross axis. No overflow or
-   flex:1/min-height:0 here — .account-page-body is the one scroll
-   container for both columns together now (see its own comment), and
-   since this section isn't the thing with overflow:auto, its own
-   padding-bottom can't get clipped by it. */
+   full width for each since width becomes the cross axis. */
 .account-section {
   display: flex;
   flex-direction: row;
   align-items: stretch;
   gap: var(--pg-gap, 20px);
   width: 100%;
-  padding: 0 24px 24px;
 }
 
 /* Below this width, .account-col--summary (300) + gap (20) +
