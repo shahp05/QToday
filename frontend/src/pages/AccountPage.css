@@ -290,8 +290,11 @@
 }
 
 /* Same lime-fill / hover-to-outline pill as students-empty-list-btn and
-   quiz-intro-start-btn. */
+   quiz-intro-start-btn. position:relative so .account-save-overlay can
+   center over the label instead of replacing it — same convention as
+   every other busy button in the app (keep the label, overlay a spinner). */
 .account-save-btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -307,6 +310,14 @@
   padding: 8px 14px;
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+.account-save-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .account-save-btn:hover:not(:disabled),

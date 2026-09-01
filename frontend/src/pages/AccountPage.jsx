@@ -267,7 +267,12 @@ function ChangePasswordSection() {
 
             <div className="account-actions">
               <button className="account-save-btn" type="submit" disabled={busy}>
-                {busy ? <span className="account-spinner" role="status" aria-label="Saving" /> : 'Save Password'}
+                <span style={{ visibility: busy ? 'hidden' : 'visible' }}>Save Password</span>
+                {busy && (
+                  <span className="account-save-overlay">
+                    <span className="account-spinner" role="status" aria-label="Saving" />
+                  </span>
+                )}
               </button>
               {resultError && <span className="account-error">{resultError}</span>}
               {successMessage && <span className="account-success"><IconCheck />{successMessage}</span>}
@@ -287,6 +292,12 @@ function ChangePasswordSection() {
 
 const CUSTOMER_RULES = {
   customer_name: { label: 'School/Group Name', required: true },
+  customer_address: { label: 'Address', required: true },
+  customer_city: { label: 'City', required: true },
+  customer_state: { label: 'State', required: true },
+  customer_zip: { label: 'Zip', required: true },
+  customer_email: { label: 'Email', required: true },
+  customer_phone: { label: 'Phone', required: true },
 }
 
 const CUSTOMER_FIELDS = {
@@ -353,15 +364,20 @@ function AccountDataSection() {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!isDirty) return // nothing changed — don't call the API
+    // Validate first — otherwise an unchanged form (e.g. required fields
+    // still empty from before this section required them) would return
+    // here before validate() ever ran, silently skipping the shake/red-
+    // border feedback entirely.
     if (!validate(form)) return
+    if (!isDirty) return // valid, but nothing changed — don't call the API
     setBusy(true)
     setResultError('')
     setSuccessMessage('')
     try {
       const updated = await updateMyCustomer(form)
       setCustomer(updated)
-      setSuccessMessage('Account data has been saved.')
+      setSuccessMessage('Account data saved')
+      setTimeout(() => setSuccessMessage(''), 3000)
     } catch (err) {
       if (err instanceof TypeError) {
         setNetworkError(resolveApiError({ error_code: ErrorCode.FRONTEND_NETWORK_ERROR }))
@@ -453,28 +469,28 @@ function AccountDataSection() {
                 </div>
 
                 <div className="account-data-field account-data-field--wide account-data-field--row-start">
-                  <Field label="Address">
+                  <Field label="Address" required error={!!errors.customer_address}>
                     <input className="su-input" type="text" value={form.customer_address}
                       onChange={ev => set('customer_address', ev.target.value)} />
                   </Field>
                 </div>
 
                 <div className="account-data-field">
-                  <Field label="City">
+                  <Field label="City" required error={!!errors.customer_city}>
                     <input className="su-input" type="text" value={form.customer_city}
                       onChange={ev => set('customer_city', ev.target.value)} />
                   </Field>
                 </div>
 
                 <div className="account-data-field">
-                  <Field label="State">
+                  <Field label="State" required error={!!errors.customer_state}>
                     <input className="su-input" type="text" value={form.customer_state}
                       onChange={ev => set('customer_state', ev.target.value)} />
                   </Field>
                 </div>
 
                 <div className="account-data-field">
-                  <Field label="Zip">
+                  <Field label="Zip" required error={!!errors.customer_zip}>
                     <input className="su-input" type="text" value={form.customer_zip}
                       onChange={ev => set('customer_zip', ev.target.value)} />
                   </Field>
@@ -488,14 +504,14 @@ function AccountDataSection() {
                 </div>
 
                 <div className="account-data-field">
-                  <Field label="Email">
+                  <Field label="Email" required error={!!errors.customer_email}>
                     <input className="su-input" type="email" value={form.customer_email}
                       onChange={ev => set('customer_email', ev.target.value)} />
                   </Field>
                 </div>
 
                 <div className="account-data-field">
-                  <Field label="Phone">
+                  <Field label="Phone" required error={!!errors.customer_phone}>
                     <input className="su-input" type="tel" value={form.customer_phone}
                       onChange={ev => set('customer_phone', ev.target.value)} />
                   </Field>
@@ -503,8 +519,13 @@ function AccountDataSection() {
               </div>
 
               <div className="account-actions">
-                <button className="account-save-btn" type="submit" disabled={busy || !isDirty}>
-                  {busy ? <span className="account-spinner" role="status" aria-label="Saving" /> : 'Save Changes'}
+                <button className="account-save-btn" type="submit" disabled={busy}>
+                  <span style={{ visibility: busy ? 'hidden' : 'visible' }}>Save Changes</span>
+                  {busy && (
+                    <span className="account-save-overlay">
+                      <span className="account-spinner" role="status" aria-label="Saving" />
+                    </span>
+                  )}
                 </button>
                 {resultError && <span className="account-error">{resultError}</span>}
                 {successMessage && <span className="account-success"><IconCheck />{successMessage}</span>}
