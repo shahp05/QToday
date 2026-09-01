@@ -21,16 +21,14 @@ import './AccountPage.css'
 const TABS = [
   { id: 'accountData', label: 'Account Data' },
   { id: 'changePassword', label: 'Change Password' },
-  { id: 'resetPassword', label: 'Reset Password', disabled: true },
   { id: 'billing', label: 'Billing', disabled: true },
 ]
 
 // Minimal for now — the self-photo-upload gap (spec 1.8), the Change
 // Password section (spec 1.9), and — for super-admins only — the Account
-// Data tab. Reset Password and Billing are visible per spec's access
-// matrix but deferred: their tabs are disabled rather than wired to a
-// placeholder screen (no "coming soon" text — the disabled state itself
-// says that).
+// Data tab. Billing is visible per spec's access matrix but deferred: its
+// tab is disabled rather than wired to a placeholder screen (no "coming
+// soon" text — the disabled state itself says that).
 export default function AccountPage() {
   const navigate = useNavigate()
   usePageView('account') // every page-header page names itself in the URL
@@ -101,6 +99,32 @@ function Field({ label, required, span, error, children }) {
   )
 }
 
+// Same shape as TeachLogList's IconChevron, without the open/rotate prop —
+// these boxes navigate to a click target rather than expand in place, so
+// the chevron always just points right.
+function IconChevronRight() {
+  return (
+    <svg className="account-box-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 6l6 6-6 6" />
+    </svg>
+  )
+}
+
+// Marks a box as informational rather than a click target — the reset-
+// password box for a student, who can only raise that request from the
+// login page, not from here.
+function IconInfo() {
+  return (
+    <svg className="account-box-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="16" x2="12" y2="12" />
+      <line x1="12" y1="8" x2="12.01" y2="8" />
+    </svg>
+  )
+}
+
 // Same tick shape/purpose as StudentsEmpty/TeachersEmpty's upload-success
 // icon and QuizPage's Submit/Done icon.
 function IconCheck() {
@@ -113,15 +137,15 @@ function IconCheck() {
 
 const PASSWORD_RULES = {
   current_password: {
-    label: 'Current password',
+    label: 'Current Password',
     required: true,
   },
   new_password: {
-    label: 'New password',
+    label: 'New Password',
     required: true,
   },
   confirm_password: {
-    label: 'Confirm new password',
+    label: 'Confirm New Password',
     required: true,
     validate: (v, all) => (v === all.new_password ? null : 'Does not match new password'),
   },
@@ -135,6 +159,8 @@ const PASSWORD_RULES = {
 // those screens use instead of routing everything through a Toast.
 function ChangePasswordSection() {
   const isStudent = useProfileStore(s => s.is_student)
+  const isParent = useProfileStore(s => s.is_parent)
+  const isSchoolTeacher = useProfileStore(s => s.is_school_teacher)
   const isDefaultPassword = useProfileStore(s => s.is_default_password)
   const passwordDateCreated = useProfileStore(s => s.password_date_created)
   const applyPasswordChange = useProfileStore(s => s.applyPasswordChange)
@@ -156,6 +182,31 @@ function ChangePasswordSection() {
     setResultError('')
     setSuccessMessage('')
   }
+
+  // TODO: source from the backend once the reset-request endpoint exists
+  // — there's no reset-request data anywhere yet, so this stays 0 (count
+  // hidden, click a no-op) until that's built.
+  const resetRequestCount = 0
+
+  // TODO: wire these up once the change-password/reset-password click
+  // targets (separate screens/modals) exist — for now the two containers
+  // are just shown as clickable.
+  function handleChangePasswordBoxClick() {}
+  function handleResetPasswordBoxClick() {
+    if (resetRequestCount === 0) return
+  }
+
+  // is_school_teacher covers admins and super-admins too (a super-admin's
+  // claims always include the teacher one — see isSchoolAdmin-implies-
+  // isSchoolTeacher elsewhere on this page), so one check reads for all of
+  // them; only parent/student need their own wording.
+  const resetRequestMessage = isParent
+    ? 'If your wards raise a request to reset their password, the request will be listed here. Their password will be reset to default when you approve.'
+    : isStudent
+    ? 'If you request for password reset at the time of login, your request will be sent to your teachers and parents and only they can reset the password.'
+    : isSchoolTeacher
+    ? 'If your students raise a request to reset their password, the request will be listed here. Their password will be reset to default when you approve.'
+    : null
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -198,35 +249,64 @@ function ChangePasswordSection() {
 
       {/* .account-section is itself the row (row on desktop, column once
           the two children can't fit side by side — see the @container
-          rule). The heading lives inside the left column instead of
-          floating above the row as a 3rd sibling, so the row only ever
-          has exactly 2 layout children. */}
+          rule): the left column (status + role-specific reset-request
+          box, same two-box layout as AccountDataSection's own left
+          column) and the right column (the form). */}
       <div className="account-section">
       <div className="account-col--summary">
-        <p className="account-password-label">Change your password</p>
+        {/* Pre-selected — the Change Password form is what's already showing
+            in the right column, so this card reads as the active one, same
+            green-border/tint idiom as .account-tab--active. */}
+        <button type="button" className="account-status-box account-clickable-box account-clickable-box--selected" onClick={handleChangePasswordBoxClick}>
+            <div className="account-clickable-content">
+              <div className="account-clickable-heading">
+                <p className="account-box-title">Change your password</p>
+                <IconChevronRight />
+              </div>
+              {isDefaultPassword ? (
+                <p className="account-password-status">
+                  You have not changed your default password. Change it now.
+                </p>
+              ) : passwordDateCreated ? (
+                <p className="account-password-status">
+                  You last changed your password on {formatDate(new Date(passwordDateCreated))}.
+                </p>
+              ) : null}
+            </div>
+          </button>
 
-        <div className={`account-status-box${isDefaultPassword ? ' account-status-box--alert' : ''}`}>
-            {isDefaultPassword ? (
-              <p className="account-password-default-msg">
-                You are currently using your default password. Change it now.
-              </p>
-            ) : passwordDateCreated ? (
-              <p className="account-password-status">
-                Last changed on {formatDate(new Date(passwordDateCreated))}
-              </p>
-            ) : null}
-          </div>
-
-          <div className="account-box">
-            <p className="account-password-policy-title">
-              Your password must follow the security policy given below:
-            </p>
-            <ul className="account-password-policy-list">
-              <li>At least 6 characters</li>
-              <li>At least 1 letter and 1 number</li>
-              {!isStudent && <li>At least 1 special character (e.g. <code>!</code>, <code>@</code>, <code>#</code>)</li>}
-            </ul>
-          </div>
+          {/* A student can only raise this request from the login page, not
+              from here — this box is informational for them (info icon, no
+              click), while a teacher/parent clicks through to act on it
+              (chevron, request count). */}
+          {resetRequestMessage && (isStudent ? (
+            <div className="account-box account-box--natural">
+              <div className="account-clickable-content">
+                <div className="account-clickable-heading">
+                  <p className="account-box-title">Reset Password</p>
+                  <IconInfo />
+                </div>
+                <p className="account-password-status">{resetRequestMessage}</p>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="account-box account-box--natural account-clickable-box"
+              onClick={handleResetPasswordBoxClick}
+            >
+              <div className="account-clickable-content">
+                <div className="account-clickable-heading">
+                  <p className="account-box-title">
+                    Reset Password
+                    {resetRequestCount > 0 && <span className="account-box-count">{resetRequestCount}</span>}
+                  </p>
+                  <IconChevronRight />
+                </div>
+                <p className="account-password-status">{resetRequestMessage}</p>
+              </div>
+            </button>
+          ))}
         </div>
 
         <div className="account-col--main">
@@ -235,7 +315,7 @@ function ChangePasswordSection() {
                 default one — per Account Rules, a default-password user
                 isn't asked to re-enter it. */}
             {!isDefaultPassword && (
-              <Field label="Current password" required error={!!errors.current_password}>
+              <Field label="Current Password" required error={!!errors.current_password}>
                 <input
                   className="su-input"
                   type="password"
@@ -246,7 +326,7 @@ function ChangePasswordSection() {
               </Field>
             )}
 
-            <Field label="New password" required error={!!errors.new_password}>
+            <Field label="New Password" required error={!!errors.new_password}>
               <input
                 className="su-input"
                 type="password"
@@ -256,7 +336,7 @@ function ChangePasswordSection() {
               />
             </Field>
 
-            <Field label="Confirm new password" required error={!!errors.confirm_password}>
+            <Field label="Confirm New Password" required error={!!errors.confirm_password}>
               <input
                 className="su-input"
                 type="password"
@@ -265,6 +345,17 @@ function ChangePasswordSection() {
                 onChange={ev => set('confirm_password', ev.target.value)}
               />
             </Field>
+
+            <div className="account-password-policy">
+              <p className="account-password-policy-title">
+                Your password must follow the security policy given below:
+              </p>
+              <ul className="account-password-policy-list">
+                <li>At least 6 characters</li>
+                <li>At least 1 letter and 1 number</li>
+                {!isStudent && <li>At least 1 special character (e.g. <code>!</code>, <code>@</code>, <code>#</code>)</li>}
+              </ul>
+            </div>
 
             <div className="account-actions">
               <button className="account-save-btn" type="submit" disabled={busy}>

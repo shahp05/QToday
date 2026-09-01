@@ -59,9 +59,9 @@
   color: var(--color-dark, #343434);
 }
 
-/* Reset Password / Billing — visible per spec's access matrix, but their
-   content is deferred; disabled (not a "coming soon" placeholder screen)
-   says that on its own. */
+/* Billing — visible per spec's access matrix, but its content is
+   deferred; disabled (not a "coming soon" placeholder screen) says that
+   on its own. */
 .account-tab:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -120,38 +120,11 @@
   width: 100%;
 }
 
-/* Below this width, .account-col--summary (300) + gap (20) +
-   .account-col--main (420) — their combined basis in row mode — no longer
-   fits comfortably; switch to a single stacked column instead of letting
-   them squeeze. flex: none on both resets their row-mode flex-basis
-   (which would otherwise apply to height, not width, once the main axis
-   turns vertical) back to natural content sizing. */
-@container (max-width: 760px) {
-  .account-section {
-    flex-direction: column;
-  }
-
-  .account-col--summary,
-  .account-col--main {
-    flex: none;
-    min-width: 0;
-  }
-}
-
-.account-password-label {
-  margin: 0;
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: #aaaaaa;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
 /* flex-grow: 1 out of a 1:10 ratio against .account-col--main — in row
    mode it takes only a sliver of whatever's left over past its 300px
    basis (10x more of any spare width goes to the main column instead), so
    it stays close to its natural width on wide screens rather than
-   visibly ballooning. Reset to flex:none by the @container rule above
+   visibly ballooning. Reset to flex:none by the @container rule below
    once stacked — there's no "reach 100%" concern to solve with grow
    ratios anymore now that column mode is explicit (align-items: stretch
    on .account-section gives it full width directly). */
@@ -166,8 +139,7 @@
 /* Border-radius matches TeachLogList's .teach-log-subjects and
    SubjectsPage's inputs/buttons (--radius-sm) rather than QuizPage's
    --radius-md — the Subjects page is the reference here, not the quiz. Same
-   translucent background/border idiom as .quiz-qa-panel; --alert switches
-   it to the app's standard --color-red for the default-password warning. */
+   translucent background/border idiom as .quiz-qa-panel. */
 .account-status-box,
 .account-box,
 .account-col--main {
@@ -178,46 +150,132 @@
   box-sizing: border-box;
 }
 
+.account-status-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 /* .account-col--summary itself stretches to the row's full height
    (align-items: stretch above), but that's an invisible wrapper —
    without this, the visible box(es) inside it would just sit at their
    own content height, leaving blank space below rather than actually
-   reaching the bottom. The status/alert box (a short, one-line statement)
-   stays its natural height; this is the one that grows to take up the
-   rest. */
+   reaching the bottom. The status box (a short statement) stays its
+   natural height; this is the one that grows to take up the rest. */
 .account-box {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.account-status-box--alert {
-  border-color: var(--color-red, #D32F2F);
-  background: var(--color-red, #D32F2F);
+/* ChangePasswordSection's reset-request box — same box styling as
+   .account-box, but it shouldn't stretch to fill the column's leftover
+   height the way AccountDataSection's own facts box does. */
+.account-box--natural {
+  flex: none;
 }
 
-/* Font sizes matched to StudentsEmpty/TeachersEmpty's own text: the policy
-   copy plays the same role as their .students-note explanatory paragraph
-   (font-size-md, 14px), not their small print (font-size-sm, 11px, which
-   is reserved here for the same kind of small inline caption they use it
-   for — the Save row's result text below). */
-.account-password-default-msg {
+/* Both of ChangePasswordSection's boxes are <button>s (same reused-box-as-
+   button idiom as .account-tab/.account-save-btn) carrying this class on
+   top of .account-status-box/.account-box — resets the UA button chrome.
+   Hover/focus treatment is the same lime-border/shadow-bump idiom as
+   .student-topic-card, this app's existing clickable-card language,
+   rather than inventing a new affordance. */
+.account-clickable-box {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.account-clickable-box:hover,
+.account-clickable-box:focus-visible {
+  border-color: var(--color-green-light, #8EEB65);
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.12));
+}
+
+/* Pre-selected state — same green-border idiom as the hover/focus state
+   above, just always on; no background tint, so it doesn't compete with
+   the grey/white text this card holds. */
+.account-clickable-box--selected {
+  border-color: var(--color-green-light, #8EEB65);
+}
+
+.account-clickable-box--selected .account-box-icon {
+  color: var(--color-green-light, #8EEB65);
+}
+
+.account-clickable-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Chevron/info icon sits in its own row with the title — rather than
+   spanning the whole card's height — so it stays middle-aligned with the
+   title line no matter how many lines the status message below wraps to. */
+.account-clickable-heading {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.account-box-icon {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Same eyebrow-label recipe as .students-empty-label/.teachers-empty-
+   label/.teach-today-label — the grey/white two-tier color-coding used
+   throughout the dashboard (title in grey, content in white below it),
+   also how .account-data-fact's dt/dd pair reads and how TeachLogList's
+   .teach-log-subject-name headlines the (lighter) topic rows under it. */
+.account-box-title {
   margin: 0;
-  font-family: var(--font-family);
-  font-size: var(--font-size-md, 14px);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-white, #ffffff);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #aaaaaa;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Same recipe as SubjectsPage's .teach-today-list-count next to "Topics
+   Covered" — not uppercase/letter-spaced like the title it sits next to,
+   since it's a number, not a label. */
+.account-box-count {
+  margin-left: 6px;
+  font-size: var(--font-size-sm, 11px);
+  text-transform: none;
+  letter-spacing: normal;
+  opacity: 0.7;
 }
 
 .account-password-status {
   margin: 0;
   font-family: var(--font-family);
-  font-size: var(--font-size-md, 14px);
+  font-size: var(--font-size-sm, 11px);
   color: #aaaaaa;
 }
 
+/* Title + list share one div, kept out of .account-password-form's own
+   14px gap track (which would otherwise land equally between title/list
+   as it does between fields) — spacing between them is this element's own
+   padding instead. */
 .account-password-policy-title {
-  margin: 0 0 10px;
+  margin: 0;
+  padding-bottom: 10px;
   font-family: var(--font-family);
-  font-size: var(--font-size-md, 14px);
+  font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
   color: rgba(255, 255, 255, 0.85);
 }
@@ -247,13 +305,35 @@
 
 /* Grows 10x as fast as .account-col--summary in row mode — it absorbs
    almost all of the row's spare width, not an even split. Reset to
-   flex:none by the @container rule above once stacked (its 420px basis
+   flex:none by the @container rule below once stacked (its 420px basis
    would otherwise apply to height, not width, in column mode). */
 .account-col--main {
   display: flex;
   flex-direction: column;
   flex: 10 1 420px;
   min-width: 420px;
+}
+
+/* Below this width, .account-col--summary (300) + gap (20) +
+   .account-col--main (420) — their combined basis in row mode — no longer
+   fits comfortably; switch to a single stacked column instead of letting
+   them squeeze. flex: none on both resets their row-mode flex-basis (which
+   would otherwise apply to height, not width, once the main axis turns
+   vertical) back to natural content sizing. Placed after both base rules
+   above (not before, as it was originally) — same specificity, so an
+   earlier placement lost the cascade to those unconditional rules even
+   when this query matched, leaving stale 300px/420px flex-bases as HEIGHT
+   floors in column mode and a large blank gap below the shorter column. */
+@container (max-width: 760px) {
+  .account-section {
+    flex-direction: column;
+  }
+
+  .account-col--summary,
+  .account-col--main {
+    flex: none;
+    min-width: 0;
+  }
 }
 
 /* Wider than the old 280px-ish effective width, but still well short of
@@ -265,17 +345,13 @@
   max-width: 420px;
 }
 
-/* su-label defaults to the auth-card style (semibold, --font-size-sm, not
-   uppercase) — overridden here to fully match the dashboard's own eyebrow
-   label style (.teach-today-label/.students-empty-label/.teachers-empty-
-   label): 0.85rem, weight 500, #aaaaaa, uppercase. su-input just needs its
-   light-background assumption corrected for this dark section. */
+/* su-label's own default (semibold, --font-size-sm, var(--color-text))
+   assumes the white auth-card it's normally shown on — same correction
+   AccountDataSection's .account-data-form .su-label makes, so both forms'
+   labels match. su-input just needs its light-background box-shadow
+   assumption corrected for this dark section. */
 .account-password-form .su-label {
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: #aaaaaa;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .account-password-form .su-input {
@@ -290,16 +366,19 @@
 }
 
 /* Same lime-fill / hover-to-outline pill as students-empty-list-btn and
-   quiz-intro-start-btn. position:relative so .account-save-overlay can
-   center over the label instead of replacing it — same convention as
-   every other busy button in the app (keep the label, overlay a spinner). */
+   quiz-intro-start-btn — same padding (8px 14px), no min-width, so it hugs
+   its label exactly like those do. position:relative so .account-save-
+   overlay can center over the label instead of replacing it — same
+   convention as every other busy button in the app (keep the label,
+   overlay a spinner); the hidden-but-still-laid-out label during busy
+   already holds the button's width, so no min-width is needed for that
+   either. */
 .account-save-btn {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  min-width: 128px;
   border: 1px solid var(--color-green-light, #8EEB65);
   border-radius: var(--radius-sm, 6px);
   background: var(--color-green-light, #8EEB65);
