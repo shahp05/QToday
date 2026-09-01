@@ -74,6 +74,24 @@ class Country(Base):
     users:     Mapped[list["User"]]     = relationship(back_populates="country")
     subjects:  Mapped[list["Subject"]]  = relationship(back_populates="country")
     topics:    Mapped[list["Topic"]]    = relationship(back_populates="country")
+    states:    Mapped[list["State"]]    = relationship(back_populates="country", foreign_keys="State.country_id")
+
+
+class State(Base):
+    __tablename__ = "states"
+
+    state_id:      Mapped[int]      = mapped_column(Integer, primary_key=True)
+    country_id:    Mapped[int]      = mapped_column(ForeignKey("countries.country_id"), nullable=False)
+    state_name:    Mapped[str]      = mapped_column(String(150), nullable=False)
+    # CountriesNow's own state_code (e.g. "DL" for Delhi) — kept as-is from
+    # the source, not validated against any standard.
+    state_code:    Mapped[str | None] = mapped_column(String(10), nullable=True)
+    date_created:  Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+    date_modified: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+    date_deleted:  Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    is_active:     Mapped[bool]     = mapped_column(Boolean, nullable=False, default=True)
+
+    country: Mapped["Country"] = relationship(back_populates="states", foreign_keys=[country_id])
 
 
 class Grade(Base):
@@ -99,7 +117,11 @@ class Customer(Base):
     customer_acronym:  Mapped[str]           = mapped_column(String(20), nullable=False, unique=True)
     customer_address:  Mapped[str | None]    = mapped_column(String(300))
     customer_city:     Mapped[str | None]    = mapped_column(String(100))
-    customer_state:    Mapped[str | None]    = mapped_column(String(100))
+    # FK-linked, same as country_id — states are seeded from CountriesNow
+    # (services/geo_service.py). City stays free text: CountriesNow's city
+    # data turned out to be a raw locality gazetteer, not an actual "cities"
+    # list, with no reliable way to filter it down (see geo_service.py).
+    customer_state_id: Mapped[int | None]    = mapped_column(ForeignKey("states.state_id"), nullable=True)
     customer_zip:      Mapped[str | None]    = mapped_column(String(20))
     customer_gstn:     Mapped[str | None]    = mapped_column(String(20))
     customer_email:    Mapped[str | None]    = mapped_column(String(200))

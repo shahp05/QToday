@@ -7,6 +7,7 @@ import { useClassQuizProgressStore } from './classQuizProgressStore'
 import { useSessionsStore } from './sessionsStore'
 import { useParentWardStore } from './parentWardStore'
 import { useStudentsListFilterStore } from './studentsListFilterStore'
+import { useAccountStore } from './accountStore'
 
 // Wipes every per-user/per-session data cache EXCEPT profileStore and
 // dashboardQuoteStore, which each caller handles itself (an explicit
@@ -37,4 +38,5 @@ export function resetUserScopedStores() {
   useSessionsStore.getState().clearSessions()
   useParentWardStore.getState().clear()
   useStudentsListFilterStore.getState().clear()
+  useAccountStore.getState().clearAccountData()
 }

@@ -37,11 +37,11 @@ async def signup_request(payload: SignupRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/verify")
-def signup_verify(payload: VerifyRequest, db: Session = Depends(get_db)):
+async def signup_verify(payload: VerifyRequest, db: Session = Depends(get_db)):
     """Verify the code and, on success, create the customer account, then
     log the new admin straight in — same token/profile shape as /auth/login,
     since the frontend navigates straight to the dashboard afterward."""
-    result = verify_and_create(db, payload.email_id, payload.code)
+    result = await verify_and_create(db, payload.email_id, payload.code)
     profile = get_profile(db, result["user_id"])
     token = create_access_token({
         "user_id":           profile["user_id"],

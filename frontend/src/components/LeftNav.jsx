@@ -6,6 +6,7 @@ import { useParentWardStore } from '../store/parentWardStore'
 import { useStudentsStore } from '../store/studentsStore'
 import { useTeachersStore } from '../store/teachersStore'
 import { useSubjectsTaughtStore } from '../store/subjectsTaughtStore'
+import { useAccountStore } from '../store/accountStore'
 import { useDashboardQuoteStore } from '../store/dashboardQuoteStore'
 import { resetUserScopedStores } from '../store/resetUserScopedStores'
 import { useSubjectsFeatureVisible } from '../hooks/useSubjectsFeatureVisible'
@@ -94,6 +95,8 @@ export default function LeftNav() {
   const studentsStatus = useStudentsStore(s => s.bySession[CURRENT_SESSION_KEY]?.status ?? 'idle')
   const teachersStatus = useTeachersStore(s => s.bySession[CURRENT_SESSION_KEY]?.status ?? 'idle')
   const subjectsStatus = useSubjectsTaughtStore(s => s.status)
+  const accountStatus = useAccountStore(s => s.status)
+  const fetchAccountData = useAccountStore(s => s.fetchAccountData)
   const { visible: subjectsFeatureVisible } = useSubjectsFeatureVisible()
   const { visible: studentsFeatureVisible } = useStudentsFeatureVisible()
   const navigate = useNavigate()
@@ -178,6 +181,11 @@ export default function LeftNav() {
     students: studentsStatus === 'idle' || studentsStatus === 'loading',
     teachers: teachersStatus === 'idle' || teachersStatus === 'loading',
     subjects: subjectsStatus === 'idle' || subjectsStatus === 'loading',
+    // Not eagerly prefetched like the others above (nothing else needs
+    // account data before it's actually opened) — 'idle' is the normal
+    // at-rest state here, not a loading one, so only 'loading' itself
+    // (kicked off by handleNav below, on click) shows the spinner.
+    account: accountStatus === 'loading',
   }
 
   // A parent has no school/board/country of their own — these reflect the
@@ -201,8 +209,26 @@ export default function LeftNav() {
     return location.pathname === `/dashboard/${id}` || location.pathname.startsWith(`/dashboard/${id}/`)
   }
 
-  function handleNav(id) {
-    if (isActive(id)) return
+  // Account is the one nav item with nothing prefetched on mount (unlike
+  // Students/Teachers/Subjects, fetched eagerly elsewhere as soon as the
+  // dashboard loads) — its data (AccountDataSection's customer + states)
+  // is only ever needed once this page is actually opened, so it's fetched
+  // right here, on click, with the same spinner shown while that's in
+  // flight, before navigating. fetchAccountData no-ops if already
+  // loaded/in flight, so re-clicking Account is cheap. Only fetched for a
+  // school admin — everyone else's Account page is just Change Password,
+  // nothing to prefetch.
+  async function handleNav(id) {
+    const alreadyActive = isActive(id)
+    // Fetch even when already on /dashboard/account — e.g. retrying after
+    // a failed fetch on refresh (see accountStore's status). Skipping the
+    // whole handler here used to also skip this fetch, so clicking Account
+    // again while already there (the exact position a refresh leaves you
+    // in) couldn't retry at all.
+    if (id === 'account' && profile.is_school_admin) {
+      await fetchAccountData()
+    }
+    if (alreadyActive) return
     navigate(`/dashboard/${id}`)
   }
 

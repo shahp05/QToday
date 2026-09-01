@@ -61,7 +61,7 @@ async def request_verification(db: Session, payload: dict) -> None:
     await send_verification_code(email, code, ttl)
 
 
-def verify_and_create(db: Session, email: str, code: str) -> dict:
+async def verify_and_create(db: Session, email: str, code: str) -> dict:
     """Verify the code. On success, create customer + user and return their IDs.
     Raises AppError with a centrally-defined ErrorCode on any failure."""
     max_attempts = int(_get_setting(db, "signup_verification_max_attempts", 5))
@@ -112,12 +112,12 @@ def verify_and_create(db: Session, email: str, code: str) -> dict:
 
     # Resolve or create country
     country_row = db.execute(
-        text("SELECT country_id FROM countries WHERE country_code = :c AND is_active = TRUE"),
+        text("SELECT country_id, country_name FROM countries WHERE country_code = :c AND is_active = TRUE"),
         {"c": p["country_code"]},
     ).fetchone()
     if country_row is None:
         raise AppError(ErrorCode.UNKNOWN_COUNTRY_CODE, context={"code": p["country_code"]})
-    country_id = country_row[0]
+    country_id, country_name = country_row
 
     # Resolve or create board
     board_row = db.execute(
@@ -189,4 +189,16 @@ def verify_and_create(db: Session, email: str, code: str) -> dict:
     ensure_session_bootstrapped(db, customer_id)
 
     db.commit()
+
+    # Trigger a background states/cities seed (services/geo_service.py) the
+    # first time a customer signs up from a country with no states yet —
+    # seed_country_geo_task no-ops if another signup already seeded it, so
+    # this check is just to avoid deferring a pointless task on every signup.
+    has_states = db.execute(
+        text("SELECT 1 FROM states WHERE country_id = :cid LIMIT 1"), {"cid": country_id}
+    ).fetchone()
+    if has_states is None:
+        from jobs.tasks import seed_country_geo_task
+        await seed_country_geo_task.defer_async(country_id=country_id, country_name=country_name)
+
     return {"customer_id": customer_id, "user_id": user_id}

@@ -17,7 +17,7 @@ from db.seed_data import ensure_default_grades
 from errors.app_error import AppError
 from errors.error_codes import ErrorCode, ERROR_DEFAULTS
 from jobs.app import app as procrastinate_app
-from routers import auth, countries, customers, error_logs, photos, qa, quizzes, sessions, signup, students, teach_logs, teachers
+from routers import auth, countries, customers, error_logs, geo, photos, qa, quizzes, sessions, signup, students, teach_logs, teachers
 from services.error_log_service import log_error
 from services.photo_service import UPLOAD_ROOT
 
@@ -61,6 +61,7 @@ app.include_router(qa.router)
 app.include_router(error_logs.router)
 app.include_router(signup.router)
 app.include_router(countries.router)
+app.include_router(geo.router)
 app.include_router(auth.router)
 app.include_router(students.router)
 app.include_router(teachers.router)

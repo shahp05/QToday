@@ -23,6 +23,27 @@ CREATE TABLE IF NOT EXISTS countries (
 
 
 -- ------------------------------------------------------------
+-- 1b. STATES  (master — per country; seeded via CountriesNow, see
+--     services/geo_service.py). No cities table — CountriesNow's city-level
+--     data turned out to be a raw settlement/locality gazetteer rather than
+--     an actual "cities" list (verified directly: includes neighborhoods
+--     like "Karol Bagh" alongside real cities, with no reliable way to tell
+--     them apart), so customers.customer_city stays free text instead.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS states (
+    state_id        SERIAL          PRIMARY KEY,
+    country_id      INTEGER         NOT NULL REFERENCES countries(country_id),
+    state_name      VARCHAR(150)    NOT NULL,
+    state_code      VARCHAR(10)     NULL,
+    date_created    TIMESTAMP       NOT NULL DEFAULT NOW(),
+    date_modified   TIMESTAMP       NOT NULL DEFAULT NOW(),
+    date_deleted    TIMESTAMP       NULL,
+    is_active       BOOLEAN         NOT NULL DEFAULT TRUE
+);
+CREATE INDEX IF NOT EXISTS idx_states_country_id ON states(country_id);
+
+
+-- ------------------------------------------------------------
 -- 2. BOARDS  (master — per country; added at signup if new)
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS boards (
@@ -69,7 +90,7 @@ CREATE TABLE IF NOT EXISTS customers (
     customer_acronym  VARCHAR(20)     NOT NULL UNIQUE,
     customer_address  VARCHAR(300)    NULL,
     customer_city     VARCHAR(100)    NULL,
-    customer_state    VARCHAR(100)    NULL,
+    customer_state_id INTEGER         NULL REFERENCES states(state_id),
     customer_zip      VARCHAR(20)     NULL,
     customer_gstn     VARCHAR(20)     NULL,
     customer_email    VARCHAR(200)    NULL,

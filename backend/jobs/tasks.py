@@ -13,6 +13,7 @@ from jobs.app import app
 from services.batch_job_service import close_job, fail_job, is_due, start_job
 from services.country_service import fetch_and_sync_countries
 from services.error_log_service import mark_old_error_logs_for_purge, physically_delete_purged_error_logs
+from services.geo_service import seed_country_geo
 from services.password_service import hash_password
 from services.qa_service import (
     generate_missing_qa, poll_and_finalize_qa_batch, should_top_up_qa, submit_qa_top_up_batch, verify_pending_qa,
@@ -29,6 +30,7 @@ REQUEST_TYPE_QA_TOP_UP = "qa_generation"
 REQUEST_TYPE_QA_VERIFICATION = "qa_verification"
 REQUEST_TYPE_SESSION_CUTOVER = "session_cutover"
 REQUEST_TYPE_ACCOUNT_PASSWORD_HASH = "account_password_hash"
+REQUEST_TYPE_COUNTRY_GEO_SEED = "country_geo_seed"
 
 
 # Not periodic — deferred once per students/teachers xlsx upload (see
@@ -67,6 +69,28 @@ async def hash_new_account_passwords_task(user_ids: list[int]) -> dict:
             db.commit()
             close_job(db, job)
             return {"hashed": len(ids)}
+        except Exception:
+            db.rollback()
+            fail_job(db, job)
+            raise
+    finally:
+        db.close()
+
+
+# Not periodic — deferred once per signup (services/signup_service.py)
+# right after a customer/country is created, only when that country has no
+# states seeded yet. seed_country_geo itself is idempotent (no-ops if
+# already seeded), so a duplicate defer for the same country is harmless.
+@app.task(queue="maintenance")
+async def seed_country_geo_task(country_id: int, country_name: str) -> dict:
+    db = SessionLocal()
+    try:
+        job = start_job(db, REQUEST_TYPE_COUNTRY_GEO_SEED, country_id=country_id)
+        try:
+            result = await seed_country_geo(db, country_id=country_id, country_name=country_name)
+            db.commit()
+            close_job(db, job)
+            return result
         except Exception:
             db.rollback()
             fail_job(db, job)

@@ -4,11 +4,12 @@ import { useProfileStore } from '../store/profileStore'
 import { CURRENT_SESSION_KEY, useSessionsStore } from '../store/sessionsStore'
 import { useStudentsStore } from '../store/studentsStore'
 import { useTeachersStore } from '../store/teachersStore'
+import { useAccountStore } from '../store/accountStore'
 import { resolveFileUrl, resolveApiError } from '../lib/api'
 import { ErrorCode } from '../errors/errorCodes'
 import { uploadMyPhoto } from '../services/photoService'
 import { changeMyPassword } from '../services/passwordService'
-import { fetchMyCustomer, updateMyCustomer } from '../services/customersService'
+import { updateMyCustomer } from '../services/customersService'
 import { formatDate } from '../lib/dateFormat'
 import { useValidation } from '../hooks/useValidation'
 import EditablePhoto from '../components/EditablePhoto'
@@ -294,7 +295,7 @@ const CUSTOMER_RULES = {
   customer_name: { label: 'School/Group Name', required: true },
   customer_address: { label: 'Address', required: true },
   customer_city: { label: 'City', required: true },
-  customer_state: { label: 'State', required: true },
+  customer_state_id: { label: 'State', required: true },
   customer_zip: { label: 'Zip', required: true },
   customer_email: { label: 'Email', required: true },
   customer_phone: { label: 'Phone', required: true },
@@ -304,11 +305,10 @@ const CUSTOMER_FIELDS = {
   customer_name: '',
   customer_address: '',
   customer_city: '',
-  customer_state: '',
+  customer_state_id: '',
   customer_zip: '',
   customer_email: '',
   customer_phone: '',
-  customer_gstn: '',
 }
 
 function customerToForm(customer) {
@@ -328,7 +328,17 @@ function AccountDataSection() {
   const currentSession = useSessionsStore(s => s.sessions.find(sess => sess.is_current))
   const teacherCount = useTeachersStore(s => s.bySession[CURRENT_SESSION_KEY]?.teachers.length)
   const studentCount = useStudentsStore(s => s.bySession[CURRENT_SESSION_KEY]?.students.length)
-  const [customer, setCustomer] = useState(null)
+  // Fetched by the time this page is reachable at all — LeftNav's Account
+  // click awaits fetchAccountData() before navigating here, so this
+  // resolves immediately below (its own already-loaded/in-flight check
+  // short-circuits). Still called again on mount as a safety net for a
+  // direct URL visit/refresh, which skips that click entirely.
+  const customer = useAccountStore(s => s.customer)
+  const states = useAccountStore(s => s.states)
+  const accountStatus = useAccountStore(s => s.status)
+  const accountError = useAccountStore(s => s.error)
+  const fetchAccountData = useAccountStore(s => s.fetchAccountData)
+  const setStoredCustomer = useAccountStore(s => s.setCustomer)
   const [form, setForm] = useState(CUSTOMER_FIELDS)
   const [busy, setBusy] = useState(false)
   const [resultError, setResultError] = useState('')
@@ -337,23 +347,61 @@ function AccountDataSection() {
   const { errors, validate, clearError, isShaking } = useValidation(CUSTOMER_RULES)
   const isDirty = customer != null && Object.keys(CUSTOMER_FIELDS).some(key => form[key] !== customerToForm(customer)[key])
 
+  // Kicks off the fetch (a no-op if the store's already loaded/in flight —
+  // e.g. LeftNav's Account click already awaited it). Deliberately doesn't
+  // populate `form` from the result here — see the render-time sync below
+  // for why.
   useEffect(() => {
-    let cancelled = false
-    fetchMyCustomer()
-      .then(data => {
-        if (cancelled) return
-        setCustomer(data)
-        setForm(customerToForm(data))
-      })
-      .catch(err => {
-        if (!cancelled) {
-          setNetworkError(err instanceof TypeError
-            ? resolveApiError({ error_code: ErrorCode.FRONTEND_NETWORK_ERROR })
-            : err.message)
-        }
-      })
-    return () => { cancelled = true }
+    fetchAccountData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Populating `form` from a .then() callback tied to *this* effect
+  // invocation's own promise broke under StrictMode's double-invoked
+  // effects: on a real fetch (a cold refresh — a same-session click has
+  // already resolved this before navigating here), the second invocation's
+  // fetchAccountData() call no-ops instantly (status is already 'loading'
+  // from the first), so its callback ran before real data arrived, while
+  // the first invocation's own callback got skipped by its cleanup's
+  // `cancelled` flag — net result, `form` never got populated even though
+  // the store's `customer` loaded correctly. Syncing during render instead
+  // (React's documented "adjusting state when a prop changes" pattern) ties
+  // this to the actual VALUE of `customer`, not to any one effect
+  // invocation's timing, so it's immune to that race.
+  const [syncedCustomer, setSyncedCustomer] = useState(null)
+  if (customer !== syncedCustomer) {
+    setSyncedCustomer(customer)
+    if (customer != null) {
+      const next = customerToForm(customer)
+      // customer_state_id comes back null for any account created before
+      // this feature (or whose customer row simply has none set yet) —
+      // default to the first state rather than showing a blank
+      // "Select..." option.
+      if (!next.customer_state_id && states.length > 0) next.customer_state_id = states[0].id
+      setForm(next)
+    }
+  }
+
+  // Same render-time-sync approach, for the fetch's own error/recovery —
+  // surfaces accountStore's error the moment status flips to 'error', and
+  // clears it again once a retry (see LeftNav.jsx's handleNav, or another
+  // mount) succeeds.
+  const [syncedAccountStatus, setSyncedAccountStatus] = useState(accountStatus)
+  if (accountStatus !== syncedAccountStatus) {
+    setSyncedAccountStatus(accountStatus)
+    if (accountStatus === 'error' && accountError) {
+      setNetworkError(accountError)
+    } else if (accountStatus === 'loaded') {
+      setNetworkError('')
+    }
+  }
+
+  function handleStateChange(stateId) {
+    setForm(f => ({ ...f, customer_state_id: Number(stateId) }))
+    clearError('customer_state_id')
+    setResultError('')
+    setSuccessMessage('')
+  }
 
   function set(field, value) {
     setForm(f => ({ ...f, [field]: value }))
@@ -369,13 +417,18 @@ function AccountDataSection() {
     // here before validate() ever ran, silently skipping the shake/red-
     // border feedback entirely.
     if (!validate(form)) return
-    if (!isDirty) return // valid, but nothing changed — don't call the API
+    if (!isDirty) {
+      // Valid, but nothing changed — same success feedback, no API call.
+      setSuccessMessage('Account data saved')
+      setTimeout(() => setSuccessMessage(''), 3000)
+      return
+    }
     setBusy(true)
     setResultError('')
     setSuccessMessage('')
     try {
       const updated = await updateMyCustomer(form)
-      setCustomer(updated)
+      setStoredCustomer(updated)
       setSuccessMessage('Account data saved')
       setTimeout(() => setSuccessMessage(''), 3000)
     } catch (err) {
@@ -454,12 +507,19 @@ function AccountDataSection() {
           </div>
 
           <div className="account-col--main">
-            <form className={`account-data-form${isShaking ? ' ui-shake' : ''}`} onSubmit={handleSubmit} noValidate>
+            {/* No onSubmit/type="submit" here (unlike ChangePasswordSection)
+                — a real form-submit event, even with preventDefault(),
+                still makes Chrome offer its native "Save this address?"
+                autofill prompt on every click, since these fields
+                (name/address/city/zip/phone/email) match its address-form
+                heuristic. handleSubmit is called directly by the button's
+                onClick instead, so no submit event is ever dispatched. */}
+            <div className={`account-data-form${isShaking ? ' ui-shake' : ''}`}>
               {/* Fixed 2-column grid — every field is exactly one unit
                   wide, Name/Address explicitly span both units (2 field-
                   widths, not an unbounded full row), and the remaining
                   fields simply pair up two-per-row in the order they're
-                  listed (City+State, Zip+GSTN, Email+Phone). */}
+                  listed (City+State, Zip+Email, Phone). */}
               <div className="account-data-fields">
                 <div className="account-data-field">
                   <Field label="School/Group Name" required error={!!errors.customer_name}>
@@ -483,9 +543,11 @@ function AccountDataSection() {
                 </div>
 
                 <div className="account-data-field">
-                  <Field label="State" required error={!!errors.customer_state}>
-                    <input className="su-input" type="text" value={form.customer_state}
-                      onChange={ev => set('customer_state', ev.target.value)} />
+                  <Field label="State" required error={!!errors.customer_state_id}>
+                    <select className="su-input su-select" value={form.customer_state_id}
+                      onChange={ev => handleStateChange(ev.target.value)} disabled={states.length === 0}>
+                      {states.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
                   </Field>
                 </div>
 
@@ -493,13 +555,6 @@ function AccountDataSection() {
                   <Field label="Zip" required error={!!errors.customer_zip}>
                     <input className="su-input" type="text" value={form.customer_zip}
                       onChange={ev => set('customer_zip', ev.target.value)} />
-                  </Field>
-                </div>
-
-                <div className="account-data-field">
-                  <Field label="GSTN">
-                    <input className="su-input" type="text" value={form.customer_gstn}
-                      onChange={ev => set('customer_gstn', ev.target.value)} />
                   </Field>
                 </div>
 
@@ -519,7 +574,7 @@ function AccountDataSection() {
               </div>
 
               <div className="account-actions">
-                <button className="account-save-btn" type="submit" disabled={busy}>
+                <button className="account-save-btn" type="button" onClick={handleSubmit} disabled={busy}>
                   <span style={{ visibility: busy ? 'hidden' : 'visible' }}>Save Changes</span>
                   {busy && (
                     <span className="account-save-overlay">
@@ -530,7 +585,7 @@ function AccountDataSection() {
                 {resultError && <span className="account-error">{resultError}</span>}
                 {successMessage && <span className="account-success"><IconCheck />{successMessage}</span>}
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
