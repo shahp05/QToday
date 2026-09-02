@@ -149,9 +149,15 @@ export default function LoginPage() {
           </div>
         </form>
 
-        <p className="su-login-link">
-          New here?{' '}
-          <button className="btn btn-link" onClick={() => navigate('/signup')}>Create an account</button>
+        <p className="su-login-link lg-login-links">
+          <span className="lg-login-links-item">
+            New here?{' '}
+            <button className="btn btn-link" onClick={() => navigate('/signup')}>Create an account</button>
+          </span>
+          <span className="lg-login-links-item">
+            Forgot password?{' '}
+            <button className="btn btn-link" onClick={() => navigate('/reset-password')}>Reset now</button>
+          </span>
         </p>
 
         <Toast message={toast} onDismiss={() => setToast('')} />

@@ -11,3 +11,21 @@
   gap: 5px;
   margin-bottom: 16px;
 }
+
+.lg-login-links {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.lg-login-links-item {
+  flex: 1;
+  text-align: center;
+}
+
+.lg-reset-notice {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  line-height: 1.5;
+  margin: 0 0 20px;
+}

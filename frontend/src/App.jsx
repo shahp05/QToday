@@ -5,6 +5,7 @@ import DashboardQuote from './pages/DashboardQuote'
 import AccountPage from './pages/AccountPage'
 import SignupPage from './pages/signup/SignupPage'
 import LoginPage  from './pages/login/LoginPage'
+import ResetPasswordPage from './pages/login/ResetPasswordPage'
 import StudentsPage from './pages/students/StudentsPage'
 import StudentDetailRoute from './pages/students/StudentDetailRoute'
 import TeachersPage from './pages/teachers/TeachersPage'
@@ -16,6 +17,7 @@ export default function App() {
       <Routes>
         <Route path="/"          element={<Home />} />
         <Route path="/login"     element={<LoginPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/signup"    element={<SignupPage />} />
         <Route path="/dashboard" element={<Dashboard />}>
           <Route index                    element={<DashboardQuote />} />
