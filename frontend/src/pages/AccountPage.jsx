@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useProfileStore } from '../store/profileStore'
 import { CURRENT_SESSION_KEY, useSessionsStore } from '../store/sessionsStore'
 import { useStudentsStore } from '../store/studentsStore'
@@ -31,13 +31,17 @@ const TABS = [
 // soon" text — the disabled state itself says that).
 export default function AccountPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   usePageView('account') // every page-header page names itself in the URL
   const userName = useProfileStore(s => s.user_name)
   const photoUrl = useProfileStore(s => s.photo_url)
   const updateOwnPhoto = useProfileStore(s => s.updateOwnPhoto)
   const isSchoolAdmin = useProfileStore(s => s.is_school_admin)
   const [error, setError] = useState('')
-  const [tab, setTab] = useState('accountData')
+  // The default-password Toast (Dashboard.jsx) links here with
+  // state:{tab:'changePassword'} so it opens straight to that tab instead
+  // of the usual Account Data default.
+  const [tab, setTab] = useState(location.state?.tab === 'changePassword' ? 'changePassword' : 'accountData')
 
   async function handleUpload(file) {
     const data = await uploadMyPhoto(file)
@@ -143,6 +147,11 @@ const PASSWORD_RULES = {
   new_password: {
     label: 'New Password',
     required: true,
+    // Only catches the case where the current password was actually typed
+    // (a default password isn't — see the !isDefaultPassword branch below
+    // — so there's nothing on the client to compare against there; that
+    // case would need a server-side check instead).
+    validate: (v, all) => (all.current_password && v === all.current_password ? 'Must be different from your current password' : null),
   },
   confirm_password: {
     label: 'Confirm New Password',

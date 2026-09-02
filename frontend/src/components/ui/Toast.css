@@ -1,7 +1,25 @@
-.ui-toast {
+/* The single shared portal target every Toast instance renders into (see
+   getToastStackRoot in Toast.jsx) — fixed positioning and stacking live
+   here instead of on each toast, so simultaneous toasts (a page's own
+   error Toast alongside Dashboard's persistent nudge, etc.) stack instead
+   of overlapping at the same corner. column-reverse + append-order means
+   a newly-mounted toast lands closest to the corner, pushing earlier ones
+   up — the usual toast-stack reading order. pointer-events:none so the
+   gaps between toasts (and the empty container) don't block clicks on the
+   page underneath; each toast opts back into pointer-events itself. */
+.ui-toast-stack {
   position: fixed;
   bottom: 24px;
   right: 24px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-end;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.ui-toast {
   transform: translateY(20px);
   /* Light surface (not the app's dark chrome) so it stands out against the
      dark page background it floats over — see the "reusable white content
@@ -16,7 +34,6 @@
   font-family: var(--font-family);
   font-size: var(--font-size-sm);
   box-shadow: var(--shadow-lg);
-  z-index: 1000;
   width: min(360px, calc(100vw - 32px));
   opacity: 0;
   transition: opacity 0.25s ease, transform 0.25s ease;
@@ -32,6 +49,18 @@
 .ui-toast__msg {
   flex: 1;
   line-height: 1.45;
+}
+
+.ui-toast__msg--clickable {
+  appearance: none;
+  -webkit-appearance: none;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .ui-toast__close {
@@ -58,4 +87,15 @@
 /* Success variant — left accent */
 .ui-toast--success {
   border-left: 3px solid var(--color-green-dark);
+}
+
+/* Action variant — a prompt to go do something (e.g. change a default
+   password) urgent enough to warrant the same red accent/text as the
+   error variant, not a neutral status report. */
+.ui-toast--action {
+  border-left: 3px solid var(--color-red);
+}
+
+.ui-toast--action .ui-toast__msg {
+  color: var(--color-red);
 }

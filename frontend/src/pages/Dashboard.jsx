@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
-import { Navigate, Outlet } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import LeftNav from '../components/LeftNav'
 import { useProfileStore } from '../store/profileStore'
 import { useSessionsStore } from '../store/sessionsStore'
@@ -7,6 +7,8 @@ import { useStudentsStore } from '../store/studentsStore'
 import { useTeachersStore } from '../store/teachersStore'
 import { useSubjectsTaughtStore } from '../store/subjectsTaughtStore'
 import { useTopicCatalogStore } from '../store/topicCatalogStore'
+import { useQuizHistoryStore } from '../store/quizHistoryStore'
+import { Toast } from '../components/ui/Toast'
 import './Dashboard.css'
 
 // Layout for everything under /dashboard: left icon nav + whichever child
@@ -14,8 +16,12 @@ import './Dashboard.css'
 // / a student's detail) is now driven entirely by the URL — see App.jsx —
 // so real back-navigation is just the browser's own history.
 export default function Dashboard() {
+  const navigate = useNavigate()
+  const location = useLocation()
   const token = useProfileStore(s => s.token)
   const isParent = useProfileStore(s => s.is_parent)
+  const isStudent = useProfileStore(s => s.is_student)
+  const isDefaultPassword = useProfileStore(s => s.is_default_password)
   const fetchStudents       = useStudentsStore(s => s.fetchStudents)
   const fetchTeachers       = useTeachersStore(s => s.fetchTeachers)
   const fetchSubjectsTaught = useSubjectsTaughtStore(s => s.fetchSubjectsTaught)
@@ -36,6 +42,29 @@ export default function Dashboard() {
     fetchTeachers()
     fetchTopicCatalog()
     fetchSessions()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Default-password nudge — mount-only (Dashboard stays mounted across
+  // /dashboard/* sub-navigation, only remounting on a fresh login or a
+  // full-page refresh, so this naturally fires once per session rather
+  // than needing its own "already shown" flag). Per Account Rules: a
+  // super-admin/teacher/parent is nudged as soon as their password is
+  // still the default; a student only once they've actually played a
+  // quiz — quizHistoryStore isn't otherwise populated this early (only
+  // StudentSubjectsHome loads it), so it's fetched here just to check.
+  const [showPasswordToast, setShowPasswordToast] = useState(false)
+  useEffect(() => {
+    if (!isDefaultPassword) return
+    if (!isStudent) {
+      setShowPasswordToast(true)
+      return
+    }
+    let cancelled = false
+    useQuizHistoryStore.getState().fetchQuizHistory().then(() => {
+      if (!cancelled && useQuizHistoryStore.getState().quizzes.length > 0) setShowPasswordToast(true)
+    })
+    return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -90,12 +119,29 @@ export default function Dashboard() {
   // (never before one), per React's rules.
   if (!token) return <Navigate to="/" replace />
 
+  // Suppressed while already on the Account page (there's nothing to click
+  // through to) and once the password's actually changed — isDefaultPassword
+  // is a live profileStore value, so this clears itself the moment
+  // ChangePasswordSection's applyPasswordChange flips it, no extra wiring
+  // needed beyond reading it here alongside showPasswordToast.
+  const isOnAccountPage = location.pathname === '/dashboard/account'
+  const passwordToastMessage = showPasswordToast && isDefaultPassword && !isOnAccountPage
+    ? 'Change your default password now'
+    : ''
+
   return (
     <div className="dashboard">
       <LeftNav />
       <div className="dashboard-panel3">
         <Outlet />
       </div>
+      <Toast
+        message={passwordToastMessage}
+        variant="action"
+        duration={null}
+        onDismiss={() => setShowPasswordToast(false)}
+        onClick={() => navigate('/dashboard/account', { state: { tab: 'changePassword' } })}
+      />
     </div>
   )
 }
