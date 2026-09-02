@@ -17,7 +17,7 @@ from db.seed_data import ensure_default_grades
 from errors.app_error import AppError
 from errors.error_codes import ErrorCode, ERROR_DEFAULTS
 from jobs.app import app as procrastinate_app
-from routers import auth, countries, customers, error_logs, geo, photos, qa, quizzes, sessions, signup, students, teach_logs, teachers
+from routers import auth, countries, customers, error_logs, geo, photos, qa, quizzes, reset_requests, sessions, signup, students, teach_logs, teachers
 from services.error_log_service import log_error
 from services.photo_service import UPLOAD_ROOT
 
@@ -70,6 +70,7 @@ app.include_router(quizzes.router)
 app.include_router(photos.router)
 app.include_router(sessions.router)
 app.include_router(customers.router)
+app.include_router(reset_requests.router)
 
 # Serves uploaded photos back out at /static/photos/<file> — matches the
 # relative URL photo_service.py stores in users.file_url.

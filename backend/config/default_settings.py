@@ -84,4 +84,8 @@ DEFAULT_SETTINGS: dict[str, tuple[Any, str]] = {
     "signup_verification_max_attempts": (
         5, "Max wrong-code attempts before the code is invalidated and a new one must be requested",
     ),
+    "password_reset_verification_ttl_seconds": (60, "Seconds before a password-reset email verification code expires"),
+    "password_reset_verification_max_attempts": (
+        5, "Max wrong-code attempts before a password-reset code is invalidated and a new one must be requested",
+    ),
 }

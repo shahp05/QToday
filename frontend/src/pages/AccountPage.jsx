@@ -9,6 +9,7 @@ import { resolveFileUrl, resolveApiError } from '../lib/api'
 import { ErrorCode } from '../errors/errorCodes'
 import { uploadMyPhoto } from '../services/photoService'
 import { changeMyPassword } from '../services/passwordService'
+import { fetchResetRequests, approveResetRequest } from '../services/resetRequestsService'
 import { updateMyCustomer } from '../services/customersService'
 import { formatDate } from '../lib/dateFormat'
 import { useValidation } from '../hooks/useValidation'
@@ -191,8 +192,12 @@ function ChangePasswordSection() {
   const isDefaultPassword = useProfileStore(s => s.is_default_password)
   const passwordDateCreated = useProfileStore(s => s.password_date_created)
   const applyPasswordChange = useProfileStore(s => s.applyPasswordChange)
-  const userName = useProfileStore(s => s.user_name)
+  const orgId = useProfileStore(s => s.org_id)
+  const emailId = useProfileStore(s => s.email_id)
   const customerAcronym = useProfileStore(s => s.customer_acronym)
+  // Same default-password formula as password_service.py / signup_service.py:
+  // a parent's default is their own email, everyone else's is org_id@acronym.
+  const ownDefaultPassword = isParent ? emailId : `${orgId}@${customerAcronym}`
 
   const rules = isDefaultPassword
     ? { new_password: PASSWORD_RULES.new_password, confirm_password: PASSWORD_RULES.confirm_password }
@@ -212,10 +217,35 @@ function ChangePasswordSection() {
     setSuccessMessage('')
   }
 
-  // TODO: source from the backend once the reset-request endpoint exists
-  // — there's no reset-request data anywhere yet, so this stays 0 (count
-  // hidden, click a no-op) until that's built.
-  const resetRequestCount = 0
+  // Fetched once on mount for anyone who can see a request queue at all
+  // (parent/teacher/admin — see resetRequestMessage below) so the badge
+  // count on the row is right before the panel is ever opened, same as
+  // AccountDataSection prefetching its own tab.
+  const [resetRequests, setResetRequests] = useState([])
+  const [approvingUserId, setApprovingUserId] = useState(null)
+
+  useEffect(() => {
+    if (isParent || isSchoolTeacher) {
+      fetchResetRequests().then(setResetRequests).catch(() => {})
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function handleApprove(userId) {
+    setApprovingUserId(userId)
+    setNetworkError('')
+    try {
+      const target = resetRequests.find(r => r.user_id === userId)
+      await approveResetRequest(target.request_id)
+      setResetRequests(reqs => reqs.filter(r => r.user_id !== userId))
+    } catch (err) {
+      setNetworkError(err.message)
+    } finally {
+      setApprovingUserId(null)
+    }
+  }
+
+  const resetRequestCount = resetRequests.length
 
   // Which of the two left cards' content shows in the right column —
   // clicking Change Password swaps back, clicking Reset Password (once
@@ -326,21 +356,54 @@ function ChangePasswordSection() {
               className={`account-option-row${activeSection === 'resetPassword' ? ' account-option-row--active' : ''}`}
               onClick={handleResetPasswordBoxClick}
             >
-              <span className="account-box-title">
-                Reset Password
+              <span className="account-box-title">Reset Password</span>
+              <span className="account-box-trailing">
                 {resetRequestCount > 0 && <span className="account-box-count">{resetRequestCount}</span>}
+                <IconChevronRight />
               </span>
-              <IconChevronRight />
             </button>
           ))}
         </div>
         </div>
 
-        <div className="account-col--main">
-          {activeSection === 'resetPassword' ? (
-            <div className="account-reset-panel">
-              {/* TODO: once the reset-request list endpoint exists, render
-                  it here, above the two info groups below. */}
+        {activeSection === 'resetPassword' ? (
+          <div className="account-col--main-stack">
+            {/* Pending requests sit above the bordered info box, not inside
+                it — their own white students-page-style cards, not part of
+                that dark box's content. */}
+            {resetRequests.length > 0 && (
+              <ul className="account-reset-requests">
+                {resetRequests.map(r => (
+                  <li className="account-reset-request-row" key={r.user_id}>
+                    <EditablePhoto
+                      editable={false}
+                      thumbClassName="account-reset-request-thumb"
+                      placeholderClassName="account-reset-request-thumb--placeholder"
+                      name={r.user_name}
+                      photoUrl={resolveFileUrl(r.photo_url)}
+                    />
+                    <span className="account-reset-request-namecell">
+                      <span className="account-reset-request-id">{r.org_id}</span>
+                      <span className="account-reset-request-name">{r.user_name}</span>
+                    </span>
+                    <button
+                      type="button"
+                      className="account-save-btn account-reset-request-btn"
+                      onClick={() => handleApprove(r.user_id)}
+                      disabled={approvingUserId === r.user_id}
+                    >
+                      <span style={{ visibility: approvingUserId === r.user_id ? 'hidden' : 'visible' }}>Reset</span>
+                      {approvingUserId === r.user_id && (
+                        <span className="account-save-overlay">
+                          <span className="account-spinner" role="status" aria-label="Resetting" />
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="account-col--main">
               <div className="account-reset-groups">
                 <div className="account-reset-group">
                   <p className="account-reset-group-title">{resetGroupLabel}</p>
@@ -361,14 +424,16 @@ function ChangePasswordSection() {
                     <li>A verification code will be emailed to you.</li>
                     <li>
                       Your password will be reset to default{' '}
-                      <span className="account-reset-id">{userName}@{customerAcronym}</span>.
+                      <span className="account-reset-id">{ownDefaultPassword}</span>.
                     </li>
                     <li>Re-login will prompt you to change the default password.</li>
                   </ul>
                 </div>
               </div>
             </div>
-          ) : (
+          </div>
+        ) : (
+          <div className="account-col--main">
           <form className={`account-password-form${isShaking ? ' ui-shake' : ''}`} onSubmit={handleSubmit} noValidate>
             {isDefaultPassword ? (
               <p className="account-password-status">
@@ -439,8 +504,8 @@ function ChangePasswordSection() {
               {successMessage && <span className="account-success"><IconCheck />{successMessage}</span>}
             </div>
           </form>
-          )}
-        </div>
+          </div>
+        )}
       </div>
       {/* Real bottom space, not padding-bottom on the scrolling ancestor —
           padding-bottom on an element that scrolls (or sits inside one

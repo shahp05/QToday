@@ -40,6 +40,52 @@ class SignupVerification(Base):
     date_created:     Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
+class PasswordResetVerification(Base):
+    """Email-OTP verification for the self-service "reset my password to
+    default" flow (parents, teachers, admins/super-admins — anyone but a
+    student, who raises a PasswordResetRequest instead). Same shape as
+    SignupVerification, keyed by user_id instead of email/payload since the
+    account already exists here."""
+
+    __tablename__ = "password_reset_verifications"
+    __table_args__ = (
+        Index("idx_prv_user", "user_id"),
+        Index("idx_prv_expires", "expires_at"),
+    )
+
+    verification_id: Mapped[int]      = mapped_column(Integer, primary_key=True)
+    user_id:          Mapped[int]      = mapped_column(ForeignKey("users.user_id"), nullable=False)
+    code:             Mapped[str]      = mapped_column(String(6), nullable=False)
+    expires_at:       Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    is_verified:      Mapped[bool]     = mapped_column(Boolean, nullable=False, default=False)
+    attempt_count:    Mapped[int]      = mapped_column(Integer, nullable=False, default=0)
+    date_created:     Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class PasswordResetRequest(Base):
+    """A student-raised "reset my password" request, made from the login
+    page (a student can't self-verify by email the way a parent/teacher/
+    admin can — see PasswordResetVerification — so this is a request queue
+    a teacher/parent/admin approves instead, same idea as an approval
+    inbox). The partial unique index enforces at most one OPEN (reset_flag
+    = false) request per student — a repeat click on Login's "Reset now"
+    is then a no-op against the existing row rather than piling up
+    duplicates. resolved_by_user_id records who approved it, for audit."""
+
+    __tablename__ = "password_reset_requests"
+    __table_args__ = (
+        Index("uq_prr_open_per_user", "user_id",
+              postgresql_where=expression.text("reset_flag = false"), unique=True),
+    )
+
+    request_id:          Mapped[int]           = mapped_column(Integer, primary_key=True)
+    user_id:              Mapped[int]           = mapped_column(ForeignKey("users.user_id"), nullable=False)
+    date_created:         Mapped[datetime]      = mapped_column(DateTime, nullable=False, server_default=func.now())
+    date_reset:           Mapped[datetime|None] = mapped_column(DateTime, nullable=True)
+    reset_flag:           Mapped[bool]          = mapped_column(Boolean, nullable=False, default=False)
+    resolved_by_user_id:  Mapped[int|None]      = mapped_column(ForeignKey("users.user_id"), nullable=True)
+
+
 class Board(Base):
     __tablename__ = "boards"
     __table_args__ = (UniqueConstraint("board_code", "country_id"),)

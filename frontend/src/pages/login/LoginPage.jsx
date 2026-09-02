@@ -2,9 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../lib/api'
 import { useProfileStore } from '../../store/profileStore'
-import { useDashboardQuoteStore } from '../../store/dashboardQuoteStore'
-import { resetUserScopedStores } from '../../store/resetUserScopedStores'
-import { fetchMyStudents } from '../../services/studentsService'
+import { completeLogin } from '../../lib/postLogin'
 import { Toast } from '../../components/ui/Toast'
 import logo512 from '../../assets/logo_512.webp'
 import './LoginPage.css'
@@ -36,9 +34,7 @@ export default function LoginPage() {
   const firstRef                      = useRef(null)
   const shakeTimer                    = useRef(null)
   const navigate                      = useNavigate()
-  const setProfile                    = useProfileStore(s => s.setProfile)
   const clearProfile                  = useProfileStore(s => s.clearProfile)
-  const resetQuoteAutoAdvance         = useDashboardQuoteStore(s => s.reset)
 
   useEffect(() => {
     firstRef.current?.focus()
@@ -75,29 +71,11 @@ export default function LoginPage() {
         return
       }
       const j = await res.json()
-      // Wipes any leftover data (including a manually browsed session)
-      // from whoever last used this browser — including this same
-      // account, if it got back here via a token expiry rather than an
-      // explicit Logout, which doesn't clear this. Must run before
-      // setProfile/navigate so Dashboard's mount-time fetches start from
-      // a genuinely clean slate, not a stale activeSessionId.
-      resetUserScopedStores()
-      setProfile(j.profile, j.access_token)
-      // A parent with no linked wards has nothing this app can show them
-      // (every parent-facing page is ward-scoped) — checked here, before
-      // ever landing on /dashboard, rather than leaving it to whichever
-      // page happens to notice the empty roster first.
-      if (j.profile.is_parent) {
-        const { students } = await fetchMyStudents()
-        if (students.length === 0) {
-          clearProfile()
-          setToast('No student wards found')
-          shake(true)
-          return
-        }
+      const result = await completeLogin(j.profile, j.access_token, navigate)
+      if (!result.ok) {
+        setToast(result.message)
+        shake(true)
       }
-      resetQuoteAutoAdvance()
-      navigate('/dashboard')
     } catch {
       clearProfile()
       shake(true)

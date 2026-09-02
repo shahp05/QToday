@@ -44,3 +44,29 @@ async def send_verification_code(email: str, code: str, ttl_seconds: int) -> Non
         subtype=MessageType.html,
     )
     await FastMail(_mail_config()).send_message(message)
+
+
+async def send_password_reset_code(email: str, code: str, ttl_seconds: int) -> None:
+    """Send a password-reset verification code to the given address."""
+    html = f"""
+    <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">
+      <h2 style="color:#0F8911;margin-bottom:8px">{APP_NAME} — Reset your password</h2>
+      <p style="color:#343434;margin-bottom:24px">
+        Use the code below to reset your {APP_NAME} password. It expires in
+        <strong>{ttl_seconds} seconds</strong>.
+      </p>
+      <div style="background:#f2f4f7;border-radius:10px;padding:24px;text-align:center">
+        <span style="font-size:36px;font-weight:700;letter-spacing:8px;color:#0F8911">{code}</span>
+      </div>
+      <p style="color:#999;font-size:12px;margin-top:24px">
+        If you did not request this from {APP_NAME}, you can safely ignore this email.
+      </p>
+    </div>
+    """
+    message = MessageSchema(
+        subject=f"Your {APP_NAME} password reset code",
+        recipients=[email],
+        body=html,
+        subtype=MessageType.html,
+    )
+    await FastMail(_mail_config()).send_message(message)

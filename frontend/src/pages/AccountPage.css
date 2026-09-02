@@ -261,15 +261,24 @@
    the plain list-item label reads better here than the uppercase eyebrow
    style. */
 .account-box-title {
+  flex: 1;
   margin: 0;
   font-size: var(--font-size-md, 14px);
   color: #aaaaaa;
 }
 
-/* Same recipe as SubjectsPage's .teach-today-list-count next to "Topics
-   Covered". */
+/* Groups the count with the chevron at the row's trailing edge (the title
+   above takes flex:1 to push this cluster there) — its own 8px gap matches
+   TeachLogList's .teach-log-subject-row gap between name/count/chevron,
+   independent of .account-option-row's wider 14px gap before the cluster. */
+.account-box-trailing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .account-box-count {
-  margin-left: 6px;
+  color: var(--color-white, #ffffff);
   font-size: var(--font-size-sm, 11px);
   opacity: 0.7;
 }
@@ -315,6 +324,107 @@
 .account-password-policy-list code {
   font-family: 'Consolas', 'Menlo', monospace;
   color: rgba(255, 255, 255, 0.85);
+}
+
+/* Reset-password's whole right-hand stack — pending-requests list above,
+   the bordered info box (.account-col--main) below — takes over
+   .account-col--main's usual row-basis role (flex:10 1 420px) so the info
+   box itself can go back to sizing off its natural content instead of the
+   column's width. */
+.account-col--main-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 10 1 420px;
+  min-width: 420px;
+}
+
+.account-col--main-stack .account-col--main {
+  flex: none;
+  min-width: 0;
+}
+
+/* Pending student reset requests — same white-card row shape as
+   StudentsList's own rows (.students-row/.students-rows), not the dark
+   info-box treatment below them — plus a Reset action. 2px row gap matches
+   .students-rows exactly. */
+.account-reset-requests {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.account-reset-request-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--color-white);
+  border-radius: var(--radius-sm, 6px);
+  padding: 12px;
+}
+
+.account-reset-request-thumb {
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: var(--color-grey-light, #f2f4f7);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.account-reset-request-thumb--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-grey-light, #f2f4f7);
+  color: var(--color-text-light, #666666);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.account-reset-request-namecell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.account-reset-request-id {
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm, 11px);
+  color: var(--color-text-light, #666666);
+}
+
+.account-reset-request-name {
+  font-family: var(--font-family);
+  font-size: var(--font-size-md, 14px);
+  font-weight: 500;
+  color: var(--color-text, #343434);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-reset-request-btn {
+  flex-shrink: 0;
+}
+
+/* .account-save-btn's hover (transparent bg + white text) is meant for its
+   usual dark surroundings — on this row's white card it would turn the
+   button invisible (white text on white). Pin it to the resting look
+   (green fill, dark text) instead of inheriting that inversion. */
+.account-reset-request-btn:hover:not(:disabled),
+.account-reset-request-btn:focus-visible:not(:disabled) {
+  background: var(--color-green-light, #8EEB65);
+  border-color: var(--color-green-light, #8EEB65);
+  color: var(--color-dark, #343434);
 }
 
 /* Two info groups, stacked. */
@@ -380,7 +490,8 @@
   }
 
   .account-col--summary,
-  .account-col--main {
+  .account-col--main,
+  .account-col--main-stack {
     flex: none;
     min-width: 0;
   }

@@ -40,6 +40,10 @@ class ErrorCode(str, Enum):
     XLSX_VALUE_MISSING = "XLSX_VALUE_MISSING"
     XLSX_FILE_TYPE_INVALID = "XLSX_FILE_TYPE_INVALID"
     EMAIL_ALREADY_USED = "EMAIL_ALREADY_USED"
+    INVALID_LOGIN_ID = "INVALID_LOGIN_ID"
+    STUDENT_CANNOT_SELF_RESET = "STUDENT_CANNOT_SELF_RESET"
+    NOT_A_STUDENT_ACCOUNT = "NOT_A_STUDENT_ACCOUNT"
+    RESET_REQUEST_NOT_FOUND = "RESET_REQUEST_NOT_FOUND"
     SESSION_TARGET_INVALID = "SESSION_TARGET_INVALID"
     EXTERNAL_SERVICE_FAILED = "EXTERNAL_SERVICE_FAILED"
     BATCH_JOB_FAILED = "BATCH_JOB_FAILED"
@@ -86,6 +90,10 @@ ERROR_DEFAULTS = {
     ErrorCode.XLSX_VALUE_MISSING: {"message": "Id, name and {field} must be entered.", "http_status": 400},
     ErrorCode.XLSX_FILE_TYPE_INVALID: {"message": "Please upload an .xlsx file.", "http_status": 400},
     ErrorCode.EMAIL_ALREADY_USED: {"message": "{email} is already used by another teacher.", "http_status": 400},
+    ErrorCode.INVALID_LOGIN_ID: {"message": "This login ID could not be found.", "http_status": 404},
+    ErrorCode.STUDENT_CANNOT_SELF_RESET: {"message": "Students cannot reset their own password this way. Ask a teacher or parent to reset it.", "http_status": 400},
+    ErrorCode.NOT_A_STUDENT_ACCOUNT: {"message": "Only student accounts can raise a password reset request this way.", "http_status": 400},
+    ErrorCode.RESET_REQUEST_NOT_FOUND: {"message": "This reset request could not be found or has already been resolved.", "http_status": 404},
     ErrorCode.SESSION_TARGET_INVALID: {"message": "This upload's target session is not valid for this school.", "http_status": 400},
     ErrorCode.EXTERNAL_SERVICE_FAILED: {"message": "An external service failed to respond correctly.", "http_status": 502},
     ErrorCode.BATCH_JOB_FAILED: {"message": "A background job failed to complete.", "http_status": 500},
