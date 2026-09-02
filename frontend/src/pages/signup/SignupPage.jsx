@@ -60,13 +60,12 @@ function CtaBtn({ icon, children, variant, ...props }) {
 }
 
 // ── Shared card header ─────────────────────────────────────────────────────────
-function CardHeader({ title, subtitle }) {
+function CardHeader({ title }) {
   const navigate = useNavigate()
   return (
     <div className="su-card-header">
       <div className="su-title-text">
         <h1 className="su-title">{title}</h1>
-        <p className="su-subtitle">{subtitle}</p>
       </div>
       <button className="su-close-btn" onClick={() => navigate(-1)} aria-label="Go back">✕</button>
     </div>
@@ -128,7 +127,7 @@ function SignupForm({ onCodeSent }) {
 
   return (
     <>
-      <CardHeader title="Create your account" subtitle="Measure Learning Outcomes" />
+      <CardHeader title="Create your account" />
       <form className={`su-form${isShaking ? ' ui-shake' : ''}`} onSubmit={handleSubmit} noValidate>
         <div className="su-grid">
           <Field label="Your name" required span="full" error={!!errors.user_name}>
@@ -329,10 +328,7 @@ function VerifyForm({ formData, onSuccess }) {
 
   return (
     <>
-      <CardHeader
-        title="Check your email"
-        subtitle={`Verification code sent to ${formData.email_id}`}
-      />
+      <CardHeader title="Check your email" />
       <form className={`su-form${isShaking ? ' ui-shake' : ''}`} onSubmit={handleVerify} noValidate>
         <div className="su-otp-wrap">
           <input

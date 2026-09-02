@@ -112,7 +112,6 @@ export default function LoginPage() {
         <div className="su-card-header">
           <div className="su-title-text">
             <h1 className="su-title">Login</h1>
-            <p className="su-subtitle">Concepts → Confidence → Competitiveness</p>
           </div>
           <button className="su-close-btn" onClick={() => navigate('/')} aria-label="Go back">✕</button>
         </div>
