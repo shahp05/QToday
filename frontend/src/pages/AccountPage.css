@@ -156,6 +156,68 @@
   gap: 10px;
 }
 
+/* Both options live as rows inside this one box now, instead of two
+   separate cards — rows own their own padding/dividers, so the box's own
+   20px padding (and the column gap it'd otherwise put between rows) is
+   cleared here. overflow:hidden keeps a row's own background from
+   spilling past the box's rounded corners. */
+.account-options-box {
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+.account-option-row {
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  padding: 20px;
+  border: none;
+  border-left: 3px solid transparent;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.account-option-row:last-child {
+  border-bottom: none;
+}
+
+.account-option-row:hover,
+.account-option-row:focus-visible {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Active row — a left border accent instead of a full card border/tint
+   (per the earlier "border only, no shaded bg" call), same green as
+   .account-tab--active; tints the trailing chevron to match. */
+.account-option-row--active {
+  border-left-color: var(--color-green-light, #8EEB65);
+}
+
+.account-option-row--active .account-box-icon {
+  color: var(--color-green-light, #8EEB65);
+}
+
+/* The student info row isn't a button — no hover/pointer, and its content
+   (title + message) stacks instead of sitting in one line. */
+.account-option-row--info {
+  align-items: flex-start;
+  cursor: default;
+}
+
+.account-option-row--info:hover {
+  background: none;
+}
+
 /* .account-col--summary itself stretches to the row's full height
    (align-items: stretch above), but that's an invisible wrapper —
    without this, the visible box(es) inside it would just sit at their
@@ -167,48 +229,6 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-}
-
-/* ChangePasswordSection's reset-request box — same box styling as
-   .account-box, but it shouldn't stretch to fill the column's leftover
-   height the way AccountDataSection's own facts box does. */
-.account-box--natural {
-  flex: none;
-}
-
-/* Both of ChangePasswordSection's boxes are <button>s (same reused-box-as-
-   button idiom as .account-tab/.account-save-btn) carrying this class on
-   top of .account-status-box/.account-box — resets the UA button chrome.
-   Hover/focus treatment is the same lime-border/shadow-bump idiom as
-   .student-topic-card, this app's existing clickable-card language,
-   rather than inventing a new affordance. */
-.account-clickable-box {
-  appearance: none;
-  -webkit-appearance: none;
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-  width: 100%;
-  box-shadow: var(--shadow-sm);
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.account-clickable-box:hover,
-.account-clickable-box:focus-visible {
-  border-color: var(--color-green-light, #8EEB65);
-  box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.12));
-}
-
-/* Pre-selected state — same green-border idiom as the hover/focus state
-   above, just always on; no background tint, so it doesn't compete with
-   the grey/white text this card holds. */
-.account-clickable-box--selected {
-  border-color: var(--color-green-light, #8EEB65);
-}
-
-.account-clickable-box--selected .account-box-icon {
-  color: var(--color-green-light, #8EEB65);
 }
 
 .account-clickable-content {
@@ -235,28 +255,21 @@
   color: rgba(255, 255, 255, 0.5);
 }
 
-/* Same eyebrow-label recipe as .students-empty-label/.teachers-empty-
-   label/.teach-today-label — the grey/white two-tier color-coding used
-   throughout the dashboard (title in grey, content in white below it),
-   also how .account-data-fact's dt/dd pair reads and how TeachLogList's
-   .teach-log-subject-name headlines the (lighter) topic rows under it. */
+/* Same recipe as TeachLogList's .teach-log-subject-name — these are list
+   rows now (same shape as that subject list), not section headings, so
+   the plain list-item label reads better here than the uppercase eyebrow
+   style. */
 .account-box-title {
   margin: 0;
-  font-size: 0.85rem;
-  font-weight: 500;
+  font-size: var(--font-size-md, 14px);
   color: #aaaaaa;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
 /* Same recipe as SubjectsPage's .teach-today-list-count next to "Topics
-   Covered" — not uppercase/letter-spaced like the title it sits next to,
-   since it's a number, not a label. */
+   Covered". */
 .account-box-count {
   margin-left: 6px;
   font-size: var(--font-size-sm, 11px);
-  text-transform: none;
-  letter-spacing: normal;
   opacity: 0.7;
 }
 
@@ -303,6 +316,42 @@
   color: rgba(255, 255, 255, 0.85);
 }
 
+/* Two info groups, stacked. */
+.account-reset-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.account-reset-group-title {
+  margin: 0 0 10px;
+  font-family: var(--font-family);
+  font-size: var(--font-size-md, 14px);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-green-light, #8EEB65);
+}
+
+/* Same bullet recipe as .account-password-policy-list. */
+.account-reset-group-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.account-reset-group-list li {
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm, 11px);
+  color: #aaaaaa;
+  line-height: 1.5;
+}
+
+.account-reset-id {
+  color: var(--color-green-light, #8EEB65);
+  font-weight: 500;
+}
+
 /* Grows 10x as fast as .account-col--summary in row mode — it absorbs
    almost all of the row's spare width, not an even split. Reset to
    flex:none by the @container rule below once stacked (its 420px basis
@@ -333,6 +382,66 @@
   .account-col--main {
     flex: none;
     min-width: 0;
+  }
+
+  /* Once the two columns stack, the options box has the full row's width
+     to itself with nothing beside it — sit the two options side by side
+     instead of stacked, same tab-like arrangement as .account-tabs above,
+     rather than leaving them as an oddly short, oddly wide single-file
+     list. The trailing chevron reads as "drill into a list" — apt for the
+     stacked layout, not for two side-by-side tabs (which show their
+     active state via the border already) — so it's hidden here. */
+  .account-options-box {
+    flex-direction: row;
+  }
+
+  .account-option-row {
+    flex: 1;
+    padding: 14px;
+    border-bottom: none;
+    border-left: none;
+    border-top: 3px solid transparent;
+  }
+
+  .account-option-row:not(:last-child) {
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .account-option-row--active {
+    border-top-color: var(--color-green-light, #8EEB65);
+  }
+
+  .account-option-row .account-box-icon {
+    display: none;
+  }
+}
+
+/* Narrow enough that two side-by-side tabs start cramping their titles —
+   back to a single stacked column (and the chevron, drill-into-a-list
+   idiom, comes back with it). */
+@container (max-width: 480px) {
+  .account-options-box {
+    flex-direction: column;
+  }
+
+  .account-option-row {
+    border-top: none;
+    border-right: none;
+    border-left: 3px solid transparent;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .account-option-row:last-child {
+    border-bottom: none;
+  }
+
+  .account-option-row--active {
+    border-top-color: transparent;
+    border-left-color: var(--color-green-light, #8EEB65);
+  }
+
+  .account-option-row .account-box-icon {
+    display: block;
   }
 }
 

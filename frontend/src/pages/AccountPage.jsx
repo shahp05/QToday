@@ -164,6 +164,8 @@ function ChangePasswordSection() {
   const isDefaultPassword = useProfileStore(s => s.is_default_password)
   const passwordDateCreated = useProfileStore(s => s.password_date_created)
   const applyPasswordChange = useProfileStore(s => s.applyPasswordChange)
+  const userName = useProfileStore(s => s.user_name)
+  const customerAcronym = useProfileStore(s => s.customer_acronym)
 
   const rules = isDefaultPassword
     ? { new_password: PASSWORD_RULES.new_password, confirm_password: PASSWORD_RULES.confirm_password }
@@ -188,18 +190,26 @@ function ChangePasswordSection() {
   // hidden, click a no-op) until that's built.
   const resetRequestCount = 0
 
-  // TODO: wire these up once the change-password/reset-password click
-  // targets (separate screens/modals) exist — for now the two containers
-  // are just shown as clickable.
-  function handleChangePasswordBoxClick() {}
+  // Which of the two left cards' content shows in the right column —
+  // clicking Change Password swaps back, clicking Reset Password (once
+  // there's actually a request to look at) swaps to its message.
+  const [activeSection, setActiveSection] = useState('changePassword')
+
+  function handleChangePasswordBoxClick() {
+    setActiveSection('changePassword')
+  }
   function handleResetPasswordBoxClick() {
-    if (resetRequestCount === 0) return
+    setActiveSection('resetPassword')
   }
 
   // is_school_teacher covers admins and super-admins too (a super-admin's
   // claims always include the teacher one — see isSchoolAdmin-implies-
   // isSchoolTeacher elsewhere on this page), so one check reads for all of
   // them; only parent/student need their own wording.
+  // Same parent/teacher split as resetRequestMessage above, for the right
+  // column's info-group label ("Wards" vs "Students").
+  const resetGroupLabel = isParent ? 'Wards' : 'Students'
+
   const resetRequestMessage = isParent
     ? 'If your wards raise a request to reset their password, the request will be listed here. Their password will be reset to default when you approve.'
     : isStudent
@@ -254,36 +264,30 @@ function ChangePasswordSection() {
           column) and the right column (the form). */}
       <div className="account-section">
       <div className="account-col--summary">
-        {/* Pre-selected — the Change Password form is what's already showing
-            in the right column, so this card reads as the active one, same
-            green-border/tint idiom as .account-tab--active. */}
-        <button type="button" className="account-status-box account-clickable-box account-clickable-box--selected" onClick={handleChangePasswordBoxClick}>
-            <div className="account-clickable-content">
-              <div className="account-clickable-heading">
-                <p className="account-box-title">Change your password</p>
-                <IconChevronRight />
-              </div>
-              {isDefaultPassword ? (
-                <p className="account-password-status">
-                  You have not changed your default password. Change it now.
-                </p>
-              ) : passwordDateCreated ? (
-                <p className="account-password-status">
-                  You last changed your password on {formatDate(new Date(passwordDateCreated))}.
-                </p>
-              ) : null}
-            </div>
+        {/* Both options live in one box as rows now, instead of two
+            separate cards — the green left-border accent on the active row
+            tracks which one's content is showing in the right column, same
+            idiom as .account-tab--active applied per-row. */}
+        <div className="account-status-box account-options-box">
+          <button
+            type="button"
+            className={`account-option-row${activeSection === 'changePassword' ? ' account-option-row--active' : ''}`}
+            onClick={handleChangePasswordBoxClick}
+          >
+            <span className="account-box-title">Change your password</span>
+            <IconChevronRight />
           </button>
 
           {/* A student can only raise this request from the login page, not
-              from here — this box is informational for them (info icon, no
-              click), while a teacher/parent clicks through to act on it
-              (chevron, request count). */}
+              from here — this row is informational for them (info icon, no
+              click, message stays here), while a teacher/parent clicks
+              through to act on it (chevron, request count) and see its
+              message in the right column instead of on this row. */}
           {resetRequestMessage && (isStudent ? (
-            <div className="account-box account-box--natural">
+            <div className="account-option-row account-option-row--info">
               <div className="account-clickable-content">
                 <div className="account-clickable-heading">
-                  <p className="account-box-title">Reset Password</p>
+                  <span className="account-box-title">Reset Password</span>
                   <IconInfo />
                 </div>
                 <p className="account-password-status">{resetRequestMessage}</p>
@@ -292,25 +296,63 @@ function ChangePasswordSection() {
           ) : (
             <button
               type="button"
-              className="account-box account-box--natural account-clickable-box"
+              className={`account-option-row${activeSection === 'resetPassword' ? ' account-option-row--active' : ''}`}
               onClick={handleResetPasswordBoxClick}
             >
-              <div className="account-clickable-content">
-                <div className="account-clickable-heading">
-                  <p className="account-box-title">
-                    Reset Password
-                    {resetRequestCount > 0 && <span className="account-box-count">{resetRequestCount}</span>}
-                  </p>
-                  <IconChevronRight />
-                </div>
-                <p className="account-password-status">{resetRequestMessage}</p>
-              </div>
+              <span className="account-box-title">
+                Reset Password
+                {resetRequestCount > 0 && <span className="account-box-count">{resetRequestCount}</span>}
+              </span>
+              <IconChevronRight />
             </button>
           ))}
         </div>
+        </div>
 
         <div className="account-col--main">
+          {activeSection === 'resetPassword' ? (
+            <div className="account-reset-panel">
+              {/* TODO: once the reset-request list endpoint exists, render
+                  it here, above the two info groups below. */}
+              <div className="account-reset-groups">
+                <div className="account-reset-group">
+                  <p className="account-reset-group-title">{resetGroupLabel}</p>
+                  <ul className="account-reset-group-list">
+                    <li>{resetGroupLabel} cannot reset their password on their own.</li>
+                    <li>Their request to reset password will appear here.</li>
+                    <li>
+                      When you reset, their password will change to default{' '}
+                      <span className="account-reset-id">Id@{customerAcronym}</span>.
+                    </li>
+                    <li>Re-login will prompt them to change their default password.</li>
+                  </ul>
+                </div>
+                <div className="account-reset-group">
+                  <p className="account-reset-group-title">You</p>
+                  <ul className="account-reset-group-list">
+                    <li>You can reset your password if you forget.</li>
+                    <li>A verification code will be emailed to you.</li>
+                    <li>
+                      Your password will be reset to default{' '}
+                      <span className="account-reset-id">{userName}@{customerAcronym}</span>.
+                    </li>
+                    <li>Re-login will prompt you to change the default password.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          ) : (
           <form className={`account-password-form${isShaking ? ' ui-shake' : ''}`} onSubmit={handleSubmit} noValidate>
+            {isDefaultPassword ? (
+              <p className="account-password-status">
+                You have not changed your default password. Change it now.
+              </p>
+            ) : passwordDateCreated ? (
+              <p className="account-password-status">
+                You last changed your password on {formatDate(new Date(passwordDateCreated))}.
+              </p>
+            ) : null}
+
             {/* Required to change the password, except while it's still the
                 default one — per Account Rules, a default-password user
                 isn't asked to re-enter it. */}
@@ -370,6 +412,7 @@ function ChangePasswordSection() {
               {successMessage && <span className="account-success"><IconCheck />{successMessage}</span>}
             </div>
           </form>
+          )}
         </div>
       </div>
       {/* Real bottom space, not padding-bottom on the scrolling ancestor —
