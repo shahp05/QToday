@@ -36,6 +36,7 @@
 }
 
 .account-tab {
+  position: relative;
   border: 1px solid transparent;
   border-radius: var(--radius-sm, 6px);
   background: rgba(255, 255, 255, 0.08);

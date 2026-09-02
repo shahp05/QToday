@@ -37,6 +37,8 @@ export default function AccountPage() {
   const photoUrl = useProfileStore(s => s.photo_url)
   const updateOwnPhoto = useProfileStore(s => s.updateOwnPhoto)
   const isSchoolAdmin = useProfileStore(s => s.is_school_admin)
+  const accountStatus = useAccountStore(s => s.status)
+  const fetchAccountData = useAccountStore(s => s.fetchAccountData)
   const [error, setError] = useState('')
   // The default-password Toast (Dashboard.jsx) links here with
   // state:{tab:'changePassword'} so it opens straight to that tab instead
@@ -66,17 +68,33 @@ export default function AccountPage() {
         }
         filter={isSchoolAdmin && (
           <div className="account-tabs">
-            {TABS.map(t => (
-              <button
-                key={t.id}
-                type="button"
-                className={`account-tab${tab === t.id ? ' account-tab--active' : ''}`}
-                onClick={() => setTab(t.id)}
-                disabled={t.disabled}
-              >
-                {t.label}
-              </button>
-            ))}
+            {TABS.map(t => {
+              // Only Account Data has anything to prefetch — kicking the
+              // fetch off here (same idempotent no-op-if-already-loading
+              // guard fetchAccountData always has) means the spinner can
+              // appear the instant the tab is clicked, not only once
+              // AccountDataSection itself has mounted.
+              const isLoadingAccountData = t.id === 'accountData' && accountStatus === 'loading'
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  className={`account-tab${tab === t.id ? ' account-tab--active' : ''}`}
+                  onClick={() => {
+                    setTab(t.id)
+                    if (t.id === 'accountData') fetchAccountData()
+                  }}
+                  disabled={t.disabled}
+                >
+                  <span style={{ visibility: isLoadingAccountData ? 'hidden' : 'visible' }}>{t.label}</span>
+                  {isLoadingAccountData && (
+                    <span className="account-save-overlay">
+                      <span className="account-spinner" role="status" aria-label="Loading" />
+                    </span>
+                  )}
+                </button>
+              )
+            })}
           </div>
         )}
       />
