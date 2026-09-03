@@ -110,7 +110,7 @@ export default function ResetPasswordPage() {
           <div className="su-title-text">
             <h1 className="su-title">{step === 'verify' ? 'Check your email' : 'Reset Password'}</h1>
           </div>
-          <button className="su-close-btn" onClick={() => navigate('/login')} aria-label="Go back">✕</button>
+          <button className="su-close-btn" onClick={() => navigate('/')} aria-label="Go back">✕</button>
         </div>
 
         {step === 'loginId' && (
@@ -136,18 +136,17 @@ export default function ResetPasswordPage() {
         )}
 
         {step === 'studentMessage' && (
-          <div className="lg-form">
-            <p className="lg-notice">
-              Your parent/teacher can reset your password to <strong>{loginKey.trim()}</strong>.
+          <div className="lg-form lg-form--message">
+            <p className="lg-notice lg-notice--plain">
+              Your request to reset password is now with your teachers and parents. When they
+              reset your password, it will be set back to <strong>{loginKey.trim()}</strong>.
             </p>
-            <div className="su-btn-wrap">
-              <CtaBtn icon={<IconCheck />} type="button" onClick={() => navigate('/login')}>Back to Login</CtaBtn>
-            </div>
           </div>
         )}
 
         {step === 'verify' && <VerifyStep loginKey={loginKey.trim()} navigate={navigate} />}
 
+        {step !== 'studentMessage' && (
         <p className="su-login-link lg-login-links">
           <span className="lg-login-links-item">
             Remembered it?{' '}
@@ -158,6 +157,7 @@ export default function ResetPasswordPage() {
             <button className="btn btn-link" onClick={() => navigate('/signup')}>Create an account</button>
           </span>
         </p>
+        )}
 
         <Toast message={toast} onDismiss={() => setToast('')} />
       </div>

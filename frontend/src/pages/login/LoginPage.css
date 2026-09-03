@@ -5,6 +5,10 @@
   padding: 24px 24px 8px;
 }
 
+.lg-form--message {
+  padding-bottom: 24px;
+}
+
 .lg-field {
   display: flex;
   flex-direction: column;
@@ -28,4 +32,14 @@
   color: var(--color-text-muted);
   line-height: 1.5;
   margin: 0 0 20px;
+}
+
+/* Student message — the page's own content, not a hint about a field
+   beside it, so it reads as normal text (not muted) and centered rather
+   than left-aligned like the field-adjacent notices above. */
+.lg-notice--plain {
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  text-align: left;
+  margin: 0;
 }

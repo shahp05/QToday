@@ -416,17 +416,6 @@
   flex-shrink: 0;
 }
 
-/* .account-save-btn's hover (transparent bg + white text) is meant for its
-   usual dark surroundings — on this row's white card it would turn the
-   button invisible (white text on white). Pin it to the resting look
-   (green fill, dark text) instead of inheriting that inversion. */
-.account-reset-request-btn:hover:not(:disabled),
-.account-reset-request-btn:focus-visible:not(:disabled) {
-  background: var(--color-green-light, #8EEB65);
-  border-color: var(--color-green-light, #8EEB65);
-  color: var(--color-dark, #343434);
-}
-
 /* Two info groups, stacked. */
 .account-reset-groups {
   display: flex;
@@ -624,6 +613,19 @@
 .account-save-btn:focus-visible:not(:disabled) {
   background: none;
   color: var(--color-white, #ffffff);
+}
+
+/* .account-save-btn's hover above (transparent bg + white text) is meant
+   for its usual dark surroundings — on the reset-request row's white card
+   the white text would turn invisible. Drop the bg to transparent same as
+   that rule (so it still visibly changes on hover — the green fill goes
+   away, same as .account-save-btn's own hover), but keep the text dark
+   instead of white so it stays readable against the row's white card.
+   Placed after that rule (same specificity — later wins) rather than
+   relying on specificity alone. */
+.account-reset-request-btn:hover:not(:disabled),
+.account-reset-request-btn:focus-visible:not(:disabled) {
+  color: var(--color-dark, #343434);
 }
 
 .account-save-btn:disabled {
